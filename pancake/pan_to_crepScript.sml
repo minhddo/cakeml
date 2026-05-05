@@ -3,7 +3,7 @@
 *)
 Theory pan_to_crep
 Ancestors
-  pan_common panLang crepLang crep_inline backend_common[qualified]
+  pan_common panLang pan_globals_start crepLang crep_inline backend_common[qualified]
 Libs
   preamble
 
@@ -372,7 +372,7 @@ Definition compile_to_crep_def:
     MAP (λ(name, params, body).
           (name,
            crep_vars params,
-           comp params body)) prog
+           comp params (opt_prog body))) prog
 End
 
 Definition compile_prog_def:

@@ -39,7 +39,9 @@ Definition pan_to_target_all_def:
         ps = [(«initial pancake program»,Pan prog1)];
         prog_a0 = pan_simp$compile_prog prog1;
         ps = ps ++ [(«after pan_simp»,Pan prog_a0)];
-        prog_a = pan_globals$compile_top prog_a0 «main»;
+        prog_ac = pan_globals_cached$compile_prog prog_a0;
+        ps = ps ++ [(«after pan_globals_cached», Pan prog_ac)];
+        prog_a = pan_globals$compile_top prog_ac «main»;
         ps = ps ++ [(«after pan_globals»,Pan prog_a)];
         prog_b0 = pan_to_crep$compile_to_crep prog_a;
         ps = ps ++ [(«after pan_to_crep»,Crep prog_b0)];
