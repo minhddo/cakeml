@@ -1,0 +1,1742 @@
+[panLang] Parent theory of "crepLang"
+   
+   [assign_ret_def]  Definition
+      
+      ⊢ ∀ns.
+          assign_ret ns =
+          nested_seq (MAP2 Assign ns (load_globals 0w (LENGTH ns)))
+   
+   [assigned_free_vars_def_primitive]  Definition
+      
+      ⊢ assigned_free_vars =
+        WFREC
+          (@R. WF R ∧ (∀e n p. R p (Dec n e p)) ∧
+               (∀p p'. R p' (Seq p p')) ∧ (∀p' p. R p (Seq p p')) ∧
+               (∀p e p'. R p' (If e p p')) ∧ (∀p' e p. R p (If e p p')) ∧
+               (∀e p. R p (While e p)) ∧
+               (∀es e p v0 rp. R rp (Call (SOME ([],rp,SOME (v0,p))) e es)) ∧
+               (∀es e v0 rp p. R p (Call (SOME ([],rp,SOME (v0,p))) e es)) ∧
+               (∀es e rp. R rp (Call (SOME ([],rp,NONE)) e es)) ∧
+               (∀es e p v1 v97 v96 rp.
+                  R rp (Call (SOME (v96::v97,rp,SOME (v1,p))) e es)) ∧
+               (∀es e v1 rp v97 v96 p.
+                  R p (Call (SOME (v96::v97,rp,SOME (v1,p))) e es)) ∧
+               ∀es e v87 v86 rp. R rp (Call (SOME (v86::v87,rp,NONE)) e es))
+          (λassigned_free_vars a.
+               case a of
+                 Skip => I []
+               | Dec n e p => I (FILTER (λy. n ≠ y) (assigned_free_vars p))
+               | Assign n' e' => I [n']
+               | Primitive lhss pop rhss => I lhss
+               | Store v46 v47 => I []
+               | Store32 v48 v49 => I []
+               | StoreByte v50 v51 => I []
+               | StoreGlob v52 v53 => I []
+               | Seq p' p'' =>
+                 I (assigned_free_vars p' ++ assigned_free_vars p'')
+               | If e'' p'³' p'⁴' =>
+                 I (assigned_free_vars p'³' ++ assigned_free_vars p'⁴')
+               | While e'³' p'⁵' => I (assigned_free_vars p'⁵')
+               | Break => I []
+               | Continue => I []
+               | Call NONE e'⁴' es => I []
+               | Call (SOME ([],rp,NONE)) e'⁴' es =>
+                 I (assigned_free_vars rp)
+               | Call (SOME (v90::v91,rp,NONE)) e'⁴' es =>
+                 I (v90::v91 ++ assigned_free_vars rp)
+               | Call (SOME ([],rp,SOME (v0,p'⁶'))) e'⁴' es =>
+                 I (assigned_free_vars rp ++ assigned_free_vars p'⁶')
+               | Call (SOME (v100::v101,rp,SOME (v0,p'⁶'))) e'⁴' es =>
+                 I
+                   (v100::v101 ++ assigned_free_vars rp ++
+                    assigned_free_vars p'⁶')
+               | ExtCall v64 v65 v66 v67 v68 => I []
+               | Raise v69 => I []
+               | Return v70 => I []
+               | ShMem op r ad => I [r]
+               | Tick => I [])
+   
+   [assigned_vars_def_primitive]  Definition
+      
+      ⊢ assigned_vars =
+        WFREC
+          (@R. WF R ∧ (∀e n p. R p (Dec n e p)) ∧
+               (∀p p'. R p' (Seq p p')) ∧ (∀p' p. R p (Seq p p')) ∧
+               (∀p e p'. R p' (If e p p')) ∧ (∀p' e p. R p (If e p p')) ∧
+               (∀e p. R p (While e p)) ∧
+               (∀es e p v0 rp. R rp (Call (SOME ([],rp,SOME (v0,p))) e es)) ∧
+               (∀es e v0 rp p. R p (Call (SOME ([],rp,SOME (v0,p))) e es)) ∧
+               (∀es e rp. R rp (Call (SOME ([],rp,NONE)) e es)) ∧
+               (∀es e p v1 v97 v96 rp.
+                  R rp (Call (SOME (v96::v97,rp,SOME (v1,p))) e es)) ∧
+               (∀es e v1 rp v97 v96 p.
+                  R p (Call (SOME (v96::v97,rp,SOME (v1,p))) e es)) ∧
+               ∀es e v87 v86 rp. R rp (Call (SOME (v86::v87,rp,NONE)) e es))
+          (λassigned_vars a.
+               case a of
+                 Skip => I []
+               | Dec n e p => I (n::assigned_vars p)
+               | Assign n' e' => I [n']
+               | Primitive lhss pop rhss => I lhss
+               | Store v46 v47 => I []
+               | Store32 v48 v49 => I []
+               | StoreByte v50 v51 => I []
+               | StoreGlob v52 v53 => I []
+               | Seq p' p'' => I (assigned_vars p' ++ assigned_vars p'')
+               | If e'' p'³' p'⁴' =>
+                 I (assigned_vars p'³' ++ assigned_vars p'⁴')
+               | While e'³' p'⁵' => I (assigned_vars p'⁵')
+               | Break => I []
+               | Continue => I []
+               | Call NONE e'⁴' es => I []
+               | Call (SOME ([],rp,NONE)) e'⁴' es => I (assigned_vars rp)
+               | Call (SOME (v90::v91,rp,NONE)) e'⁴' es =>
+                 I (v90::v91 ++ assigned_vars rp)
+               | Call (SOME ([],rp,SOME (v0,p'⁶'))) e'⁴' es =>
+                 I (assigned_vars rp ++ assigned_vars p'⁶')
+               | Call (SOME (v100::v101,rp,SOME (v0,p'⁶'))) e'⁴' es =>
+                 I (v100::v101 ++ assigned_vars rp ++ assigned_vars p'⁶')
+               | ExtCall v64 v65 v66 v67 v68 => I []
+               | Raise v69 => I []
+               | Return v70 => I []
+               | ShMem op r ad => I [r]
+               | Tick => I [])
+   
+   [crepop_BIJ]  Definition
+      
+      ⊢ (∀a. num2crepop (crepop2num a) = a) ∧
+        ∀r. (λn. n < 1) r ⇔ crepop2num (num2crepop r) = r
+   
+   [crepop_CASE]  Definition
+      
+      ⊢ ∀x v0. (case x of Mul => v0) = (λm. v0) (crepop2num x)
+   
+   [crepop_TY_DEF]  Definition
+      
+      ⊢ ∃rep. TYPE_DEFINITION (λn. n < 1) rep
+   
+   [crepop_size_def]  Definition
+      
+      ⊢ ∀x. crepop_size x = 0
+   
+   [exp_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0'.
+                 ∀ $var$('exp') $var$('@temp@ind_typecrepLang0list').
+                   (∀a0'.
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR 0
+                                  (a,ARB,ARB,ARB,ARB,ARB,ARB)
+                                  (λn. ind_type$BOTTOM)) a) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR (SUC 0)
+                                  (ARB,a,ARB,ARB,ARB,ARB,ARB)
+                                  (λn. ind_type$BOTTOM)) a) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR (SUC (SUC 0))
+                                  (ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                  (ind_type$FCONS a (λn. ind_type$BOTTOM)))
+                             a ∧ $var$('exp') a) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR (SUC (SUC (SUC 0)))
+                                  (ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                  (ind_type$FCONS a (λn. ind_type$BOTTOM)))
+                             a ∧ $var$('exp') a) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR (SUC (SUC (SUC (SUC 0))))
+                                  (ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                  (ind_type$FCONS a (λn. ind_type$BOTTOM)))
+                             a ∧ $var$('exp') a) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR
+                                  (SUC (SUC (SUC (SUC (SUC 0)))))
+                                  (ARB,ARB,a,ARB,ARB,ARB,ARB)
+                                  (λn. ind_type$BOTTOM)) a) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC (SUC (SUC (SUC (SUC (SUC 0))))))
+                                (ARB,ARB,ARB,a0,ARB,ARB,ARB)
+                                (ind_type$FCONS a1 (λn. ind_type$BOTTOM)))
+                           a0 a1 ∧ $var$('@temp@ind_typecrepLang0list') a1) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC (SUC (SUC (SUC (SUC (SUC (SUC 0)))))))
+                                (ARB,ARB,ARB,ARB,a0,ARB,ARB)
+                                (ind_type$FCONS a1 (λn. ind_type$BOTTOM)))
+                           a0 a1 ∧ $var$('@temp@ind_typecrepLang0list') a1) ∨
+                      (∃a0 a1 a2.
+                         a0' =
+                         (λa0 a1 a2.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC (SUC (SUC (SUC (SUC (SUC 0))))))))
+                                (ARB,ARB,ARB,ARB,ARB,a0,ARB)
+                                (ind_type$FCONS a1
+                                   (ind_type$FCONS a2 (λn. ind_type$BOTTOM))))
+                           a0 a1 a2 ∧ $var$('exp') a1 ∧ $var$('exp') a2) ∨
+                      (∃a0 a1 a2.
+                         a0' =
+                         (λa0 a1 a2.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC (SUC (SUC (SUC (SUC 0)))))))))
+                                (ARB,a2,ARB,ARB,ARB,ARB,a0)
+                                (ind_type$FCONS a1 (λn. ind_type$BOTTOM)))
+                           a0 a1 a2 ∧ $var$('exp') a1) ∨
+                      a0' =
+                      ind_type$CONSTR
+                        (SUC
+                           (SUC
+                              (SUC
+                                 (SUC (SUC (SUC (SUC (SUC (SUC (SUC 0))))))))))
+                        (ARB,ARB,ARB,ARB,ARB,ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      a0' =
+                      ind_type$CONSTR
+                        (SUC
+                           (SUC
+                              (SUC
+                                 (SUC
+                                    (SUC
+                                       (SUC (SUC (SUC (SUC (SUC (SUC 0)))))))))))
+                        (ARB,ARB,ARB,ARB,ARB,ARB,ARB) (λn. ind_type$BOTTOM) ⇒
+                      $var$('exp') a0') ∧
+                   (∀a1'.
+                      a1' =
+                      ind_type$CONSTR
+                        (SUC
+                           (SUC
+                              (SUC
+                                 (SUC
+                                    (SUC
+                                       (SUC
+                                          (SUC
+                                             (SUC (SUC (SUC (SUC (SUC 0))))))))))))
+                        (ARB,ARB,ARB,ARB,ARB,ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      (∃a0 a1.
+                         a1' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC
+                                                     (SUC
+                                                        (SUC
+                                                           (SUC
+                                                              (SUC
+                                                                 (SUC
+                                                                    (SUC 0)))))))))))))
+                                (ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                (ind_type$FCONS a0
+                                   (ind_type$FCONS a1 (λn. ind_type$BOTTOM))))
+                           a0 a1 ∧ $var$('exp') a0 ∧
+                         $var$('@temp@ind_typecrepLang0list') a1) ⇒
+                      $var$('@temp@ind_typecrepLang0list') a1') ⇒
+                   $var$('exp') a0') rep
+   
+   [exp_case_def]  Definition
+      
+      ⊢ (∀a f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1.
+           exp_CASE (Const a) f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1 = f a) ∧
+        (∀a f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1.
+           exp_CASE (Var a) f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1 = f1 a) ∧
+        (∀a f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1.
+           exp_CASE (Load a) f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1 = f2 a) ∧
+        (∀a f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1.
+           exp_CASE (Load32 a) f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1 = f3 a) ∧
+        (∀a f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1.
+           exp_CASE (LoadByte a) f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1 = f4 a) ∧
+        (∀a f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1.
+           exp_CASE (LoadGlob a) f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1 = f5 a) ∧
+        (∀a0 a1 f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1.
+           exp_CASE (Op a0 a1) f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1 = f6 a0 a1) ∧
+        (∀a0 a1 f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1.
+           exp_CASE (Crepop a0 a1) f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1 =
+           f7 a0 a1) ∧
+        (∀a0 a1 a2 f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1.
+           exp_CASE (Cmp a0 a1 a2) f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1 =
+           f8 a0 a1 a2) ∧
+        (∀a0 a1 a2 f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1.
+           exp_CASE (Shift a0 a1 a2) f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1 =
+           f9 a0 a1 a2) ∧
+        (∀f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1.
+           exp_CASE BaseAddr f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1 = v) ∧
+        ∀f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1.
+          exp_CASE TopAddr f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1 = v1
+   
+   [exp_size_def]  Definition
+      
+      ⊢ (∀f a. exp_size f (Const a) = 1 + w2n a) ∧
+        (∀f a. exp_size f (Var a) = 1 + a) ∧
+        (∀f a. exp_size f (Load a) = 1 + exp_size f a) ∧
+        (∀f a. exp_size f (Load32 a) = 1 + exp_size f a) ∧
+        (∀f a. exp_size f (LoadByte a) = 1 + exp_size f a) ∧
+        (∀f a. exp_size f (LoadGlob a) = 1 + w2n a) ∧
+        (∀f a0 a1.
+           exp_size f (Op a0 a1) = 1 + (binop_size a0 + exp1_size f a1)) ∧
+        (∀f a0 a1.
+           exp_size f (Crepop a0 a1) =
+           1 + (crepop_size a0 + exp1_size f a1)) ∧
+        (∀f a0 a1 a2.
+           exp_size f (Cmp a0 a1 a2) =
+           1 + (cmp_size a0 + (exp_size f a1 + exp_size f a2))) ∧
+        (∀f a0 a1 a2.
+           exp_size f (Shift a0 a1 a2) =
+           1 + (shift_size a0 + (exp_size f a1 + a2))) ∧
+        (∀f. exp_size f BaseAddr = 0) ∧ (∀f. exp_size f TopAddr = 0) ∧
+        (∀f. exp1_size f [] = 0) ∧
+        ∀f a0 a1.
+          exp1_size f (a0::a1) = 1 + (exp_size f a0 + exp1_size f a1)
+   
+   [exps_def_primitive]  Definition
+      
+      ⊢ exps =
+        WFREC
+          (@R. WF R ∧ (∀e. R e (Load e)) ∧ (∀e. R e (Load32 e)) ∧
+               (∀e. R e (LoadByte e)) ∧
+               (∀bop es a. MEM a es ⇒ R a (Op bop es)) ∧
+               (∀pop es a. MEM a es ⇒ R a (Crepop pop es)) ∧
+               (∀e1 c e2. R e2 (Cmp c e1 e2)) ∧
+               (∀e2 c e1. R e1 (Cmp c e1 e2)) ∧
+               ∀num sh e. R e (Shift sh e num))
+          (λexps a'.
+               case a' of
+                 Const w => I [Const w]
+               | Var v => I [Var v]
+               | Load e => I (exps e)
+               | Load32 e' => I (exps e')
+               | LoadByte e'' => I (exps e'')
+               | LoadGlob a => I [LoadGlob a]
+               | Op bop es => I (FLAT (MAP (λa. exps a) es))
+               | Crepop pop es' => I (FLAT (MAP (λa. exps a) es'))
+               | Cmp c e1 e2 => I (exps e1 ++ exps e2)
+               | Shift sh e'³' num => I (exps e'³')
+               | BaseAddr => I [BaseAddr]
+               | TopAddr => I [TopAddr])
+   
+   [load_globals_def]  Definition
+      
+      ⊢ (∀v0. load_globals v0 0 = []) ∧
+        ∀ad n.
+          load_globals ad (SUC n) = LoadGlob ad::load_globals (ad + 1w) n
+   
+   [load_shape_def]  Definition
+      
+      ⊢ (∀a e. load_shape a 0 e = []) ∧
+        ∀a i e.
+          load_shape a (SUC i) e =
+          if a = 0w then Load e::load_shape (a + bytes_in_word) i e
+          else
+            Load (Op Add [e; Const a])::load_shape (a + bytes_in_word) i e
+   
+   [nested_seq_def]  Definition
+      
+      ⊢ nested_seq [] = Skip ∧
+        ∀e es. nested_seq (e::es) = Seq e (nested_seq es)
+   
+   [prog_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0'.
+                 ∀ $var$('prog') $var$('@temp@ind_typecrepLang21option')
+                     $var$('@temp@ind_typecrepLang22prod')
+                     $var$('@temp@ind_typecrepLang23prod')
+                     $var$('@temp@ind_typecrepLang24option')
+                     $var$('@temp@ind_typecrepLang25prod').
+                   (∀a0'.
+                      a0' =
+                      ind_type$CONSTR 0
+                        (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                         ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      (∃a0 a1 a2.
+                         a0' =
+                         (λa0 a1 a2.
+                              ind_type$CONSTR (SUC 0)
+                                (a0,a1,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB)
+                                (ind_type$FCONS a2 (λn. ind_type$BOTTOM)))
+                           a0 a1 a2 ∧ $var$('prog') a2) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR (SUC (SUC 0))
+                                (a0,a1,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB) (λn. ind_type$BOTTOM)) a0 a1) ∨
+                      (∃a0 a1 a2.
+                         a0' =
+                         (λa0 a1 a2.
+                              ind_type$CONSTR (SUC (SUC (SUC 0)))
+                                (ARB,ARB,a0,a1,a2,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB) (λn. ind_type$BOTTOM)) a0 a1
+                           a2) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR (SUC (SUC (SUC (SUC 0))))
+                                (ARB,a0,ARB,ARB,ARB,a1,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB) (λn. ind_type$BOTTOM)) a0 a1) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC (SUC (SUC (SUC (SUC 0)))))
+                                (ARB,a0,ARB,ARB,ARB,a1,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB) (λn. ind_type$BOTTOM)) a0 a1) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC (SUC (SUC (SUC (SUC (SUC 0))))))
+                                (ARB,a0,ARB,ARB,ARB,a1,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB) (λn. ind_type$BOTTOM)) a0 a1) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC (SUC (SUC (SUC (SUC (SUC (SUC 0)))))))
+                                (ARB,a1,ARB,ARB,ARB,ARB,a0,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB) (λn. ind_type$BOTTOM)) a0 a1) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC (SUC (SUC (SUC (SUC (SUC 0))))))))
+                                (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB)
+                                (ind_type$FCONS a0
+                                   (ind_type$FCONS a1 (λn. ind_type$BOTTOM))))
+                           a0 a1 ∧ $var$('prog') a0 ∧ $var$('prog') a1) ∨
+                      (∃a0 a1 a2.
+                         a0' =
+                         (λa0 a1 a2.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC (SUC (SUC (SUC (SUC 0)))))))))
+                                (ARB,a0,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB)
+                                (ind_type$FCONS a1
+                                   (ind_type$FCONS a2 (λn. ind_type$BOTTOM))))
+                           a0 a1 a2 ∧ $var$('prog') a1 ∧ $var$('prog') a2) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC (SUC (SUC (SUC 0))))))))))
+                                (ARB,a0,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB)
+                                (ind_type$FCONS a1 (λn. ind_type$BOTTOM)))
+                           a0 a1 ∧ $var$('prog') a1) ∨
+                      a0' =
+                      ind_type$CONSTR
+                        (SUC
+                           (SUC
+                              (SUC
+                                 (SUC
+                                    (SUC
+                                       (SUC (SUC (SUC (SUC (SUC (SUC 0)))))))))))
+                        (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                         ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      a0' =
+                      ind_type$CONSTR
+                        (SUC
+                           (SUC
+                              (SUC
+                                 (SUC
+                                    (SUC
+                                       (SUC
+                                          (SUC
+                                             (SUC (SUC (SUC (SUC (SUC 0))))))))))))
+                        (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                         ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      (∃a0 a1 a2.
+                         a0' =
+                         (λa0 a1 a2.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC
+                                                     (SUC
+                                                        (SUC
+                                                           (SUC
+                                                              (SUC
+                                                                 (SUC
+                                                                    (SUC 0)))))))))))))
+                                (ARB,ARB,ARB,ARB,ARB,ARB,ARB,a1,a2,ARB,ARB,
+                                 ARB,ARB,ARB)
+                                (ind_type$FCONS a0 (λn. ind_type$BOTTOM)))
+                           a0 a1 a2 ∧
+                         $var$('@temp@ind_typecrepLang21option') a0) ∨
+                      (∃a0 a1 a2 a3 a4.
+                         a0' =
+                         (λa0 a1 a2 a3 a4.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC
+                                                     (SUC
+                                                        (SUC
+                                                           (SUC
+                                                              (SUC
+                                                                 (SUC
+                                                                    (SUC
+                                                                       (SUC
+                                                                          0))))))))))))))
+                                (a1,ARB,ARB,ARB,ARB,ARB,ARB,a0,ARB,a2,a3,
+                                 a4,ARB,ARB) (λn. ind_type$BOTTOM)) a0 a1
+                           a2 a3 a4) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR
+                                  (SUC
+                                     (SUC
+                                        (SUC
+                                           (SUC
+                                              (SUC
+                                                 (SUC
+                                                    (SUC
+                                                       (SUC
+                                                          (SUC
+                                                             (SUC
+                                                                (SUC
+                                                                   (SUC
+                                                                      (SUC
+                                                                         (SUC
+                                                                            (SUC
+                                                                               0)))))))))))))))
+                                  (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                   ARB,ARB,a,ARB) (λn. ind_type$BOTTOM)) a) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR
+                                  (SUC
+                                     (SUC
+                                        (SUC
+                                           (SUC
+                                              (SUC
+                                                 (SUC
+                                                    (SUC
+                                                       (SUC
+                                                          (SUC
+                                                             (SUC
+                                                                (SUC
+                                                                   (SUC
+                                                                      (SUC
+                                                                         (SUC
+                                                                            (SUC
+                                                                               (SUC
+                                                                                  0))))))))))))))))
+                                  (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,a,ARB,
+                                   ARB,ARB,ARB,ARB) (λn. ind_type$BOTTOM))
+                             a) ∨
+                      (∃a0 a1 a2.
+                         a0' =
+                         (λa0 a1 a2.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC
+                                                     (SUC
+                                                        (SUC
+                                                           (SUC
+                                                              (SUC
+                                                                 (SUC
+                                                                    (SUC
+                                                                       (SUC
+                                                                          (SUC
+                                                                             (SUC
+                                                                                (SUC
+                                                                                   0)))))))))))))))))
+                                (a1,a2,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,a0) (λn. ind_type$BOTTOM)) a0 a1
+                           a2) ∨
+                      a0' =
+                      ind_type$CONSTR
+                        (SUC
+                           (SUC
+                              (SUC
+                                 (SUC
+                                    (SUC
+                                       (SUC
+                                          (SUC
+                                             (SUC
+                                                (SUC
+                                                   (SUC
+                                                      (SUC
+                                                         (SUC
+                                                            (SUC
+                                                               (SUC
+                                                                  (SUC
+                                                                     (SUC
+                                                                        (SUC
+                                                                           (SUC
+                                                                              0))))))))))))))))))
+                        (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                         ARB,ARB) (λn. ind_type$BOTTOM) ⇒
+                      $var$('prog') a0') ∧
+                   (∀a1'.
+                      a1' =
+                      ind_type$CONSTR
+                        (SUC
+                           (SUC
+                              (SUC
+                                 (SUC
+                                    (SUC
+                                       (SUC
+                                          (SUC
+                                             (SUC
+                                                (SUC
+                                                   (SUC
+                                                      (SUC
+                                                         (SUC
+                                                            (SUC
+                                                               (SUC
+                                                                  (SUC
+                                                                     (SUC
+                                                                        (SUC
+                                                                           (SUC
+                                                                              (SUC
+                                                                                 0)))))))))))))))))))
+                        (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                         ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      (∃a. a1' =
+                           (λa.
+                                ind_type$CONSTR
+                                  (SUC
+                                     (SUC
+                                        (SUC
+                                           (SUC
+                                              (SUC
+                                                 (SUC
+                                                    (SUC
+                                                       (SUC
+                                                          (SUC
+                                                             (SUC
+                                                                (SUC
+                                                                   (SUC
+                                                                      (SUC
+                                                                         (SUC
+                                                                            (SUC
+                                                                               (SUC
+                                                                                  (SUC
+                                                                                     (SUC
+                                                                                        (SUC
+                                                                                           (SUC
+                                                                                              0))))))))))))))))))))
+                                  (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                   ARB,ARB,ARB,ARB)
+                                  (ind_type$FCONS a (λn. ind_type$BOTTOM)))
+                             a ∧ $var$('@temp@ind_typecrepLang22prod') a) ⇒
+                      $var$('@temp@ind_typecrepLang21option') a1') ∧
+                   (∀a2'.
+                      (∃a0 a1.
+                         a2' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC
+                                                     (SUC
+                                                        (SUC
+                                                           (SUC
+                                                              (SUC
+                                                                 (SUC
+                                                                    (SUC
+                                                                       (SUC
+                                                                          (SUC
+                                                                             (SUC
+                                                                                (SUC
+                                                                                   (SUC
+                                                                                      (SUC
+                                                                                         (SUC
+                                                                                            (SUC
+                                                                                               0)))))))))))))))))))))
+                                (ARB,ARB,a0,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB)
+                                (ind_type$FCONS a1 (λn. ind_type$BOTTOM)))
+                           a0 a1 ∧ $var$('@temp@ind_typecrepLang23prod') a1) ⇒
+                      $var$('@temp@ind_typecrepLang22prod') a2') ∧
+                   (∀a3'.
+                      (∃a0 a1.
+                         a3' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC
+                                                     (SUC
+                                                        (SUC
+                                                           (SUC
+                                                              (SUC
+                                                                 (SUC
+                                                                    (SUC
+                                                                       (SUC
+                                                                          (SUC
+                                                                             (SUC
+                                                                                (SUC
+                                                                                   (SUC
+                                                                                      (SUC
+                                                                                         (SUC
+                                                                                            (SUC
+                                                                                               (SUC
+                                                                                                  0))))))))))))))))))))))
+                                (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB)
+                                (ind_type$FCONS a0
+                                   (ind_type$FCONS a1 (λn. ind_type$BOTTOM))))
+                           a0 a1 ∧ $var$('prog') a0 ∧
+                         $var$('@temp@ind_typecrepLang24option') a1) ⇒
+                      $var$('@temp@ind_typecrepLang23prod') a3') ∧
+                   (∀a4'.
+                      a4' =
+                      ind_type$CONSTR
+                        (SUC
+                           (SUC
+                              (SUC
+                                 (SUC
+                                    (SUC
+                                       (SUC
+                                          (SUC
+                                             (SUC
+                                                (SUC
+                                                   (SUC
+                                                      (SUC
+                                                         (SUC
+                                                            (SUC
+                                                               (SUC
+                                                                  (SUC
+                                                                     (SUC
+                                                                        (SUC
+                                                                           (SUC
+                                                                              (SUC
+                                                                                 (SUC
+                                                                                    (SUC
+                                                                                       (SUC
+                                                                                          (SUC
+                                                                                             0)))))))))))))))))))))))
+                        (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                         ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      (∃a. a4' =
+                           (λa.
+                                ind_type$CONSTR
+                                  (SUC
+                                     (SUC
+                                        (SUC
+                                           (SUC
+                                              (SUC
+                                                 (SUC
+                                                    (SUC
+                                                       (SUC
+                                                          (SUC
+                                                             (SUC
+                                                                (SUC
+                                                                   (SUC
+                                                                      (SUC
+                                                                         (SUC
+                                                                            (SUC
+                                                                               (SUC
+                                                                                  (SUC
+                                                                                     (SUC
+                                                                                        (SUC
+                                                                                           (SUC
+                                                                                              (SUC
+                                                                                                 (SUC
+                                                                                                    (SUC
+                                                                                                       (SUC
+                                                                                                          0))))))))))))))))))))))))
+                                  (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                   ARB,ARB,ARB,ARB)
+                                  (ind_type$FCONS a (λn. ind_type$BOTTOM)))
+                             a ∧ $var$('@temp@ind_typecrepLang25prod') a) ⇒
+                      $var$('@temp@ind_typecrepLang24option') a4') ∧
+                   (∀a5.
+                      (∃a0 a1.
+                         a5 =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC
+                                                     (SUC
+                                                        (SUC
+                                                           (SUC
+                                                              (SUC
+                                                                 (SUC
+                                                                    (SUC
+                                                                       (SUC
+                                                                          (SUC
+                                                                             (SUC
+                                                                                (SUC
+                                                                                   (SUC
+                                                                                      (SUC
+                                                                                         (SUC
+                                                                                            (SUC
+                                                                                               (SUC
+                                                                                                  (SUC
+                                                                                                     (SUC
+                                                                                                        (SUC
+                                                                                                           0)))))))))))))))))))))))))
+                                (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,a0,ARB)
+                                (ind_type$FCONS a1 (λn. ind_type$BOTTOM)))
+                           a0 a1 ∧ $var$('prog') a1) ⇒
+                      $var$('@temp@ind_typecrepLang25prod') a5) ⇒
+                   $var$('prog') a0') rep
+   
+   [prog_case_def]  Definition
+      
+      ⊢ (∀v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14 v3.
+           prog_CASE Skip v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12
+             f13 f14 v3 = v) ∧
+        (∀a0 a1 a2 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14
+             v3.
+           prog_CASE (Dec a0 a1 a2) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2
+             f10 f11 f12 f13 f14 v3 = f a0 a1 a2) ∧
+        (∀a0 a1 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14
+             v3.
+           prog_CASE (Assign a0 a1) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2
+             f10 f11 f12 f13 f14 v3 = f1 a0 a1) ∧
+        (∀a0 a1 a2 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14
+             v3.
+           prog_CASE (Primitive a0 a1 a2) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1
+             v2 f10 f11 f12 f13 f14 v3 = f2 a0 a1 a2) ∧
+        (∀a0 a1 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14
+             v3.
+           prog_CASE (Store a0 a1) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10
+             f11 f12 f13 f14 v3 = f3 a0 a1) ∧
+        (∀a0 a1 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14
+             v3.
+           prog_CASE (Store32 a0 a1) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2
+             f10 f11 f12 f13 f14 v3 = f4 a0 a1) ∧
+        (∀a0 a1 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14
+             v3.
+           prog_CASE (StoreByte a0 a1) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2
+             f10 f11 f12 f13 f14 v3 = f5 a0 a1) ∧
+        (∀a0 a1 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14
+             v3.
+           prog_CASE (StoreGlob a0 a1) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2
+             f10 f11 f12 f13 f14 v3 = f6 a0 a1) ∧
+        (∀a0 a1 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14
+             v3.
+           prog_CASE (Seq a0 a1) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10
+             f11 f12 f13 f14 v3 = f7 a0 a1) ∧
+        (∀a0 a1 a2 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14
+             v3.
+           prog_CASE (If a0 a1 a2) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10
+             f11 f12 f13 f14 v3 = f8 a0 a1 a2) ∧
+        (∀a0 a1 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14
+             v3.
+           prog_CASE (While a0 a1) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10
+             f11 f12 f13 f14 v3 = f9 a0 a1) ∧
+        (∀v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14 v3.
+           prog_CASE Break v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12
+             f13 f14 v3 = v1) ∧
+        (∀v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14 v3.
+           prog_CASE Continue v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11
+             f12 f13 f14 v3 = v2) ∧
+        (∀a0 a1 a2 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14
+             v3.
+           prog_CASE (Call a0 a1 a2) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2
+             f10 f11 f12 f13 f14 v3 = f10 a0 a1 a2) ∧
+        (∀a0 a1 a2 a3 a4 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12
+             f13 f14 v3.
+           prog_CASE (ExtCall a0 a1 a2 a3 a4) v f f1 f2 f3 f4 f5 f6 f7 f8
+             f9 v1 v2 f10 f11 f12 f13 f14 v3 = f11 a0 a1 a2 a3 a4) ∧
+        (∀a v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14 v3.
+           prog_CASE (Raise a) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11
+             f12 f13 f14 v3 = f12 a) ∧
+        (∀a v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14 v3.
+           prog_CASE (Return a) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10
+             f11 f12 f13 f14 v3 = f13 a) ∧
+        (∀a0 a1 a2 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14
+             v3.
+           prog_CASE (ShMem a0 a1 a2) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2
+             f10 f11 f12 f13 f14 v3 = f14 a0 a1 a2) ∧
+        ∀v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14 v3.
+          prog_CASE Tick v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12
+            f13 f14 v3 = v3
+   
+   [prog_size_def]  Definition
+      
+      ⊢ (∀f. prog_size f Skip = 0) ∧
+        (∀f a0 a1 a2.
+           prog_size f (Dec a0 a1 a2) =
+           1 + (a0 + (exp_size f a1 + prog_size f a2))) ∧
+        (∀f a0 a1. prog_size f (Assign a0 a1) = 1 + (a0 + exp_size f a1)) ∧
+        (∀f a0 a1 a2.
+           prog_size f (Primitive a0 a1 a2) =
+           1 +
+           (list_size (λx. x) a0 + (primop_size a1 + list_size (λx. x) a2))) ∧
+        (∀f a0 a1.
+           prog_size f (Store a0 a1) = 1 + (exp_size f a0 + exp_size f a1)) ∧
+        (∀f a0 a1.
+           prog_size f (Store32 a0 a1) =
+           1 + (exp_size f a0 + exp_size f a1)) ∧
+        (∀f a0 a1.
+           prog_size f (StoreByte a0 a1) =
+           1 + (exp_size f a0 + exp_size f a1)) ∧
+        (∀f a0 a1.
+           prog_size f (StoreGlob a0 a1) = 1 + (w2n a0 + exp_size f a1)) ∧
+        (∀f a0 a1.
+           prog_size f (Seq a0 a1) = 1 + (prog_size f a0 + prog_size f a1)) ∧
+        (∀f a0 a1 a2.
+           prog_size f (If a0 a1 a2) =
+           1 + (exp_size f a0 + (prog_size f a1 + prog_size f a2))) ∧
+        (∀f a0 a1.
+           prog_size f (While a0 a1) = 1 + (exp_size f a0 + prog_size f a1)) ∧
+        (∀f. prog_size f Break = 0) ∧ (∀f. prog_size f Continue = 0) ∧
+        (∀f a0 a1 a2.
+           prog_size f (Call a0 a1 a2) =
+           1 +
+           (prog1_size f a0 +
+            (mlstring_size a1 + list_size (exp_size f) a2))) ∧
+        (∀f a0 a1 a2 a3 a4.
+           prog_size f (ExtCall a0 a1 a2 a3 a4) =
+           1 + (mlstring_size a0 + (a1 + (a2 + (a3 + a4))))) ∧
+        (∀f a. prog_size f (Raise a) = 1 + w2n a) ∧
+        (∀f a. prog_size f (Return a) = 1 + list_size (exp_size f) a) ∧
+        (∀f a0 a1 a2.
+           prog_size f (ShMem a0 a1 a2) =
+           1 + (memop_size a0 + (a1 + exp_size f a2))) ∧
+        (∀f. prog_size f Tick = 0) ∧ (∀f. prog1_size f NONE = 0) ∧
+        (∀f a. prog1_size f (SOME a) = 1 + prog2_size f a) ∧
+        (∀f a0 a1.
+           prog2_size f (a0,a1) =
+           1 + (list_size (λx. x) a0 + prog3_size f a1)) ∧
+        (∀f a0 a1.
+           prog3_size f (a0,a1) = 1 + (prog_size f a0 + prog4_size f a1)) ∧
+        (∀f. prog4_size f NONE = 0) ∧
+        (∀f a. prog4_size f (SOME a) = 1 + prog5_size f a) ∧
+        ∀f a0 a1. prog5_size f (a0,a1) = 1 + (w2n a0 + prog_size f a1)
+   
+   [store_globals_def]  Definition
+      
+      ⊢ (∀ad. store_globals ad [] = []) ∧
+        ∀ad e es.
+          store_globals ad (e::es) =
+          StoreGlob ad e::store_globals (ad + 1w) es
+   
+   [stores_def]  Definition
+      
+      ⊢ (∀ad a. stores ad [] a = []) ∧
+        ∀ad e es a.
+          stores ad (e::es) a =
+          if a = 0w then Store ad e::stores ad es (a + bytes_in_word)
+          else
+            Store (Op Add [ad; Const a]) e::
+              stores ad es (a + bytes_in_word)
+   
+   [var_cexp_def_primitive]  Definition
+      
+      ⊢ var_cexp =
+        WFREC
+          (@R. WF R ∧ (∀e. R e (Load e)) ∧ (∀e. R e (Load32 e)) ∧
+               (∀e. R e (LoadByte e)) ∧
+               (∀bop es a. MEM a es ⇒ R a (Op bop es)) ∧
+               (∀cop es a. MEM a es ⇒ R a (Crepop cop es)) ∧
+               (∀e1 c e2. R e2 (Cmp c e1 e2)) ∧
+               (∀e2 c e1. R e1 (Cmp c e1 e2)) ∧
+               ∀num sh e. R e (Shift sh e num))
+          (λvar_cexp a'.
+               case a' of
+                 Const w => I []
+               | Var v => I [v]
+               | Load e => I (var_cexp e)
+               | Load32 e' => I (var_cexp e')
+               | LoadByte e'' => I (var_cexp e'')
+               | LoadGlob a => I []
+               | Op bop es => I (FLAT (MAP (λa. var_cexp a) es))
+               | Crepop cop es' => I (FLAT (MAP (λa. var_cexp a) es'))
+               | Cmp c e1 e2 => I (var_cexp e1 ++ var_cexp e2)
+               | Shift sh e'³' num => I (var_cexp e'³')
+               | BaseAddr => I []
+               | TopAddr => I [])
+   
+   [MEM_IMP_exp_size]  Theorem
+      
+      ⊢ ∀xs a. MEM a xs ⇒ exp_size l a < exp1_size l xs
+   
+   [assigned_free_vars_def]  Theorem
+      
+      ⊢ assigned_free_vars Skip = [] ∧
+        (∀p n e.
+           assigned_free_vars (Dec n e p) =
+           FILTER (λy. n ≠ y) (assigned_free_vars p)) ∧
+        (∀n e. assigned_free_vars (Assign n e) = [n]) ∧
+        (∀rhss pop lhss.
+           assigned_free_vars (Primitive lhss pop rhss) = lhss) ∧
+        (∀p' p.
+           assigned_free_vars (Seq p p') =
+           assigned_free_vars p ++ assigned_free_vars p') ∧
+        (∀p' p e.
+           assigned_free_vars (If e p p') =
+           assigned_free_vars p ++ assigned_free_vars p') ∧
+        (∀p e. assigned_free_vars (While e p) = assigned_free_vars p) ∧
+        (∀v0 rp p es e.
+           assigned_free_vars (Call (SOME ([],rp,SOME (v0,p))) e es) =
+           assigned_free_vars rp ++ assigned_free_vars p) ∧
+        (∀rp es e.
+           assigned_free_vars (Call (SOME ([],rp,NONE)) e es) =
+           assigned_free_vars rp) ∧
+        (∀v97 v96 v1 rp p es e.
+           assigned_free_vars (Call (SOME (v96::v97,rp,SOME (v1,p))) e es) =
+           v96::v97 ++ assigned_free_vars rp ++ assigned_free_vars p) ∧
+        (∀v87 v86 rp es e.
+           assigned_free_vars (Call (SOME (v86::v87,rp,NONE)) e es) =
+           v86::v87 ++ assigned_free_vars rp) ∧
+        (∀r op ad. assigned_free_vars (ShMem op r ad) = [r]) ∧
+        (∀v11 v10. assigned_free_vars (Store v10 v11) = []) ∧
+        (∀v13 v12. assigned_free_vars (Store32 v12 v13) = []) ∧
+        (∀v15 v14. assigned_free_vars (StoreByte v14 v15) = []) ∧
+        (∀v17 v16. assigned_free_vars (StoreGlob v16 v17) = []) ∧
+        assigned_free_vars Break = [] ∧ assigned_free_vars Continue = [] ∧
+        (∀v27 v26. assigned_free_vars (Call NONE v26 v27) = []) ∧
+        (∀v32 v31 v30 v29 v28.
+           assigned_free_vars (ExtCall v28 v29 v30 v31 v32) = []) ∧
+        (∀v33. assigned_free_vars (Raise v33) = []) ∧
+        (∀v34. assigned_free_vars (Return v34) = []) ∧
+        assigned_free_vars Tick = []
+   
+   [assigned_free_vars_ind]  Theorem
+      
+      ⊢ ∀P. P Skip ∧ (∀n e p. P p ⇒ P (Dec n e p)) ∧
+            (∀n e. P (Assign n e)) ∧
+            (∀lhss pop rhss. P (Primitive lhss pop rhss)) ∧
+            (∀p p'. P p ∧ P p' ⇒ P (Seq p p')) ∧
+            (∀e p p'. P p ∧ P p' ⇒ P (If e p p')) ∧
+            (∀e p. P p ⇒ P (While e p)) ∧
+            (∀rp v0 p e es.
+               P p ∧ P rp ⇒ P (Call (SOME ([],rp,SOME (v0,p))) e es)) ∧
+            (∀rp e es. P rp ⇒ P (Call (SOME ([],rp,NONE)) e es)) ∧
+            (∀v96 v97 rp v1 p e es.
+               P p ∧ P rp ⇒ P (Call (SOME (v96::v97,rp,SOME (v1,p))) e es)) ∧
+            (∀v86 v87 rp e es.
+               P rp ⇒ P (Call (SOME (v86::v87,rp,NONE)) e es)) ∧
+            (∀op r ad. P (ShMem op r ad)) ∧ (∀v10 v11. P (Store v10 v11)) ∧
+            (∀v12 v13. P (Store32 v12 v13)) ∧
+            (∀v14 v15. P (StoreByte v14 v15)) ∧
+            (∀v16 v17. P (StoreGlob v16 v17)) ∧ P Break ∧ P Continue ∧
+            (∀v26 v27. P (Call NONE v26 v27)) ∧
+            (∀v28 v29 v30 v31 v32. P (ExtCall v28 v29 v30 v31 v32)) ∧
+            (∀v33. P (Raise v33)) ∧ (∀v34. P (Return v34)) ∧ P Tick ⇒
+            ∀v. P v
+   
+   [assigned_vars_def]  Theorem
+      
+      ⊢ assigned_vars Skip = [] ∧
+        (∀p n e. assigned_vars (Dec n e p) = n::assigned_vars p) ∧
+        (∀n e. assigned_vars (Assign n e) = [n]) ∧
+        (∀rhss pop lhss. assigned_vars (Primitive lhss pop rhss) = lhss) ∧
+        (∀p' p.
+           assigned_vars (Seq p p') = assigned_vars p ++ assigned_vars p') ∧
+        (∀p' p e.
+           assigned_vars (If e p p') = assigned_vars p ++ assigned_vars p') ∧
+        (∀p e. assigned_vars (While e p) = assigned_vars p) ∧
+        (∀v0 rp p es e.
+           assigned_vars (Call (SOME ([],rp,SOME (v0,p))) e es) =
+           assigned_vars rp ++ assigned_vars p) ∧
+        (∀rp es e.
+           assigned_vars (Call (SOME ([],rp,NONE)) e es) = assigned_vars rp) ∧
+        (∀v97 v96 v1 rp p es e.
+           assigned_vars (Call (SOME (v96::v97,rp,SOME (v1,p))) e es) =
+           v96::v97 ++ assigned_vars rp ++ assigned_vars p) ∧
+        (∀v87 v86 rp es e.
+           assigned_vars (Call (SOME (v86::v87,rp,NONE)) e es) =
+           v86::v87 ++ assigned_vars rp) ∧
+        (∀r op ad. assigned_vars (ShMem op r ad) = [r]) ∧
+        (∀v11 v10. assigned_vars (Store v10 v11) = []) ∧
+        (∀v13 v12. assigned_vars (Store32 v12 v13) = []) ∧
+        (∀v15 v14. assigned_vars (StoreByte v14 v15) = []) ∧
+        (∀v17 v16. assigned_vars (StoreGlob v16 v17) = []) ∧
+        assigned_vars Break = [] ∧ assigned_vars Continue = [] ∧
+        (∀v27 v26. assigned_vars (Call NONE v26 v27) = []) ∧
+        (∀v32 v31 v30 v29 v28.
+           assigned_vars (ExtCall v28 v29 v30 v31 v32) = []) ∧
+        (∀v33. assigned_vars (Raise v33) = []) ∧
+        (∀v34. assigned_vars (Return v34) = []) ∧ assigned_vars Tick = []
+   
+   [assigned_vars_ind]  Theorem
+      
+      ⊢ ∀P. P Skip ∧ (∀n e p. P p ⇒ P (Dec n e p)) ∧
+            (∀n e. P (Assign n e)) ∧
+            (∀lhss pop rhss. P (Primitive lhss pop rhss)) ∧
+            (∀p p'. P p ∧ P p' ⇒ P (Seq p p')) ∧
+            (∀e p p'. P p ∧ P p' ⇒ P (If e p p')) ∧
+            (∀e p. P p ⇒ P (While e p)) ∧
+            (∀rp v0 p e es.
+               P p ∧ P rp ⇒ P (Call (SOME ([],rp,SOME (v0,p))) e es)) ∧
+            (∀rp e es. P rp ⇒ P (Call (SOME ([],rp,NONE)) e es)) ∧
+            (∀v96 v97 rp v1 p e es.
+               P p ∧ P rp ⇒ P (Call (SOME (v96::v97,rp,SOME (v1,p))) e es)) ∧
+            (∀v86 v87 rp e es.
+               P rp ⇒ P (Call (SOME (v86::v87,rp,NONE)) e es)) ∧
+            (∀op r ad. P (ShMem op r ad)) ∧ (∀v10 v11. P (Store v10 v11)) ∧
+            (∀v12 v13. P (Store32 v12 v13)) ∧
+            (∀v14 v15. P (StoreByte v14 v15)) ∧
+            (∀v16 v17. P (StoreGlob v16 v17)) ∧ P Break ∧ P Continue ∧
+            (∀v26 v27. P (Call NONE v26 v27)) ∧
+            (∀v28 v29 v30 v31 v32. P (ExtCall v28 v29 v30 v31 v32)) ∧
+            (∀v33. P (Raise v33)) ∧ (∀v34. P (Return v34)) ∧ P Tick ⇒
+            ∀v. P v
+   
+   [crepop2num_11]  Theorem
+      
+      ⊢ ∀a a'. crepop2num a = crepop2num a' ⇔ a = a'
+   
+   [crepop2num_ONTO]  Theorem
+      
+      ⊢ ∀r. r < 1 ⇔ ∃a. r = crepop2num a
+   
+   [crepop2num_num2crepop]  Theorem
+      
+      ⊢ ∀r. r < 1 ⇔ crepop2num (num2crepop r) = r
+   
+   [crepop2num_thm]  Theorem
+      
+      ⊢ crepop2num Mul = 0
+   
+   [crepop_Axiom]  Theorem
+      
+      ⊢ ∀x0. ∃f. f Mul = x0
+   
+   [crepop_EQ_crepop]  Theorem
+      
+      ⊢ ∀a a'. a = a' ⇔ crepop2num a = crepop2num a'
+   
+   [crepop_case_cong]  Theorem
+      
+      ⊢ ∀M M' v0.
+          M = M' ∧ (M' = Mul ⇒ v0 = v0') ⇒
+          (case M of Mul => v0) = case M' of Mul => v0'
+   
+   [crepop_case_def]  Theorem
+      
+      ⊢ ∀v0. (case Mul of Mul => v0) = v0
+   
+   [crepop_case_eq]  Theorem
+      
+      ⊢ (case x of Mul => v0) = v ⇔ x = Mul ∧ v0 = v
+   
+   [crepop_induction]  Theorem
+      
+      ⊢ ∀P. P Mul ⇒ ∀a. P a
+   
+   [crepop_nchotomy]  Theorem
+      
+      ⊢ ∀a. a = Mul
+   
+   [datatype_crepop]  Theorem
+      
+      ⊢ DATATYPE (crepop Mul)
+   
+   [datatype_exp]  Theorem
+      
+      ⊢ DATATYPE
+          (exp Const Var Load Load32 LoadByte LoadGlob Op Crepop Cmp Shift
+             BaseAddr TopAddr)
+   
+   [datatype_prog]  Theorem
+      
+      ⊢ DATATYPE
+          (prog Skip Dec Assign Primitive Store Store32 StoreByte StoreGlob
+             Seq If While Break Continue Call ExtCall Raise Return ShMem
+             Tick)
+   
+   [exp_11]  Theorem
+      
+      ⊢ (∀a a'. Const a = Const a' ⇔ a = a') ∧
+        (∀a a'. Var a = Var a' ⇔ a = a') ∧
+        (∀a a'. Load a = Load a' ⇔ a = a') ∧
+        (∀a a'. Load32 a = Load32 a' ⇔ a = a') ∧
+        (∀a a'. LoadByte a = LoadByte a' ⇔ a = a') ∧
+        (∀a a'. LoadGlob a = LoadGlob a' ⇔ a = a') ∧
+        (∀a0 a1 a0' a1'. Op a0 a1 = Op a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a0' a1'.
+           Crepop a0 a1 = Crepop a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a2 a0' a1' a2'.
+           Cmp a0 a1 a2 = Cmp a0' a1' a2' ⇔ a0 = a0' ∧ a1 = a1' ∧ a2 = a2') ∧
+        ∀a0 a1 a2 a0' a1' a2'.
+          Shift a0 a1 a2 = Shift a0' a1' a2' ⇔
+          a0 = a0' ∧ a1 = a1' ∧ a2 = a2'
+   
+   [exp_Axiom]  Theorem
+      
+      ⊢ ∀f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13. ∃fn0 fn1.
+          (∀a. fn0 (Const a) = f0 a) ∧ (∀a. fn0 (Var a) = f1 a) ∧
+          (∀a. fn0 (Load a) = f2 a (fn0 a)) ∧
+          (∀a. fn0 (Load32 a) = f3 a (fn0 a)) ∧
+          (∀a. fn0 (LoadByte a) = f4 a (fn0 a)) ∧
+          (∀a. fn0 (LoadGlob a) = f5 a) ∧
+          (∀a0 a1. fn0 (Op a0 a1) = f6 a0 a1 (fn1 a1)) ∧
+          (∀a0 a1. fn0 (Crepop a0 a1) = f7 a0 a1 (fn1 a1)) ∧
+          (∀a0 a1 a2. fn0 (Cmp a0 a1 a2) = f8 a0 a1 a2 (fn0 a1) (fn0 a2)) ∧
+          (∀a0 a1 a2. fn0 (Shift a0 a1 a2) = f9 a0 a2 a1 (fn0 a1)) ∧
+          fn0 BaseAddr = f10 ∧ fn0 TopAddr = f11 ∧ fn1 [] = f12 ∧
+          ∀a0 a1. fn1 (a0::a1) = f13 a0 a1 (fn0 a0) (fn1 a1)
+   
+   [exp_case_cong]  Theorem
+      
+      ⊢ ∀M M' f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1.
+          M = M' ∧ (∀a. M' = Const a ⇒ f a = f' a) ∧
+          (∀a. M' = Var a ⇒ f1 a = f1' a) ∧
+          (∀a. M' = Load a ⇒ f2 a = f2' a) ∧
+          (∀a. M' = Load32 a ⇒ f3 a = f3' a) ∧
+          (∀a. M' = LoadByte a ⇒ f4 a = f4' a) ∧
+          (∀a. M' = LoadGlob a ⇒ f5 a = f5' a) ∧
+          (∀a0 a1. M' = Op a0 a1 ⇒ f6 a0 a1 = f6' a0 a1) ∧
+          (∀a0 a1. M' = Crepop a0 a1 ⇒ f7 a0 a1 = f7' a0 a1) ∧
+          (∀a0 a1 a2. M' = Cmp a0 a1 a2 ⇒ f8 a0 a1 a2 = f8' a0 a1 a2) ∧
+          (∀a0 a1 a2. M' = Shift a0 a1 a2 ⇒ f9 a0 a1 a2 = f9' a0 a1 a2) ∧
+          (M' = BaseAddr ⇒ v = v') ∧ (M' = TopAddr ⇒ v1 = v1') ⇒
+          exp_CASE M f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1 =
+          exp_CASE M' f' f1' f2' f3' f4' f5' f6' f7' f8' f9' v' v1'
+   
+   [exp_case_eq]  Theorem
+      
+      ⊢ exp_CASE x f f1 f2 f3 f4 f5 f6 f7 f8 f9 v v1 = v' ⇔
+        (∃c. x = Const c ∧ f c = v') ∨ (∃n. x = Var n ∧ f1 n = v') ∨
+        (∃e. x = Load e ∧ f2 e = v') ∨ (∃e. x = Load32 e ∧ f3 e = v') ∨
+        (∃e. x = LoadByte e ∧ f4 e = v') ∨
+        (∃c. x = LoadGlob c ∧ f5 c = v') ∨
+        (∃b l. x = Op b l ∧ f6 b l = v') ∨
+        (∃c l. x = Crepop c l ∧ f7 c l = v') ∨
+        (∃c e e0. x = Cmp c e e0 ∧ f8 c e e0 = v') ∨
+        (∃s e n. x = Shift s e n ∧ f9 s e n = v') ∨ x = BaseAddr ∧ v = v' ∨
+        x = TopAddr ∧ v1 = v'
+   
+   [exp_distinct]  Theorem
+      
+      ⊢ (∀a' a. Const a ≠ Var a') ∧ (∀a' a. Const a ≠ Load a') ∧
+        (∀a' a. Const a ≠ Load32 a') ∧ (∀a' a. Const a ≠ LoadByte a') ∧
+        (∀a' a. Const a ≠ LoadGlob a') ∧ (∀a1 a0 a. Const a ≠ Op a0 a1) ∧
+        (∀a1 a0 a. Const a ≠ Crepop a0 a1) ∧
+        (∀a2 a1 a0 a. Const a ≠ Cmp a0 a1 a2) ∧
+        (∀a2 a1 a0 a. Const a ≠ Shift a0 a1 a2) ∧
+        (∀a. Const a ≠ BaseAddr) ∧ (∀a. Const a ≠ TopAddr) ∧
+        (∀a' a. Var a ≠ Load a') ∧ (∀a' a. Var a ≠ Load32 a') ∧
+        (∀a' a. Var a ≠ LoadByte a') ∧ (∀a' a. Var a ≠ LoadGlob a') ∧
+        (∀a1 a0 a. Var a ≠ Op a0 a1) ∧ (∀a1 a0 a. Var a ≠ Crepop a0 a1) ∧
+        (∀a2 a1 a0 a. Var a ≠ Cmp a0 a1 a2) ∧
+        (∀a2 a1 a0 a. Var a ≠ Shift a0 a1 a2) ∧ (∀a. Var a ≠ BaseAddr) ∧
+        (∀a. Var a ≠ TopAddr) ∧ (∀a' a. Load a ≠ Load32 a') ∧
+        (∀a' a. Load a ≠ LoadByte a') ∧ (∀a' a. Load a ≠ LoadGlob a') ∧
+        (∀a1 a0 a. Load a ≠ Op a0 a1) ∧ (∀a1 a0 a. Load a ≠ Crepop a0 a1) ∧
+        (∀a2 a1 a0 a. Load a ≠ Cmp a0 a1 a2) ∧
+        (∀a2 a1 a0 a. Load a ≠ Shift a0 a1 a2) ∧ (∀a. Load a ≠ BaseAddr) ∧
+        (∀a. Load a ≠ TopAddr) ∧ (∀a' a. Load32 a ≠ LoadByte a') ∧
+        (∀a' a. Load32 a ≠ LoadGlob a') ∧ (∀a1 a0 a. Load32 a ≠ Op a0 a1) ∧
+        (∀a1 a0 a. Load32 a ≠ Crepop a0 a1) ∧
+        (∀a2 a1 a0 a. Load32 a ≠ Cmp a0 a1 a2) ∧
+        (∀a2 a1 a0 a. Load32 a ≠ Shift a0 a1 a2) ∧
+        (∀a. Load32 a ≠ BaseAddr) ∧ (∀a. Load32 a ≠ TopAddr) ∧
+        (∀a' a. LoadByte a ≠ LoadGlob a') ∧
+        (∀a1 a0 a. LoadByte a ≠ Op a0 a1) ∧
+        (∀a1 a0 a. LoadByte a ≠ Crepop a0 a1) ∧
+        (∀a2 a1 a0 a. LoadByte a ≠ Cmp a0 a1 a2) ∧
+        (∀a2 a1 a0 a. LoadByte a ≠ Shift a0 a1 a2) ∧
+        (∀a. LoadByte a ≠ BaseAddr) ∧ (∀a. LoadByte a ≠ TopAddr) ∧
+        (∀a1 a0 a. LoadGlob a ≠ Op a0 a1) ∧
+        (∀a1 a0 a. LoadGlob a ≠ Crepop a0 a1) ∧
+        (∀a2 a1 a0 a. LoadGlob a ≠ Cmp a0 a1 a2) ∧
+        (∀a2 a1 a0 a. LoadGlob a ≠ Shift a0 a1 a2) ∧
+        (∀a. LoadGlob a ≠ BaseAddr) ∧ (∀a. LoadGlob a ≠ TopAddr) ∧
+        (∀a1' a1 a0' a0. Op a0 a1 ≠ Crepop a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Op a0 a1 ≠ Cmp a0' a1' a2) ∧
+        (∀a2 a1' a1 a0' a0. Op a0 a1 ≠ Shift a0' a1' a2) ∧
+        (∀a1 a0. Op a0 a1 ≠ BaseAddr) ∧ (∀a1 a0. Op a0 a1 ≠ TopAddr) ∧
+        (∀a2 a1' a1 a0' a0. Crepop a0 a1 ≠ Cmp a0' a1' a2) ∧
+        (∀a2 a1' a1 a0' a0. Crepop a0 a1 ≠ Shift a0' a1' a2) ∧
+        (∀a1 a0. Crepop a0 a1 ≠ BaseAddr) ∧
+        (∀a1 a0. Crepop a0 a1 ≠ TopAddr) ∧
+        (∀a2' a2 a1' a1 a0' a0. Cmp a0 a1 a2 ≠ Shift a0' a1' a2') ∧
+        (∀a2 a1 a0. Cmp a0 a1 a2 ≠ BaseAddr) ∧
+        (∀a2 a1 a0. Cmp a0 a1 a2 ≠ TopAddr) ∧
+        (∀a2 a1 a0. Shift a0 a1 a2 ≠ BaseAddr) ∧
+        (∀a2 a1 a0. Shift a0 a1 a2 ≠ TopAddr) ∧ BaseAddr ≠ TopAddr
+   
+   [exp_induction]  Theorem
+      
+      ⊢ ∀P0 P1.
+          (∀c. P0 (Const c)) ∧ (∀n. P0 (Var n)) ∧
+          (∀e. P0 e ⇒ P0 (Load e)) ∧ (∀e. P0 e ⇒ P0 (Load32 e)) ∧
+          (∀e. P0 e ⇒ P0 (LoadByte e)) ∧ (∀c. P0 (LoadGlob c)) ∧
+          (∀l. P1 l ⇒ ∀b. P0 (Op b l)) ∧ (∀l. P1 l ⇒ ∀c. P0 (Crepop c l)) ∧
+          (∀e e0. P0 e ∧ P0 e0 ⇒ ∀c. P0 (Cmp c e e0)) ∧
+          (∀e. P0 e ⇒ ∀n s. P0 (Shift s e n)) ∧ P0 BaseAddr ∧ P0 TopAddr ∧
+          P1 [] ∧ (∀e l. P0 e ∧ P1 l ⇒ P1 (e::l)) ⇒
+          (∀e. P0 e) ∧ ∀l. P1 l
+   
+   [exp_nchotomy]  Theorem
+      
+      ⊢ ∀ee.
+          (∃c. ee = Const c) ∨ (∃n. ee = Var n) ∨ (∃e. ee = Load e) ∨
+          (∃e. ee = Load32 e) ∨ (∃e. ee = LoadByte e) ∨
+          (∃c. ee = LoadGlob c) ∨ (∃b l. ee = Op b l) ∨
+          (∃c l. ee = Crepop c l) ∨ (∃c e e0. ee = Cmp c e e0) ∨
+          (∃s e n. ee = Shift s e n) ∨ ee = BaseAddr ∨ ee = TopAddr
+   
+   [exps_def]  Theorem
+      
+      ⊢ (∀w. exps (Const w) = [Const w]) ∧ (∀v. exps (Var v) = [Var v]) ∧
+        (∀e. exps (Load e) = exps e) ∧ (∀e. exps (Load32 e) = exps e) ∧
+        (∀e. exps (LoadByte e) = exps e) ∧
+        (∀a. exps (LoadGlob a) = [LoadGlob a]) ∧
+        (∀es bop. exps (Op bop es) = FLAT (MAP (λa. exps a) es)) ∧
+        (∀pop es. exps (Crepop pop es) = FLAT (MAP (λa. exps a) es)) ∧
+        (∀e2 e1 c. exps (Cmp c e1 e2) = exps e1 ++ exps e2) ∧
+        (∀sh num e. exps (Shift sh e num) = exps e) ∧
+        exps BaseAddr = [BaseAddr] ∧ exps TopAddr = [TopAddr]
+   
+   [exps_ind]  Theorem
+      
+      ⊢ ∀P. (∀w. P (Const w)) ∧ (∀v. P (Var v)) ∧ (∀e. P e ⇒ P (Load e)) ∧
+            (∀e. P e ⇒ P (Load32 e)) ∧ (∀e. P e ⇒ P (LoadByte e)) ∧
+            (∀a. P (LoadGlob a)) ∧
+            (∀bop es. (∀a. MEM a es ⇒ P a) ⇒ P (Op bop es)) ∧
+            (∀pop es. (∀a. MEM a es ⇒ P a) ⇒ P (Crepop pop es)) ∧
+            (∀c e1 e2. P e1 ∧ P e2 ⇒ P (Cmp c e1 e2)) ∧
+            (∀sh e num. P e ⇒ P (Shift sh e num)) ∧ P BaseAddr ∧ P TopAddr ⇒
+            ∀v. P v
+   
+   [load_globals_compute]  Theorem
+      
+      ⊢ (∀v0. load_globals v0 0 = []) ∧
+        (∀ad n.
+           load_globals ad (NUMERAL (BIT1 n)) =
+           LoadGlob ad::load_globals (ad + 1w) (NUMERAL (BIT1 n) − 1)) ∧
+        ∀ad n.
+          load_globals ad (NUMERAL (BIT2 n)) =
+          LoadGlob ad::load_globals (ad + 1w) (NUMERAL (BIT1 n))
+   
+   [load_shape_compute]  Theorem
+      
+      ⊢ (∀a e. load_shape a 0 e = []) ∧
+        (∀a i e.
+           load_shape a (NUMERAL (BIT1 i)) e =
+           if a = 0w then
+             Load e::
+               load_shape (a + bytes_in_word) (NUMERAL (BIT1 i) − 1) e
+           else
+             Load (Op Add [e; Const a])::
+               load_shape (a + bytes_in_word) (NUMERAL (BIT1 i) − 1) e) ∧
+        ∀a i e.
+          load_shape a (NUMERAL (BIT2 i)) e =
+          if a = 0w then
+            Load e::load_shape (a + bytes_in_word) (NUMERAL (BIT1 i)) e
+          else
+            Load (Op Add [e; Const a])::
+              load_shape (a + bytes_in_word) (NUMERAL (BIT1 i)) e
+   
+   [nested_decs_def]  Theorem
+      
+      ⊢ (∀p. nested_decs [] [] p = p) ∧
+        (∀p ns n es e.
+           nested_decs (n::ns) (e::es) p = Dec n e (nested_decs ns es p)) ∧
+        (∀v9 v10 p. nested_decs [] (v9::v10) p = Skip) ∧
+        ∀v6 v5 p. nested_decs (v5::v6) [] p = Skip
+   
+   [nested_decs_ind]  Theorem
+      
+      ⊢ ∀P. (∀p. P [] [] p) ∧
+            (∀n ns e es p. P ns es p ⇒ P (n::ns) (e::es) p) ∧
+            (∀v9 v10 p. P [] (v9::v10) p) ∧ (∀v5 v6 p. P (v5::v6) [] p) ⇒
+            ∀v v1 v2. P v v1 v2
+   
+   [num2crepop_11]  Theorem
+      
+      ⊢ ∀r r'. r < 1 ⇒ r' < 1 ⇒ (num2crepop r = num2crepop r' ⇔ r = r')
+   
+   [num2crepop_ONTO]  Theorem
+      
+      ⊢ ∀a. ∃r. a = num2crepop r ∧ r < 1
+   
+   [num2crepop_crepop2num]  Theorem
+      
+      ⊢ ∀a. num2crepop (crepop2num a) = a
+   
+   [num2crepop_thm]  Theorem
+      
+      ⊢ num2crepop 0 = Mul
+   
+   [prog_11]  Theorem
+      
+      ⊢ (∀a0 a1 a2 a0' a1' a2'.
+           Dec a0 a1 a2 = Dec a0' a1' a2' ⇔ a0 = a0' ∧ a1 = a1' ∧ a2 = a2') ∧
+        (∀a0 a1 a0' a1'.
+           Assign a0 a1 = Assign a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a2 a0' a1' a2'.
+           Primitive a0 a1 a2 = Primitive a0' a1' a2' ⇔
+           a0 = a0' ∧ a1 = a1' ∧ a2 = a2') ∧
+        (∀a0 a1 a0' a1'. Store a0 a1 = Store a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a0' a1'.
+           Store32 a0 a1 = Store32 a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a0' a1'.
+           StoreByte a0 a1 = StoreByte a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a0' a1'.
+           StoreGlob a0 a1 = StoreGlob a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a0' a1'. Seq a0 a1 = Seq a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a2 a0' a1' a2'.
+           If a0 a1 a2 = If a0' a1' a2' ⇔ a0 = a0' ∧ a1 = a1' ∧ a2 = a2') ∧
+        (∀a0 a1 a0' a1'. While a0 a1 = While a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a2 a0' a1' a2'.
+           Call a0 a1 a2 = Call a0' a1' a2' ⇔
+           a0 = a0' ∧ a1 = a1' ∧ a2 = a2') ∧
+        (∀a0 a1 a2 a3 a4 a0' a1' a2' a3' a4'.
+           ExtCall a0 a1 a2 a3 a4 = ExtCall a0' a1' a2' a3' a4' ⇔
+           a0 = a0' ∧ a1 = a1' ∧ a2 = a2' ∧ a3 = a3' ∧ a4 = a4') ∧
+        (∀a a'. Raise a = Raise a' ⇔ a = a') ∧
+        (∀a a'. Return a = Return a' ⇔ a = a') ∧
+        ∀a0 a1 a2 a0' a1' a2'.
+          ShMem a0 a1 a2 = ShMem a0' a1' a2' ⇔
+          a0 = a0' ∧ a1 = a1' ∧ a2 = a2'
+   
+   [prog_Axiom]  Theorem
+      
+      ⊢ ∀f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18
+            f19 f20 f21 f22 f23 f24 f25. ∃fn0 fn1 fn2 fn3 fn4 fn5.
+          fn0 Skip = f0 ∧
+          (∀a0 a1 a2. fn0 (Dec a0 a1 a2) = f1 a0 a1 a2 (fn0 a2)) ∧
+          (∀a0 a1. fn0 (Assign a0 a1) = f2 a0 a1) ∧
+          (∀a0 a1 a2. fn0 (Primitive a0 a1 a2) = f3 a0 a1 a2) ∧
+          (∀a0 a1. fn0 (Store a0 a1) = f4 a0 a1) ∧
+          (∀a0 a1. fn0 (Store32 a0 a1) = f5 a0 a1) ∧
+          (∀a0 a1. fn0 (StoreByte a0 a1) = f6 a0 a1) ∧
+          (∀a0 a1. fn0 (StoreGlob a0 a1) = f7 a0 a1) ∧
+          (∀a0 a1. fn0 (Seq a0 a1) = f8 a0 a1 (fn0 a0) (fn0 a1)) ∧
+          (∀a0 a1 a2. fn0 (If a0 a1 a2) = f9 a0 a1 a2 (fn0 a1) (fn0 a2)) ∧
+          (∀a0 a1. fn0 (While a0 a1) = f10 a0 a1 (fn0 a1)) ∧
+          fn0 Break = f11 ∧ fn0 Continue = f12 ∧
+          (∀a0 a1 a2. fn0 (Call a0 a1 a2) = f13 a1 a2 a0 (fn1 a0)) ∧
+          (∀a0 a1 a2 a3 a4.
+             fn0 (ExtCall a0 a1 a2 a3 a4) = f14 a0 a1 a2 a3 a4) ∧
+          (∀a. fn0 (Raise a) = f15 a) ∧ (∀a. fn0 (Return a) = f16 a) ∧
+          (∀a0 a1 a2. fn0 (ShMem a0 a1 a2) = f17 a0 a1 a2) ∧
+          fn0 Tick = f18 ∧ fn1 NONE = f19 ∧
+          (∀a. fn1 (SOME a) = f20 a (fn2 a)) ∧
+          (∀a0 a1. fn2 (a0,a1) = f21 a0 a1 (fn3 a1)) ∧
+          (∀a0 a1. fn3 (a0,a1) = f22 a0 a1 (fn0 a0) (fn4 a1)) ∧
+          fn4 NONE = f23 ∧ (∀a. fn4 (SOME a) = f24 a (fn5 a)) ∧
+          ∀a0 a1. fn5 (a0,a1) = f25 a0 a1 (fn0 a1)
+   
+   [prog_case_cong]  Theorem
+      
+      ⊢ ∀M M' v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13 f14 v3.
+          M = M' ∧ (M' = Skip ⇒ v = v') ∧
+          (∀a0 a1 a2. M' = Dec a0 a1 a2 ⇒ f a0 a1 a2 = f' a0 a1 a2) ∧
+          (∀a0 a1. M' = Assign a0 a1 ⇒ f1 a0 a1 = f1' a0 a1) ∧
+          (∀a0 a1 a2. M' = Primitive a0 a1 a2 ⇒ f2 a0 a1 a2 = f2' a0 a1 a2) ∧
+          (∀a0 a1. M' = Store a0 a1 ⇒ f3 a0 a1 = f3' a0 a1) ∧
+          (∀a0 a1. M' = Store32 a0 a1 ⇒ f4 a0 a1 = f4' a0 a1) ∧
+          (∀a0 a1. M' = StoreByte a0 a1 ⇒ f5 a0 a1 = f5' a0 a1) ∧
+          (∀a0 a1. M' = StoreGlob a0 a1 ⇒ f6 a0 a1 = f6' a0 a1) ∧
+          (∀a0 a1. M' = Seq a0 a1 ⇒ f7 a0 a1 = f7' a0 a1) ∧
+          (∀a0 a1 a2. M' = If a0 a1 a2 ⇒ f8 a0 a1 a2 = f8' a0 a1 a2) ∧
+          (∀a0 a1. M' = While a0 a1 ⇒ f9 a0 a1 = f9' a0 a1) ∧
+          (M' = Break ⇒ v1 = v1') ∧ (M' = Continue ⇒ v2 = v2') ∧
+          (∀a0 a1 a2. M' = Call a0 a1 a2 ⇒ f10 a0 a1 a2 = f10' a0 a1 a2) ∧
+          (∀a0 a1 a2 a3 a4.
+             M' = ExtCall a0 a1 a2 a3 a4 ⇒
+             f11 a0 a1 a2 a3 a4 = f11' a0 a1 a2 a3 a4) ∧
+          (∀a. M' = Raise a ⇒ f12 a = f12' a) ∧
+          (∀a. M' = Return a ⇒ f13 a = f13' a) ∧
+          (∀a0 a1 a2. M' = ShMem a0 a1 a2 ⇒ f14 a0 a1 a2 = f14' a0 a1 a2) ∧
+          (M' = Tick ⇒ v3 = v3') ⇒
+          prog_CASE M v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13
+            f14 v3 =
+          prog_CASE M' v' f' f1' f2' f3' f4' f5' f6' f7' f8' f9' v1' v2'
+            f10' f11' f12' f13' f14' v3'
+   
+   [prog_case_eq]  Theorem
+      
+      ⊢ prog_CASE x v f f1 f2 f3 f4 f5 f6 f7 f8 f9 v1 v2 f10 f11 f12 f13
+          f14 v3 = v' ⇔
+        x = Skip ∧ v = v' ∨ (∃n e p. x = Dec n e p ∧ f n e p = v') ∨
+        (∃n e. x = Assign n e ∧ f1 n e = v') ∨
+        (∃l p l0. x = Primitive l p l0 ∧ f2 l p l0 = v') ∨
+        (∃e e0. x = Store e e0 ∧ f3 e e0 = v') ∨
+        (∃e e0. x = Store32 e e0 ∧ f4 e e0 = v') ∨
+        (∃e e0. x = StoreByte e e0 ∧ f5 e e0 = v') ∨
+        (∃c e. x = StoreGlob c e ∧ f6 c e = v') ∨
+        (∃p p0. x = Seq p p0 ∧ f7 p p0 = v') ∨
+        (∃e p p0. x = If e p p0 ∧ f8 e p p0 = v') ∨
+        (∃e p. x = While e p ∧ f9 e p = v') ∨ x = Break ∧ v1 = v' ∨
+        x = Continue ∧ v2 = v' ∨
+        (∃o' m l. x = Call o' m l ∧ f10 o' m l = v') ∨
+        (∃m n n0 n1 n2. x = ExtCall m n n0 n1 n2 ∧ f11 m n n0 n1 n2 = v') ∨
+        (∃c. x = Raise c ∧ f12 c = v') ∨ (∃l. x = Return l ∧ f13 l = v') ∨
+        (∃m n e. x = ShMem m n e ∧ f14 m n e = v') ∨ x = Tick ∧ v3 = v'
+   
+   [prog_distinct]  Theorem
+      
+      ⊢ (∀a2 a1 a0. Skip ≠ Dec a0 a1 a2) ∧ (∀a1 a0. Skip ≠ Assign a0 a1) ∧
+        (∀a2 a1 a0. Skip ≠ Primitive a0 a1 a2) ∧
+        (∀a1 a0. Skip ≠ Store a0 a1) ∧ (∀a1 a0. Skip ≠ Store32 a0 a1) ∧
+        (∀a1 a0. Skip ≠ StoreByte a0 a1) ∧
+        (∀a1 a0. Skip ≠ StoreGlob a0 a1) ∧ (∀a1 a0. Skip ≠ Seq a0 a1) ∧
+        (∀a2 a1 a0. Skip ≠ If a0 a1 a2) ∧ (∀a1 a0. Skip ≠ While a0 a1) ∧
+        Skip ≠ Break ∧ Skip ≠ Continue ∧
+        (∀a2 a1 a0. Skip ≠ Call a0 a1 a2) ∧
+        (∀a4 a3 a2 a1 a0. Skip ≠ ExtCall a0 a1 a2 a3 a4) ∧
+        (∀a. Skip ≠ Raise a) ∧ (∀a. Skip ≠ Return a) ∧
+        (∀a2 a1 a0. Skip ≠ ShMem a0 a1 a2) ∧ Skip ≠ Tick ∧
+        (∀a2 a1' a1 a0' a0. Dec a0 a1 a2 ≠ Assign a0' a1') ∧
+        (∀a2' a2 a1' a1 a0' a0. Dec a0 a1 a2 ≠ Primitive a0' a1' a2') ∧
+        (∀a2 a1' a1 a0' a0. Dec a0 a1 a2 ≠ Store a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Dec a0 a1 a2 ≠ Store32 a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Dec a0 a1 a2 ≠ StoreByte a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Dec a0 a1 a2 ≠ StoreGlob a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Dec a0 a1 a2 ≠ Seq a0' a1') ∧
+        (∀a2' a2 a1' a1 a0' a0. Dec a0 a1 a2 ≠ If a0' a1' a2') ∧
+        (∀a2 a1' a1 a0' a0. Dec a0 a1 a2 ≠ While a0' a1') ∧
+        (∀a2 a1 a0. Dec a0 a1 a2 ≠ Break) ∧
+        (∀a2 a1 a0. Dec a0 a1 a2 ≠ Continue) ∧
+        (∀a2' a2 a1' a1 a0' a0. Dec a0 a1 a2 ≠ Call a0' a1' a2') ∧
+        (∀a4 a3 a2' a2 a1' a1 a0' a0.
+           Dec a0 a1 a2 ≠ ExtCall a0' a1' a2' a3 a4) ∧
+        (∀a2 a1 a0 a. Dec a0 a1 a2 ≠ Raise a) ∧
+        (∀a2 a1 a0 a. Dec a0 a1 a2 ≠ Return a) ∧
+        (∀a2' a2 a1' a1 a0' a0. Dec a0 a1 a2 ≠ ShMem a0' a1' a2') ∧
+        (∀a2 a1 a0. Dec a0 a1 a2 ≠ Tick) ∧
+        (∀a2 a1' a1 a0' a0. Assign a0 a1 ≠ Primitive a0' a1' a2) ∧
+        (∀a1' a1 a0' a0. Assign a0 a1 ≠ Store a0' a1') ∧
+        (∀a1' a1 a0' a0. Assign a0 a1 ≠ Store32 a0' a1') ∧
+        (∀a1' a1 a0' a0. Assign a0 a1 ≠ StoreByte a0' a1') ∧
+        (∀a1' a1 a0' a0. Assign a0 a1 ≠ StoreGlob a0' a1') ∧
+        (∀a1' a1 a0' a0. Assign a0 a1 ≠ Seq a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Assign a0 a1 ≠ If a0' a1' a2) ∧
+        (∀a1' a1 a0' a0. Assign a0 a1 ≠ While a0' a1') ∧
+        (∀a1 a0. Assign a0 a1 ≠ Break) ∧
+        (∀a1 a0. Assign a0 a1 ≠ Continue) ∧
+        (∀a2 a1' a1 a0' a0. Assign a0 a1 ≠ Call a0' a1' a2) ∧
+        (∀a4 a3 a2 a1' a1 a0' a0. Assign a0 a1 ≠ ExtCall a0' a1' a2 a3 a4) ∧
+        (∀a1 a0 a. Assign a0 a1 ≠ Raise a) ∧
+        (∀a1 a0 a. Assign a0 a1 ≠ Return a) ∧
+        (∀a2 a1' a1 a0' a0. Assign a0 a1 ≠ ShMem a0' a1' a2) ∧
+        (∀a1 a0. Assign a0 a1 ≠ Tick) ∧
+        (∀a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ Store a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ Store32 a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ StoreByte a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ StoreGlob a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ Seq a0' a1') ∧
+        (∀a2' a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ If a0' a1' a2') ∧
+        (∀a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ While a0' a1') ∧
+        (∀a2 a1 a0. Primitive a0 a1 a2 ≠ Break) ∧
+        (∀a2 a1 a0. Primitive a0 a1 a2 ≠ Continue) ∧
+        (∀a2' a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ Call a0' a1' a2') ∧
+        (∀a4 a3 a2' a2 a1' a1 a0' a0.
+           Primitive a0 a1 a2 ≠ ExtCall a0' a1' a2' a3 a4) ∧
+        (∀a2 a1 a0 a. Primitive a0 a1 a2 ≠ Raise a) ∧
+        (∀a2 a1 a0 a. Primitive a0 a1 a2 ≠ Return a) ∧
+        (∀a2' a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ ShMem a0' a1' a2') ∧
+        (∀a2 a1 a0. Primitive a0 a1 a2 ≠ Tick) ∧
+        (∀a1' a1 a0' a0. Store a0 a1 ≠ Store32 a0' a1') ∧
+        (∀a1' a1 a0' a0. Store a0 a1 ≠ StoreByte a0' a1') ∧
+        (∀a1' a1 a0' a0. Store a0 a1 ≠ StoreGlob a0' a1') ∧
+        (∀a1' a1 a0' a0. Store a0 a1 ≠ Seq a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Store a0 a1 ≠ If a0' a1' a2) ∧
+        (∀a1' a1 a0' a0. Store a0 a1 ≠ While a0' a1') ∧
+        (∀a1 a0. Store a0 a1 ≠ Break) ∧ (∀a1 a0. Store a0 a1 ≠ Continue) ∧
+        (∀a2 a1' a1 a0' a0. Store a0 a1 ≠ Call a0' a1' a2) ∧
+        (∀a4 a3 a2 a1' a1 a0' a0. Store a0 a1 ≠ ExtCall a0' a1' a2 a3 a4) ∧
+        (∀a1 a0 a. Store a0 a1 ≠ Raise a) ∧
+        (∀a1 a0 a. Store a0 a1 ≠ Return a) ∧
+        (∀a2 a1' a1 a0' a0. Store a0 a1 ≠ ShMem a0' a1' a2) ∧
+        (∀a1 a0. Store a0 a1 ≠ Tick) ∧
+        (∀a1' a1 a0' a0. Store32 a0 a1 ≠ StoreByte a0' a1') ∧
+        (∀a1' a1 a0' a0. Store32 a0 a1 ≠ StoreGlob a0' a1') ∧
+        (∀a1' a1 a0' a0. Store32 a0 a1 ≠ Seq a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Store32 a0 a1 ≠ If a0' a1' a2) ∧
+        (∀a1' a1 a0' a0. Store32 a0 a1 ≠ While a0' a1') ∧
+        (∀a1 a0. Store32 a0 a1 ≠ Break) ∧
+        (∀a1 a0. Store32 a0 a1 ≠ Continue) ∧
+        (∀a2 a1' a1 a0' a0. Store32 a0 a1 ≠ Call a0' a1' a2) ∧
+        (∀a4 a3 a2 a1' a1 a0' a0. Store32 a0 a1 ≠ ExtCall a0' a1' a2 a3 a4) ∧
+        (∀a1 a0 a. Store32 a0 a1 ≠ Raise a) ∧
+        (∀a1 a0 a. Store32 a0 a1 ≠ Return a) ∧
+        (∀a2 a1' a1 a0' a0. Store32 a0 a1 ≠ ShMem a0' a1' a2) ∧
+        (∀a1 a0. Store32 a0 a1 ≠ Tick) ∧
+        (∀a1' a1 a0' a0. StoreByte a0 a1 ≠ StoreGlob a0' a1') ∧
+        (∀a1' a1 a0' a0. StoreByte a0 a1 ≠ Seq a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. StoreByte a0 a1 ≠ If a0' a1' a2) ∧
+        (∀a1' a1 a0' a0. StoreByte a0 a1 ≠ While a0' a1') ∧
+        (∀a1 a0. StoreByte a0 a1 ≠ Break) ∧
+        (∀a1 a0. StoreByte a0 a1 ≠ Continue) ∧
+        (∀a2 a1' a1 a0' a0. StoreByte a0 a1 ≠ Call a0' a1' a2) ∧
+        (∀a4 a3 a2 a1' a1 a0' a0.
+           StoreByte a0 a1 ≠ ExtCall a0' a1' a2 a3 a4) ∧
+        (∀a1 a0 a. StoreByte a0 a1 ≠ Raise a) ∧
+        (∀a1 a0 a. StoreByte a0 a1 ≠ Return a) ∧
+        (∀a2 a1' a1 a0' a0. StoreByte a0 a1 ≠ ShMem a0' a1' a2) ∧
+        (∀a1 a0. StoreByte a0 a1 ≠ Tick) ∧
+        (∀a1' a1 a0' a0. StoreGlob a0 a1 ≠ Seq a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. StoreGlob a0 a1 ≠ If a0' a1' a2) ∧
+        (∀a1' a1 a0' a0. StoreGlob a0 a1 ≠ While a0' a1') ∧
+        (∀a1 a0. StoreGlob a0 a1 ≠ Break) ∧
+        (∀a1 a0. StoreGlob a0 a1 ≠ Continue) ∧
+        (∀a2 a1' a1 a0' a0. StoreGlob a0 a1 ≠ Call a0' a1' a2) ∧
+        (∀a4 a3 a2 a1' a1 a0' a0.
+           StoreGlob a0 a1 ≠ ExtCall a0' a1' a2 a3 a4) ∧
+        (∀a1 a0 a. StoreGlob a0 a1 ≠ Raise a) ∧
+        (∀a1 a0 a. StoreGlob a0 a1 ≠ Return a) ∧
+        (∀a2 a1' a1 a0' a0. StoreGlob a0 a1 ≠ ShMem a0' a1' a2) ∧
+        (∀a1 a0. StoreGlob a0 a1 ≠ Tick) ∧
+        (∀a2 a1' a1 a0' a0. Seq a0 a1 ≠ If a0' a1' a2) ∧
+        (∀a1' a1 a0' a0. Seq a0 a1 ≠ While a0' a1') ∧
+        (∀a1 a0. Seq a0 a1 ≠ Break) ∧ (∀a1 a0. Seq a0 a1 ≠ Continue) ∧
+        (∀a2 a1' a1 a0' a0. Seq a0 a1 ≠ Call a0' a1' a2) ∧
+        (∀a4 a3 a2 a1' a1 a0' a0. Seq a0 a1 ≠ ExtCall a0' a1' a2 a3 a4) ∧
+        (∀a1 a0 a. Seq a0 a1 ≠ Raise a) ∧
+        (∀a1 a0 a. Seq a0 a1 ≠ Return a) ∧
+        (∀a2 a1' a1 a0' a0. Seq a0 a1 ≠ ShMem a0' a1' a2) ∧
+        (∀a1 a0. Seq a0 a1 ≠ Tick) ∧
+        (∀a2 a1' a1 a0' a0. If a0 a1 a2 ≠ While a0' a1') ∧
+        (∀a2 a1 a0. If a0 a1 a2 ≠ Break) ∧
+        (∀a2 a1 a0. If a0 a1 a2 ≠ Continue) ∧
+        (∀a2' a2 a1' a1 a0' a0. If a0 a1 a2 ≠ Call a0' a1' a2') ∧
+        (∀a4 a3 a2' a2 a1' a1 a0' a0.
+           If a0 a1 a2 ≠ ExtCall a0' a1' a2' a3 a4) ∧
+        (∀a2 a1 a0 a. If a0 a1 a2 ≠ Raise a) ∧
+        (∀a2 a1 a0 a. If a0 a1 a2 ≠ Return a) ∧
+        (∀a2' a2 a1' a1 a0' a0. If a0 a1 a2 ≠ ShMem a0' a1' a2') ∧
+        (∀a2 a1 a0. If a0 a1 a2 ≠ Tick) ∧ (∀a1 a0. While a0 a1 ≠ Break) ∧
+        (∀a1 a0. While a0 a1 ≠ Continue) ∧
+        (∀a2 a1' a1 a0' a0. While a0 a1 ≠ Call a0' a1' a2) ∧
+        (∀a4 a3 a2 a1' a1 a0' a0. While a0 a1 ≠ ExtCall a0' a1' a2 a3 a4) ∧
+        (∀a1 a0 a. While a0 a1 ≠ Raise a) ∧
+        (∀a1 a0 a. While a0 a1 ≠ Return a) ∧
+        (∀a2 a1' a1 a0' a0. While a0 a1 ≠ ShMem a0' a1' a2) ∧
+        (∀a1 a0. While a0 a1 ≠ Tick) ∧ Break ≠ Continue ∧
+        (∀a2 a1 a0. Break ≠ Call a0 a1 a2) ∧
+        (∀a4 a3 a2 a1 a0. Break ≠ ExtCall a0 a1 a2 a3 a4) ∧
+        (∀a. Break ≠ Raise a) ∧ (∀a. Break ≠ Return a) ∧
+        (∀a2 a1 a0. Break ≠ ShMem a0 a1 a2) ∧ Break ≠ Tick ∧
+        (∀a2 a1 a0. Continue ≠ Call a0 a1 a2) ∧
+        (∀a4 a3 a2 a1 a0. Continue ≠ ExtCall a0 a1 a2 a3 a4) ∧
+        (∀a. Continue ≠ Raise a) ∧ (∀a. Continue ≠ Return a) ∧
+        (∀a2 a1 a0. Continue ≠ ShMem a0 a1 a2) ∧ Continue ≠ Tick ∧
+        (∀a4 a3 a2' a2 a1' a1 a0' a0.
+           Call a0 a1 a2 ≠ ExtCall a0' a1' a2' a3 a4) ∧
+        (∀a2 a1 a0 a. Call a0 a1 a2 ≠ Raise a) ∧
+        (∀a2 a1 a0 a. Call a0 a1 a2 ≠ Return a) ∧
+        (∀a2' a2 a1' a1 a0' a0. Call a0 a1 a2 ≠ ShMem a0' a1' a2') ∧
+        (∀a2 a1 a0. Call a0 a1 a2 ≠ Tick) ∧
+        (∀a4 a3 a2 a1 a0 a. ExtCall a0 a1 a2 a3 a4 ≠ Raise a) ∧
+        (∀a4 a3 a2 a1 a0 a. ExtCall a0 a1 a2 a3 a4 ≠ Return a) ∧
+        (∀a4 a3 a2' a2 a1' a1 a0' a0.
+           ExtCall a0 a1 a2 a3 a4 ≠ ShMem a0' a1' a2') ∧
+        (∀a4 a3 a2 a1 a0. ExtCall a0 a1 a2 a3 a4 ≠ Tick) ∧
+        (∀a' a. Raise a ≠ Return a') ∧
+        (∀a2 a1 a0 a. Raise a ≠ ShMem a0 a1 a2) ∧ (∀a. Raise a ≠ Tick) ∧
+        (∀a2 a1 a0 a. Return a ≠ ShMem a0 a1 a2) ∧ (∀a. Return a ≠ Tick) ∧
+        ∀a2 a1 a0. ShMem a0 a1 a2 ≠ Tick
+   
+   [prog_induction]  Theorem
+      
+      ⊢ ∀P0 P1 P2 P3 P4 P5.
+          P0 Skip ∧ (∀p. P0 p ⇒ ∀e n. P0 (Dec n e p)) ∧
+          (∀n e. P0 (Assign n e)) ∧ (∀l p l0. P0 (Primitive l p l0)) ∧
+          (∀e e0. P0 (Store e e0)) ∧ (∀e e0. P0 (Store32 e e0)) ∧
+          (∀e e0. P0 (StoreByte e e0)) ∧ (∀c e. P0 (StoreGlob c e)) ∧
+          (∀p p0. P0 p ∧ P0 p0 ⇒ P0 (Seq p p0)) ∧
+          (∀p p0. P0 p ∧ P0 p0 ⇒ ∀e. P0 (If e p p0)) ∧
+          (∀p. P0 p ⇒ ∀e. P0 (While e p)) ∧ P0 Break ∧ P0 Continue ∧
+          (∀ $o. P1 $o ⇒ ∀l m. P0 (Call $o m l)) ∧
+          (∀m n n0 n1 n2. P0 (ExtCall m n n0 n1 n2)) ∧ (∀c. P0 (Raise c)) ∧
+          (∀l. P0 (Return l)) ∧ (∀m n e. P0 (ShMem m n e)) ∧ P0 Tick ∧
+          P1 NONE ∧ (∀p. P2 p ⇒ P1 (SOME p)) ∧ (∀p. P3 p ⇒ ∀l. P2 (l,p)) ∧
+          (∀p $o. P0 p ∧ P4 $o ⇒ P3 (p,$o)) ∧ P4 NONE ∧
+          (∀p. P5 p ⇒ P4 (SOME p)) ∧ (∀p. P0 p ⇒ ∀c. P5 (c,p)) ⇒
+          (∀p. P0 p) ∧ (∀ $o. P1 $o) ∧ (∀p. P2 p) ∧ (∀p. P3 p) ∧
+          (∀ $o. P4 $o) ∧ ∀p. P5 p
+   
+   [prog_nchotomy]  Theorem
+      
+      ⊢ ∀pp.
+          pp = Skip ∨ (∃n e p. pp = Dec n e p) ∨ (∃n e. pp = Assign n e) ∨
+          (∃l p l0. pp = Primitive l p l0) ∨ (∃e e0. pp = Store e e0) ∨
+          (∃e e0. pp = Store32 e e0) ∨ (∃e e0. pp = StoreByte e e0) ∨
+          (∃c e. pp = StoreGlob c e) ∨ (∃p p0. pp = Seq p p0) ∨
+          (∃e p p0. pp = If e p p0) ∨ (∃e p. pp = While e p) ∨ pp = Break ∨
+          pp = Continue ∨ (∃ $o m l. pp = Call $o m l) ∨
+          (∃m n n0 n1 n2. pp = ExtCall m n n0 n1 n2) ∨ (∃c. pp = Raise c) ∨
+          (∃l. pp = Return l) ∨ (∃m n e. pp = ShMem m n e) ∨ pp = Tick
+   
+   [var_cexp_def]  Theorem
+      
+      ⊢ (∀w. var_cexp (Const w) = []) ∧ (∀v. var_cexp (Var v) = [v]) ∧
+        (∀e. var_cexp (Load e) = var_cexp e) ∧
+        (∀e. var_cexp (Load32 e) = var_cexp e) ∧
+        (∀e. var_cexp (LoadByte e) = var_cexp e) ∧
+        (∀a. var_cexp (LoadGlob a) = []) ∧
+        (∀es bop. var_cexp (Op bop es) = FLAT (MAP (λa. var_cexp a) es)) ∧
+        (∀es cop. var_cexp (Crepop cop es) = FLAT (MAP (λa. var_cexp a) es)) ∧
+        (∀e2 e1 c. var_cexp (Cmp c e1 e2) = var_cexp e1 ++ var_cexp e2) ∧
+        (∀sh num e. var_cexp (Shift sh e num) = var_cexp e) ∧
+        var_cexp BaseAddr = [] ∧ var_cexp TopAddr = []
+   
+   [var_cexp_ind]  Theorem
+      
+      ⊢ ∀P. (∀w. P (Const w)) ∧ (∀v. P (Var v)) ∧ (∀e. P e ⇒ P (Load e)) ∧
+            (∀e. P e ⇒ P (Load32 e)) ∧ (∀e. P e ⇒ P (LoadByte e)) ∧
+            (∀a. P (LoadGlob a)) ∧
+            (∀bop es. (∀a. MEM a es ⇒ P a) ⇒ P (Op bop es)) ∧
+            (∀cop es. (∀a. MEM a es ⇒ P a) ⇒ P (Crepop cop es)) ∧
+            (∀c e1 e2. P e1 ∧ P e2 ⇒ P (Cmp c e1 e2)) ∧
+            (∀sh e num. P e ⇒ P (Shift sh e num)) ∧ P BaseAddr ∧ P TopAddr ⇒
+            ∀v. P v
+   
+   

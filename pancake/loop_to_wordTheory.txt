@@ -1,0 +1,271 @@
+[loopLang] Parent theory of "loop_to_word"
+   
+   [wordLang] Parent theory of "loop_to_word"
+   
+   [comp_func_def]  Definition
+      
+      ⊢ ∀name params body.
+          comp_func name params body =
+          (let
+             vs =
+               fromNumSet (difference (acc_vars body LN) (toNumSet params));
+             ctxt = make_ctxt 2 (params ++ vs) LN
+           in
+             FST (comp ctxt body (name,2)))
+   
+   [compile_def]  Definition
+      
+      ⊢ ∀p. compile p = compile_prog p
+   
+   [compile_prog_def]  Definition
+      
+      ⊢ ∀p. compile_prog p =
+            MAP
+              (λ(name,params,body).
+                   (name,LENGTH params + 1,comp_func name params body)) p
+   
+   [find_reg_imm_def]  Definition
+      
+      ⊢ (∀ctxt w. find_reg_imm ctxt (Imm w) = Imm w) ∧
+        ∀ctxt n. find_reg_imm ctxt (Reg n) = Reg (find_var ctxt n)
+   
+   [find_var_def]  Definition
+      
+      ⊢ ∀ctxt v.
+          find_var ctxt v = case lookup v ctxt of NONE => 0 | SOME n => n
+   
+   [fromNumSet_def]  Definition
+      
+      ⊢ ∀t. fromNumSet t = MAP FST (toAList t)
+   
+   [make_ctxt_def]  Definition
+      
+      ⊢ (∀n l. make_ctxt n [] l = l) ∧
+        ∀n x xs l.
+          make_ctxt n (x::xs) l = make_ctxt (n + 2) xs (insert x n l)
+   
+   [mk_new_cutset_def]  Definition
+      
+      ⊢ ∀ctxt l.
+          mk_new_cutset ctxt l =
+          insert 0 () (toNumSet (MAP (find_var ctxt) (fromNumSet l)))
+   
+   [toNumSet_def]  Definition
+      
+      ⊢ isEmpty (toNumSet []) ∧
+        ∀n ns. toNumSet (n::ns) = insert n () (toNumSet ns)
+   
+   [comp_def]  Theorem
+      
+      ⊢ (∀l ctxt. comp ctxt Skip l = (Skip,l)) ∧
+        (∀n l e ctxt.
+           comp ctxt (Assign n e) l =
+           (Assign (find_var ctxt n) (comp_exp ctxt e),l)) ∧
+        (∀rhss pop lhss l ctxt.
+           comp ctxt (Primitive lhss pop rhss) l =
+           if LENGTH lhss = 2 ∧ LENGTH rhss = 3 then
+             (let
+                res = lhss❲0❳;
+                co = lhss❲1❳;
+                li = rhss❲0❳;
+                ri = rhss❲1❳;
+                ci = rhss❲2❳;
+                scratch_ci = 1;
+                scratch_res = 3
+              in
+                (Seq (Assign scratch_ci (Var (find_var ctxt ci)))
+                   (Seq
+                      (Inst
+                         (Arith
+                            (AddCarry scratch_res (find_var ctxt li)
+                               (find_var ctxt ri) scratch_ci)))
+                      (Seq (Assign (find_var ctxt co) (Var scratch_ci))
+                         (Assign (find_var ctxt res) (Var scratch_res)))),l))
+           else (Skip,l)) ∧
+        (∀l ctxt arith.
+           comp ctxt (Arith arith) l =
+           case arith of
+             LLongMul r1 r2 r3 r4 =>
+               (Inst
+                  (Arith
+                     (LongMul (find_var ctxt r1) (find_var ctxt r2)
+                        (find_var ctxt r3) (find_var ctxt r4))),l)
+           | LLongDiv r1' r2' r3' r4' r5 =>
+             (Inst
+                (Arith
+                   (LongDiv (find_var ctxt r1') (find_var ctxt r2')
+                      (find_var ctxt r3') (find_var ctxt r4')
+                      (find_var ctxt r5))),l)
+           | LDiv r1'' r2'' r3'' =>
+             (Inst
+                (Arith
+                   (Div (find_var ctxt r1'') (find_var ctxt r2'')
+                      (find_var ctxt r3''))),l)) ∧
+        (∀v l e ctxt.
+           comp ctxt (Store e v) l =
+           (Store (comp_exp ctxt e) (find_var ctxt v),l)) ∧
+        (∀l e ctxt a.
+           comp ctxt (SetGlobal a e) l = (Set (Temp a) (comp_exp ctxt e),l)) ∧
+        (∀v l ctxt a.
+           comp ctxt (Load32 a v) l =
+           (Inst (Mem Load32 (find_var ctxt v) (Addr (find_var ctxt a) 0w)),
+            l)) ∧
+        (∀v l ctxt a.
+           comp ctxt (LoadByte a v) l =
+           (Inst (Mem Load8 (find_var ctxt v) (Addr (find_var ctxt a) 0w)),
+            l)) ∧
+        (∀v l ctxt a.
+           comp ctxt (Store32 a v) l =
+           (Inst
+              (Mem Store32 (find_var ctxt v) (Addr (find_var ctxt a) 0w)),l)) ∧
+        (∀v l ctxt a.
+           comp ctxt (StoreByte a v) l =
+           (Inst (Mem Store8 (find_var ctxt v) (Addr (find_var ctxt a) 0w)),
+            l)) ∧
+        (∀q p l ctxt.
+           comp ctxt (Seq p q) l =
+           (let
+              (wp,l') = comp ctxt p l;
+              (wq,l'') = comp ctxt q l'
+            in
+              (Seq wp wq,l''))) ∧
+        (∀ri q p n l1 l ctxt c.
+           comp ctxt (If c n ri p q l1) l =
+           (let
+              (wp,l') = comp ctxt p l;
+              (wq,l'') = comp ctxt q l'
+            in
+              (Seq (If c (find_var ctxt n) (find_reg_imm ctxt ri) wp wq)
+                 Tick,l''))) ∧
+        (∀l2 l1 l ctxt body.
+           comp ctxt (Loop l1 body l2) l =
+           (let
+              (wbody,l') = comp ctxt body l
+            in
+              (Seq Tick
+                 (Seq
+                    (Loop (mk_new_cutset ctxt l1) wbody
+                       (mk_new_cutset ctxt l2)) Tick),l'))) ∧
+        (∀l ctxt. comp ctxt Break l = (Break 0,l)) ∧
+        (∀l ctxt. comp ctxt Continue l = (Continue 0,l)) ∧
+        (∀v l ctxt. comp ctxt (Raise v) l = (Raise (find_var ctxt v),l)) ∧
+        (∀vs l ctxt.
+           comp ctxt (Return vs) l = (Return 0 (MAP (find_var ctxt) vs),l)) ∧
+        (∀l ctxt. comp ctxt Tick l = (Tick,l)) ∧
+        (∀p l ctxt. comp ctxt (Mark p) l = comp ctxt p l) ∧
+        (∀l ctxt. comp ctxt Fail l = (Skip,l)) ∧
+        (∀n m l ctxt.
+           comp ctxt (LocValue n m) l = (LocValue (find_var ctxt n) m,l)) ∧
+        (∀ret l handler dest ctxt args.
+           comp ctxt (Call ret dest args handler) l =
+           (let
+              args' = MAP (find_var ctxt) args
+            in
+              case ret of
+                NONE => (Call NONE dest (0::args') NONE,l)
+              | SOME (vs,live) =>
+                (let
+                   vs' = MAP (find_var ctxt) vs;
+                   live' = mk_new_cutset ctxt live;
+                   new_l = (FST l,SND l + 1)
+                 in
+                   case handler of
+                     NONE =>
+                       (Call (SOME (vs',(live',LN),Skip,l)) dest args' NONE,
+                        new_l)
+                   | SOME (n,p1,p2,v6) =>
+                     (let
+                        (p1',l1) = comp ctxt p1 new_l;
+                        (p2',l1') = comp ctxt p2 l1;
+                        new_l = (FST l1',SND l1' + 1)
+                      in
+                        (Seq
+                           (Call (SOME (vs',(live',LN),p2',l)) dest args'
+                              (SOME (find_var ctxt n,p1',l1'))) Tick,new_l))))) ∧
+        (∀ptr2 ptr1 live len2 len1 l f ctxt.
+           comp ctxt (FFI f ptr1 len1 ptr2 len2 live) l =
+           (let
+              live = mk_new_cutset ctxt live
+            in
+              (FFI f (find_var ctxt ptr1) (find_var ctxt len1)
+                 (find_var ctxt ptr2) (find_var ctxt len2) (live,LN),l))) ∧
+        ∀n memop l e ctxt.
+          comp ctxt (ShMem memop n e) l =
+          (ShareInst memop (find_var ctxt n) (comp_exp ctxt e),l)
+   
+   [comp_exp_def]  Theorem
+      
+      ⊢ (∀w ctxt. comp_exp ctxt (Const w) = Const w) ∧
+        (∀n ctxt. comp_exp ctxt (Var n) = Var (find_var ctxt n)) ∧
+        (∀m ctxt. comp_exp ctxt (Lookup m) = Lookup (Temp m)) ∧
+        (∀ctxt. comp_exp ctxt BaseAddr = Lookup CurrHeap) ∧
+        (∀ctxt.
+           comp_exp ctxt TopAddr =
+           Op Add [Lookup CurrHeap; ShiftN Lsl (Lookup HeapLength) 1]) ∧
+        (∀exp ctxt. comp_exp ctxt (Load exp) = Load (comp_exp ctxt exp)) ∧
+        (∀s n exp ctxt.
+           comp_exp ctxt (Shift s exp n) = ShiftN s (comp_exp ctxt exp) n) ∧
+        ∀wexps op ctxt.
+          comp_exp ctxt (Op op wexps) =
+          (let wexps' = MAP (λa. comp_exp ctxt a) wexps in Op op wexps')
+   
+   [comp_exp_ind]  Theorem
+      
+      ⊢ ∀P. (∀ctxt w. P ctxt (Const w)) ∧ (∀ctxt n. P ctxt (Var n)) ∧
+            (∀ctxt m. P ctxt (Lookup m)) ∧ (∀ctxt. P ctxt BaseAddr) ∧
+            (∀ctxt. P ctxt TopAddr) ∧
+            (∀ctxt exp. P ctxt exp ⇒ P ctxt (Load exp)) ∧
+            (∀ctxt s exp n. P ctxt exp ⇒ P ctxt (Shift s exp n)) ∧
+            (∀ctxt op wexps.
+               (∀a. MEM a wexps ⇒ P ctxt a) ⇒ P ctxt (Op op wexps)) ⇒
+            ∀v v1. P v v1
+   
+   [comp_ind]  Theorem
+      
+      ⊢ ∀P. (∀ctxt l. P ctxt Skip l) ∧
+            (∀ctxt n e l. P ctxt (Assign n e) l) ∧
+            (∀ctxt lhss pop rhss l. P ctxt (Primitive lhss pop rhss) l) ∧
+            (∀ctxt arith l. P ctxt (Arith arith) l) ∧
+            (∀ctxt e v l. P ctxt (Store e v) l) ∧
+            (∀ctxt a e l. P ctxt (SetGlobal a e) l) ∧
+            (∀ctxt a v l. P ctxt (Load32 a v) l) ∧
+            (∀ctxt a v l. P ctxt (LoadByte a v) l) ∧
+            (∀ctxt a v l. P ctxt (Store32 a v) l) ∧
+            (∀ctxt a v l. P ctxt (StoreByte a v) l) ∧
+            (∀ctxt p q l.
+               (∀wp l'. (wp,l') = comp ctxt p l ⇒ P ctxt q l') ∧ P ctxt p l ⇒
+               P ctxt (Seq p q) l) ∧
+            (∀ctxt c n ri p q l1 l.
+               (∀wp l'. (wp,l') = comp ctxt p l ⇒ P ctxt q l') ∧ P ctxt p l ⇒
+               P ctxt (If c n ri p q l1) l) ∧
+            (∀ctxt l1 body l2 l. P ctxt body l ⇒ P ctxt (Loop l1 body l2) l) ∧
+            (∀ctxt l. P ctxt Break l) ∧ (∀ctxt l. P ctxt Continue l) ∧
+            (∀ctxt v l. P ctxt (Raise v) l) ∧
+            (∀ctxt vs l. P ctxt (Return vs) l) ∧ (∀ctxt l. P ctxt Tick l) ∧
+            (∀ctxt p l. P ctxt p l ⇒ P ctxt (Mark p) l) ∧
+            (∀ctxt l. P ctxt Fail l) ∧
+            (∀ctxt n m l. P ctxt (LocValue n m) l) ∧
+            (∀ctxt ret dest args handler l.
+               (∀args' v1 vs live vs' live' new_l v n v2 p1 v4 p2 v6 p1'
+                    l1.
+                  args' = MAP (find_var ctxt) args ∧ ret = SOME v1 ∧
+                  v1 = (vs,live) ∧ vs' = MAP (find_var ctxt) vs ∧
+                  live' = mk_new_cutset ctxt live ∧
+                  new_l = (FST l,SND l + 1) ∧ handler = SOME v ∧
+                  v = (n,v2) ∧ v2 = (p1,v4) ∧ v4 = (p2,v6) ∧
+                  (p1',l1) = comp ctxt p1 new_l ⇒
+                  P ctxt p2 l1) ∧
+               (∀args' v1 vs live vs' live' new_l v n v2 p1 v4 p2 v6.
+                  args' = MAP (find_var ctxt) args ∧ ret = SOME v1 ∧
+                  v1 = (vs,live) ∧ vs' = MAP (find_var ctxt) vs ∧
+                  live' = mk_new_cutset ctxt live ∧
+                  new_l = (FST l,SND l + 1) ∧ handler = SOME v ∧
+                  v = (n,v2) ∧ v2 = (p1,v4) ∧ v4 = (p2,v6) ⇒
+                  P ctxt p1 new_l) ⇒
+               P ctxt (Call ret dest args handler) l) ∧
+            (∀ctxt f ptr1 len1 ptr2 len2 live l.
+               P ctxt (FFI f ptr1 len1 ptr2 len2 live) l) ∧
+            (∀ctxt memop n e l. P ctxt (ShMem memop n e) l) ⇒
+            ∀v v1 v2. P v v1 v2
+   
+   

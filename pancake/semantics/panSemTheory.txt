@@ -1,0 +1,2822 @@
+[ffi] Parent theory of "panSem"
+   
+   [panLang] Parent theory of "panSem"
+   
+   [wordLang] Parent theory of "panSem"
+   
+   [dec_clock_def]  Definition
+      
+      ⊢ ∀s. dec_clock s = s with clock := s.clock − 1
+   
+   [empty_locals_def]  Definition
+      
+      ⊢ ∀s. empty_locals s = s with locals := FEMPTY
+   
+   [fix_clock_def]  Definition
+      
+      ⊢ ∀old_s res new_s.
+          fix_clock old_s (res,new_s) =
+          (res,
+           new_s with
+           clock :=
+             if old_s.clock < new_s.clock then old_s.clock else new_s.clock)
+   
+   [flatten_def_primitive]  Definition
+      
+      ⊢ flatten =
+        WFREC
+          (@R. WF R ∧ (∀vs a. MEM a vs ⇒ R a (RStruct vs)) ∧
+               ∀nm flds a. MEM a (MAP SND flds) ⇒ R a (NStruct nm flds))
+          (λflatten a'.
+               case a' of
+                 Val w => I [w]
+               | RStruct vs => I (FLAT (MAP (λa. flatten a) vs))
+               | NStruct nm flds =>
+                 I (FLAT (MAP (λa. flatten a) (MAP SND flds))))
+   
+   [isValWord_def_primitive]  Definition
+      
+      ⊢ isValWord =
+        WFREC (@R. WF R)
+          (λisValWord a.
+               case a of
+                 Val v5 => I T
+               | RStruct v6 => I F
+               | NStruct v7 v8 => I F)
+   
+   [isWord_def_primitive]  Definition
+      
+      ⊢ isWord = WFREC (@R. WF R) (λisWord a. I T)
+   
+   [is_valid_value_def]  Definition
+      
+      ⊢ ∀s vk v value.
+          is_valid_value s vk v value ⇔
+          case lookup_kvar vk v s of
+            NONE => F
+          | SOME w => shape_of value = shape_of w
+   
+   [lookup_code_def]  Definition
+      
+      ⊢ ∀code fname args.
+          lookup_code code fname args =
+          case FLOOKUP code fname of
+            NONE => NONE
+          | SOME (vshapes,prog) =>
+            if
+              ALL_DISTINCT (MAP FST vshapes) ∧
+              LIST_REL (λvshape arg. SND vshape = shape_of arg) vshapes
+                args
+            then
+              SOME (prog,FEMPTY |++ ZIP (MAP FST vshapes,args))
+            else NONE
+   
+   [lookup_kvar_def]  Definition
+      
+      ⊢ ∀vk v s.
+          lookup_kvar vk v s =
+          case vk of
+            Local => FLOOKUP s.locals v
+          | Global => FLOOKUP s.globals v
+   
+   [mem_load_32_def]  Definition
+      
+      ⊢ ∀m dm be w.
+          mem_load_32 m dm be w =
+          if aligned 2 w then
+            case m (byte_align w) of
+              Word v =>
+                if byte_align w ∈ dm then
+                  SOME
+                    (word_of_bytes be 0w
+                       [get_byte w v be; get_byte (w + 1w) v be;
+                        get_byte (w + 2w) v be; get_byte (w + 3w) v be])
+                else NONE
+          else NONE
+   
+   [mem_load_byte_def]  Definition
+      
+      ⊢ ∀m dm be w.
+          mem_load_byte m dm be w =
+          case m (byte_align w) of
+            Word v =>
+              if byte_align w ∈ dm then SOME (get_byte w v be) else NONE
+   
+   [mem_store_32_def]  Definition
+      
+      ⊢ ∀m dm be w hw.
+          mem_store_32 m dm be w hw =
+          if aligned 2 w then
+            case m (byte_align w) of
+              Word v =>
+                if byte_align w ∈ dm then
+                  (let
+                     v0 = set_byte w (get_byte 0w hw be) v be;
+                     v1 = set_byte (w + 1w) (get_byte 1w hw be) v0 be;
+                     v2 = set_byte (w + 2w) (get_byte 2w hw be) v1 be;
+                     v3 = set_byte (w + 3w) (get_byte 3w hw be) v2 be
+                   in
+                     SOME m⦇byte_align w ↦ Word v3⦈)
+                else NONE
+          else NONE
+   
+   [mem_store_byte_def]  Definition
+      
+      ⊢ ∀m dm be w b.
+          mem_store_byte m dm be w b =
+          case m (byte_align w) of
+            Word v =>
+              if byte_align w ∈ dm then
+                SOME m⦇byte_align w ↦ Word (set_byte w b v be)⦈
+              else NONE
+   
+   [mem_store_def]  Definition
+      
+      ⊢ ∀addr w dm m.
+          mem_store addr w dm m =
+          if addr ∈ dm then SOME m⦇addr ↦ w⦈ else NONE
+   
+   [mem_stores_def]  Definition
+      
+      ⊢ (∀a dm m. mem_stores a [] dm m = SOME m) ∧
+        ∀a w ws dm m.
+          mem_stores a (w::ws) dm m =
+          case mem_store a w dm m of
+            NONE => NONE
+          | SOME m' => mem_stores (a + bytes_in_word) ws dm m'
+   
+   [nb_op_def]  Definition
+      
+      ⊢ nb_op Op8 = 1 ∧ nb_op Op16 = 2 ∧ nb_op OpW = 0 ∧ nb_op Op32 = 4
+   
+   [pan_primop_def]  Definition
+      
+      ⊢ ∀args.
+          pan_primop AddCarry args =
+          if LENGTH args = 3 ∧ EVERY isValWord args then
+            (let
+               l = theValWord args❲0❳;
+               r = theValWord args❲1❳;
+               ci = theValWord args❲2❳;
+               (res,co) = word_and_carry l r ci
+             in
+               SOME (RStruct [ValWord res; ValWord co]))
+          else NONE
+   
+   [recordtype_state_seldef_base_addr_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).base_addr = c
+   
+   [recordtype_state_seldef_base_addr_fupd_def]  Definition
+      
+      ⊢ ∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with
+          base_addr updated_by f7 =
+          state f f0 l f1 f2 f3 f4 f5 n b f6 (f7 c) c0
+   
+   [recordtype_state_seldef_be_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).be ⇔ b
+   
+   [recordtype_state_seldef_be_fupd_def]  Definition
+      
+      ⊢ ∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with be updated_by f7 =
+          state f f0 l f1 f2 f3 f4 f5 n (f7 b) f6 c c0
+   
+   [recordtype_state_seldef_clock_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).clock = n
+   
+   [recordtype_state_seldef_clock_fupd_def]  Definition
+      
+      ⊢ ∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with clock updated_by f7 =
+          state f f0 l f1 f2 f3 f4 f5 (f7 n) b f6 c c0
+   
+   [recordtype_state_seldef_code_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).code = f1
+   
+   [recordtype_state_seldef_code_fupd_def]  Definition
+      
+      ⊢ ∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with code updated_by f7 =
+          state f f0 l (f7 f1) f2 f3 f4 f5 n b f6 c c0
+   
+   [recordtype_state_seldef_eshapes_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).eshapes = f2
+   
+   [recordtype_state_seldef_eshapes_fupd_def]  Definition
+      
+      ⊢ ∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with
+          eshapes updated_by f7 =
+          state f f0 l f1 (f7 f2) f3 f4 f5 n b f6 c c0
+   
+   [recordtype_state_seldef_ffi_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).ffi = f6
+   
+   [recordtype_state_seldef_ffi_fupd_def]  Definition
+      
+      ⊢ ∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with ffi updated_by f7 =
+          state f f0 l f1 f2 f3 f4 f5 n b (f7 f6) c c0
+   
+   [recordtype_state_seldef_globals_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).globals = f0
+   
+   [recordtype_state_seldef_globals_fupd_def]  Definition
+      
+      ⊢ ∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with
+          globals updated_by f7 =
+          state f (f7 f0) l f1 f2 f3 f4 f5 n b f6 c c0
+   
+   [recordtype_state_seldef_locals_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).locals = f
+   
+   [recordtype_state_seldef_locals_fupd_def]  Definition
+      
+      ⊢ ∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with locals updated_by f7 =
+          state (f7 f) f0 l f1 f2 f3 f4 f5 n b f6 c c0
+   
+   [recordtype_state_seldef_memaddrs_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).memaddrs = f4
+   
+   [recordtype_state_seldef_memaddrs_fupd_def]  Definition
+      
+      ⊢ ∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with
+          memaddrs updated_by f7 =
+          state f f0 l f1 f2 f3 (f7 f4) f5 n b f6 c c0
+   
+   [recordtype_state_seldef_memory_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).memory = f3
+   
+   [recordtype_state_seldef_memory_fupd_def]  Definition
+      
+      ⊢ ∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with memory updated_by f7 =
+          state f f0 l f1 f2 (f7 f3) f4 f5 n b f6 c c0
+   
+   [recordtype_state_seldef_sh_memaddrs_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).sh_memaddrs = f5
+   
+   [recordtype_state_seldef_sh_memaddrs_fupd_def]  Definition
+      
+      ⊢ ∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with
+          sh_memaddrs updated_by f7 =
+          state f f0 l f1 f2 f3 f4 (f7 f5) n b f6 c c0
+   
+   [recordtype_state_seldef_structs_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).structs = l
+   
+   [recordtype_state_seldef_structs_fupd_def]  Definition
+      
+      ⊢ ∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with
+          structs updated_by f7 =
+          state f f0 (f7 l) f1 f2 f3 f4 f5 n b f6 c c0
+   
+   [recordtype_state_seldef_top_addr_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).top_addr = c0
+   
+   [recordtype_state_seldef_top_addr_fupd_def]  Definition
+      
+      ⊢ ∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with
+          top_addr updated_by f7 =
+          state f f0 l f1 f2 f3 f4 f5 n b f6 c (f7 c0)
+   
+   [result_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0'.
+                 ∀ $var$('result').
+                   (∀a0'.
+                      a0' =
+                      ind_type$CONSTR 0 (ARB,ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      a0' =
+                      ind_type$CONSTR (SUC 0) (ARB,ARB,ARB)
+                        (λn. ind_type$BOTTOM) ∨
+                      a0' =
+                      ind_type$CONSTR (SUC (SUC 0)) (ARB,ARB,ARB)
+                        (λn. ind_type$BOTTOM) ∨
+                      a0' =
+                      ind_type$CONSTR (SUC (SUC (SUC 0))) (ARB,ARB,ARB)
+                        (λn. ind_type$BOTTOM) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR (SUC (SUC (SUC (SUC 0))))
+                                  (a,ARB,ARB) (λn. ind_type$BOTTOM)) a) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC (SUC (SUC (SUC (SUC 0))))) (a1,a0,ARB)
+                                (λn. ind_type$BOTTOM)) a0 a1) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR
+                                  (SUC (SUC (SUC (SUC (SUC (SUC 0))))))
+                                  (ARB,ARB,a) (λn. ind_type$BOTTOM)) a) ⇒
+                      $var$('result') a0') ⇒
+                   $var$('result') a0') rep
+   
+   [result_case_def]  Definition
+      
+      ⊢ (∀v v1 v2 v3 f f1 f2. result_CASE Error v v1 v2 v3 f f1 f2 = v) ∧
+        (∀v v1 v2 v3 f f1 f2. result_CASE TimeOut v v1 v2 v3 f f1 f2 = v1) ∧
+        (∀v v1 v2 v3 f f1 f2. result_CASE Break v v1 v2 v3 f f1 f2 = v2) ∧
+        (∀v v1 v2 v3 f f1 f2. result_CASE Continue v v1 v2 v3 f f1 f2 = v3) ∧
+        (∀a v v1 v2 v3 f f1 f2.
+           result_CASE (Return a) v v1 v2 v3 f f1 f2 = f a) ∧
+        (∀a0 a1 v v1 v2 v3 f f1 f2.
+           result_CASE (Exception a0 a1) v v1 v2 v3 f f1 f2 = f1 a0 a1) ∧
+        ∀a v v1 v2 v3 f f1 f2.
+          result_CASE (FinalFFI a) v v1 v2 v3 f f1 f2 = f2 a
+   
+   [result_size_def]  Definition
+      
+      ⊢ (∀f. result_size f Error = 0) ∧ (∀f. result_size f TimeOut = 0) ∧
+        (∀f. result_size f Break = 0) ∧ (∀f. result_size f Continue = 0) ∧
+        (∀f a. result_size f (Return a) = 1 + v_size f a) ∧
+        (∀f a0 a1.
+           result_size f (Exception a0 a1) =
+           1 + (mlstring_size a0 + v_size f a1)) ∧
+        ∀f a. result_size f (FinalFFI a) = 1 + final_event_size a
+   
+   [semantics_decls_def]  Definition
+      
+      ⊢ ∀s start decls.
+          semantics_decls s start decls =
+          case decs_stcnames [] decls of
+            NONE => Fail
+          | SOME st_ctxt =>
+            case evaluate_decls (s with structs := st_ctxt) decls of
+              NONE => Fail
+            | SOME s' => semantics s' start
+   
+   [semantics_def]  Definition
+      
+      ⊢ ∀s start.
+          semantics s start =
+          (let
+             prog = TailCall start []
+           in
+             if
+               ∃k. case FST (evaluate (prog,s with clock := k)) of
+                     NONE => T
+                   | SOME Error => T
+                   | SOME TimeOut => F
+                   | SOME Break => T
+                   | SOME Continue => T
+                   | SOME (Return v6) => F
+                   | SOME (Exception v7 v8) => T
+                   | SOME (FinalFFI v9) => F
+             then
+               Fail
+             else
+               case
+                 some res. ∃k t r outcome.
+                   evaluate (prog,s with clock := k) = (r,t) ∧
+                   (case r of
+                      NONE => F
+                    | SOME Error => F
+                    | SOME TimeOut => F
+                    | SOME Break => F
+                    | SOME Continue => F
+                    | SOME (Return v6) => outcome = Success
+                    | SOME (Exception v7 v8) => F
+                    | SOME (FinalFFI e) => outcome = FFI_outcome e) ∧
+                   res = Terminate outcome t.ffi.io_events
+               of
+                 NONE =>
+                   Diverge
+                     (LUB
+                        (IMAGE
+                           (λk.
+                                fromList
+                                  (SND (evaluate (prog,s with clock := k))).
+                                  ffi.io_events) 𝕌(:num)))
+               | SOME res => res)
+   
+   [set_global_def]  Definition
+      
+      ⊢ ∀v value s.
+          set_global v value s = s with globals := s.globals⟨v ↦ value⟩
+   
+   [set_kvar_def]  Definition
+      
+      ⊢ ∀vk v value s.
+          set_kvar vk v value s =
+          case vk of
+            Local => set_var v value s
+          | Global => set_global v value s
+   
+   [set_var_def]  Definition
+      
+      ⊢ ∀v value s.
+          set_var v value s = s with locals := s.locals⟨v ↦ value⟩
+   
+   [sh_mem_load_def]  Definition
+      
+      ⊢ ∀vk v addr nb s.
+          sh_mem_load vk v addr nb s =
+          if nb = 0 then
+            if addr ∈ s.sh_memaddrs then
+              case
+                call_FFI s.ffi (SharedMem MappedRead) [n2w nb]
+                  (word_to_bytes addr F)
+              of
+                FFI_return new_ffi new_bytes =>
+                  (NONE,
+                   set_kvar vk v (ValWord (word_of_bytes F 0w new_bytes)) s with
+                   ffi := new_ffi)
+              | FFI_final outcome =>
+                (SOME (FinalFFI outcome),empty_locals s)
+            else (SOME Error,s)
+          else if byte_align addr ∈ s.sh_memaddrs then
+            case
+              call_FFI s.ffi (SharedMem MappedRead) [n2w nb]
+                (word_to_bytes addr F)
+            of
+              FFI_return new_ffi new_bytes =>
+                (NONE,
+                 set_kvar vk v (ValWord (word_of_bytes F 0w new_bytes)) s with
+                 ffi := new_ffi)
+            | FFI_final outcome => (SOME (FinalFFI outcome),empty_locals s)
+          else (SOME Error,s)
+   
+   [sh_mem_store_def]  Definition
+      
+      ⊢ ∀w addr nb s.
+          sh_mem_store w addr nb s =
+          if nb = 0 then
+            if addr ∈ s.sh_memaddrs then
+              case
+                call_FFI s.ffi (SharedMem MappedWrite) [n2w nb]
+                  (word_to_bytes w F ++ word_to_bytes addr F)
+              of
+                FFI_return new_ffi new_bytes =>
+                  (NONE,s with ffi := new_ffi)
+              | FFI_final outcome => (SOME (FinalFFI outcome),s)
+            else (SOME Error,s)
+          else if byte_align addr ∈ s.sh_memaddrs then
+            case
+              call_FFI s.ffi (SharedMem MappedWrite) [n2w nb]
+                (TAKE nb (word_to_bytes w F) ++ word_to_bytes addr F)
+            of
+              FFI_return new_ffi new_bytes => (NONE,s with ffi := new_ffi)
+            | FFI_final outcome => (SOME (FinalFFI outcome),s)
+          else (SOME Error,s)
+   
+   [shape_of_def_primitive]  Definition
+      
+      ⊢ shape_of =
+        WFREC (@R. WF R ∧ ∀vs a. MEM a vs ⇒ R a (RStruct vs))
+          (λshape_of a'.
+               case a' of
+                 Val v => I One
+               | RStruct vs => I (Comb (MAP (λa. shape_of a) vs))
+               | NStruct nm v1 => I (Named nm))
+   
+   [state_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0'.
+                 ∀ $var$('state').
+                   (∀a0'.
+                      (∃a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12.
+                         a0' =
+                         (λa0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12.
+                              ind_type$CONSTR 0
+                                (a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12)
+                                (λn. ind_type$BOTTOM)) a0 a1 a2 a3 a4 a5 a6
+                           a7 a8 a9 a10 a11 a12) ⇒
+                      $var$('state') a0') ⇒
+                   $var$('state') a0') rep
+   
+   [state_case_def]  Definition
+      
+      ⊢ ∀a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 f.
+          state_CASE (state a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12) f =
+          f a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12
+   
+   [state_size_def]  Definition
+      
+      ⊢ ∀f f1 a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12.
+          state_size f f1 (state a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12) =
+          1 +
+          (fmap_size (λk. 0) (λv. 1 + v_size f v) a0 +
+           (fmap_size (λk. 0) (λv. 1 + v_size f v) a1 +
+            (list_size (pair_size mlstring_size struct_info_size) a2 +
+             (fmap_size (λk. 0)
+                (λv.
+                     1 +
+                     pair_size
+                       (list_size (pair_size mlstring_size shape_size))
+                       (prog_size f) v) a3 +
+              (fmap_size (λk. 0) (λv. 1 + shape_size v) a4 +
+               (a8 +
+                (bool_size a9 +
+                 (ffi_state_size f1 a10 + (w2n a11 + w2n a12)))))))))
+   
+   [theValWord_def_primitive]  Definition
+      
+      ⊢ theValWord =
+        WFREC (@R. WF R)
+          (λtheValWord a.
+               case a of
+                 ValWord w => I w
+               | RStruct v1 => ARB
+               | NStruct v3 v4 => ARB)
+   
+   [theWord_def]  Definition
+      
+      ⊢ ∀w. theWord (Word w) = w
+   
+   [upd_locals_def]  Definition
+      
+      ⊢ ∀varargs s.
+          upd_locals varargs s = s with locals := FEMPTY |++ varargs
+   
+   [v_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0'.
+                 ∀ $var$('v') $var$('@temp@ind_typepanSem3list')
+                     $var$('@temp@ind_typepanSem4prod')
+                     $var$('@temp@ind_typepanSem5list').
+                   (∀a0'.
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR 0 (a,ARB)
+                                  (λn. ind_type$BOTTOM)) a) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR (SUC 0) (ARB,ARB)
+                                  (ind_type$FCONS a (λn. ind_type$BOTTOM)))
+                             a ∧ $var$('@temp@ind_typepanSem5list') a) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR (SUC (SUC 0)) (ARB,a0)
+                                (ind_type$FCONS a1 (λn. ind_type$BOTTOM)))
+                           a0 a1 ∧ $var$('@temp@ind_typepanSem3list') a1) ⇒
+                      $var$('v') a0') ∧
+                   (∀a1'.
+                      a1' =
+                      ind_type$CONSTR (SUC (SUC (SUC 0))) (ARB,ARB)
+                        (λn. ind_type$BOTTOM) ∨
+                      (∃a0 a1.
+                         a1' =
+                         (λa0 a1.
+                              ind_type$CONSTR (SUC (SUC (SUC (SUC 0))))
+                                (ARB,ARB)
+                                (ind_type$FCONS a0
+                                   (ind_type$FCONS a1 (λn. ind_type$BOTTOM))))
+                           a0 a1 ∧ $var$('@temp@ind_typepanSem4prod') a0 ∧
+                         $var$('@temp@ind_typepanSem3list') a1) ⇒
+                      $var$('@temp@ind_typepanSem3list') a1') ∧
+                   (∀a2.
+                      (∃a0 a1.
+                         a2 =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC (SUC (SUC (SUC (SUC 0))))) (ARB,a0)
+                                (ind_type$FCONS a1 (λn. ind_type$BOTTOM)))
+                           a0 a1 ∧ $var$('v') a1) ⇒
+                      $var$('@temp@ind_typepanSem4prod') a2) ∧
+                   (∀a3.
+                      a3 =
+                      ind_type$CONSTR (SUC (SUC (SUC (SUC (SUC (SUC 0))))))
+                        (ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      (∃a0 a1.
+                         a3 =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC (SUC (SUC (SUC (SUC (SUC (SUC 0)))))))
+                                (ARB,ARB)
+                                (ind_type$FCONS a0
+                                   (ind_type$FCONS a1 (λn. ind_type$BOTTOM))))
+                           a0 a1 ∧ $var$('v') a0 ∧
+                         $var$('@temp@ind_typepanSem5list') a1) ⇒
+                      $var$('@temp@ind_typepanSem5list') a3) ⇒
+                   $var$('v') a0') rep
+   
+   [v_case_def]  Definition
+      
+      ⊢ (∀a f f1 f2. v_CASE (Val a) f f1 f2 = f a) ∧
+        (∀a f f1 f2. v_CASE (RStruct a) f f1 f2 = f1 a) ∧
+        ∀a0 a1 f f1 f2. v_CASE (NStruct a0 a1) f f1 f2 = f2 a0 a1
+   
+   [v_size_def]  Definition
+      
+      ⊢ (∀f a. v_size f (Val a) = 1 + word_lab_size f a) ∧
+        (∀f a. v_size f (RStruct a) = 1 + v3_size f a) ∧
+        (∀f a0 a1.
+           v_size f (NStruct a0 a1) = 1 + (mlstring_size a0 + v1_size f a1)) ∧
+        (∀f. v1_size f [] = 0) ∧
+        (∀f a0 a1. v1_size f (a0::a1) = 1 + (v2_size f a0 + v1_size f a1)) ∧
+        (∀f a0 a1. v2_size f (a0,a1) = 1 + (mlstring_size a0 + v_size f a1)) ∧
+        (∀f. v3_size f [] = 0) ∧
+        ∀f a0 a1. v3_size f (a0::a1) = 1 + (v_size f a0 + v3_size f a1)
+   
+   [word_lab_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0.
+                 ∀ $var$('word_lab').
+                   (∀a0.
+                      (∃a. a0 =
+                           (λa. ind_type$CONSTR 0 a (λn. ind_type$BOTTOM))
+                             a) ⇒
+                      $var$('word_lab') a0) ⇒
+                   $var$('word_lab') a0) rep
+   
+   [word_lab_case_def]  Definition
+      
+      ⊢ ∀a f. word_lab_CASE (Word a) f = f a
+   
+   [word_lab_size_def]  Definition
+      
+      ⊢ ∀f a. word_lab_size f (Word a) = 1 + w2n a
+   
+   [write_bytearray_def]  Definition
+      
+      ⊢ (∀a m dm be. write_bytearray a [] m dm be = m) ∧
+        ∀a b bs m dm be.
+          write_bytearray a (b::bs) m dm be =
+          case
+            mem_store_byte (write_bytearray (a + 1w) bs m dm be) dm be a b
+          of
+            NONE => m
+          | SOME v => v
+   
+   [EXISTS_state]  Theorem
+      
+      ⊢ ∀P. (∃s. P s) ⇔
+            ∃f6 f5 l f4 f3 f2 f1 f0 n b f c0 c.
+              P
+                <|locals := f6; globals := f5; structs := l; code := f4;
+                  eshapes := f3; memory := f2; memaddrs := f1;
+                  sh_memaddrs := f0; clock := n; be := b; ffi := f;
+                  base_addr := c0; top_addr := c|>
+   
+   [FORALL_state]  Theorem
+      
+      ⊢ ∀P. (∀s. P s) ⇔
+            ∀f6 f5 l f4 f3 f2 f1 f0 n b f c0 c.
+              P
+                <|locals := f6; globals := f5; structs := l; code := f4;
+                  eshapes := f3; memory := f2; memaddrs := f1;
+                  sh_memaddrs := f0; clock := n; be := b; ffi := f;
+                  base_addr := c0; top_addr := c|>
+   
+   [datatype_result]  Theorem
+      
+      ⊢ DATATYPE
+          (result Error TimeOut Break Continue Return Exception FinalFFI)
+   
+   [datatype_state]  Theorem
+      
+      ⊢ DATATYPE
+          (record state locals globals structs code eshapes memory memaddrs
+             sh_memaddrs clock be ffi base_addr top_addr)
+   
+   [datatype_v]  Theorem
+      
+      ⊢ DATATYPE (v Val RStruct NStruct)
+   
+   [datatype_word_lab]  Theorem
+      
+      ⊢ DATATYPE (word_lab Word)
+   
+   [decs_stcnames_def]  Theorem
+      
+      ⊢ (∀st_ctxt. decs_stcnames st_ctxt [] = SOME st_ctxt) ∧
+        (∀st_ctxt nm flds ds.
+           decs_stcnames st_ctxt (Name nm flds::ds) =
+           case ALOOKUP st_ctxt nm of
+             NONE =>
+               if ALL_DISTINCT (MAP FST flds) then
+                 (let
+                    shs = MAP SND flds
+                  in
+                    if EVERY (is_wf_shape st_ctxt) shs then
+                      (let
+                         info =
+                           <|fields := flds;
+                             size :=
+                               size_of_sh_with_ctxt st_ctxt (Comb shs)|>
+                       in
+                         decs_stcnames ((nm,info)::st_ctxt) ds)
+                    else NONE)
+               else NONE
+           | SOME info => NONE) ∧
+        (∀v st_ctxt sh e ds.
+           decs_stcnames st_ctxt (Decl sh v e::ds) =
+           decs_stcnames st_ctxt ds) ∧
+        ∀st_ctxt fi ds.
+          decs_stcnames st_ctxt (Function fi::ds) =
+          decs_stcnames st_ctxt ds
+   
+   [decs_stcnames_ind]  Theorem
+      
+      ⊢ ∀P. (∀st_ctxt. P st_ctxt []) ∧
+            (∀st_ctxt nm flds ds.
+               (∀shs info.
+                  ALOOKUP st_ctxt nm = NONE ∧ ALL_DISTINCT (MAP FST flds) ∧
+                  shs = MAP SND flds ∧ EVERY (is_wf_shape st_ctxt) shs ∧
+                  info =
+                  <|fields := flds;
+                    size := size_of_sh_with_ctxt st_ctxt (Comb shs)|> ⇒
+                  P ((nm,info)::st_ctxt) ds) ⇒
+               P st_ctxt (Name nm flds::ds)) ∧
+            (∀st_ctxt sh v e ds. P st_ctxt ds ⇒ P st_ctxt (Decl sh v e::ds)) ∧
+            (∀st_ctxt fi ds. P st_ctxt ds ⇒ P st_ctxt (Function fi::ds)) ⇒
+            ∀v v1. P v v1
+   
+   [eval_def]  Theorem
+      
+      ⊢ (∀w s. eval s (Const w) = SOME (ValWord w)) ∧
+        (∀v s. eval s (Var Local v) = FLOOKUP s.locals v) ∧
+        (∀v s. eval s (Var Global v) = FLOOKUP s.globals v) ∧
+        (∀s es.
+           eval s (RStruct es) =
+           case OPT_MMAP (λa. eval s a) es of
+             NONE => NONE
+           | SOME vs => SOME (RStruct vs)) ∧
+        (∀s index e.
+           eval s (RField index e) =
+           case eval s e of
+             NONE => NONE
+           | SOME (Val v6) => NONE
+           | SOME (RStruct vs) =>
+             if index < LENGTH vs then SOME vs❲index❳ else NONE
+           | SOME (NStruct v8 v9) => NONE) ∧
+        (∀s nm eflds.
+           eval s (NStruct nm eflds) =
+           (let
+              (field_names,field_exps) = UNZIP eflds
+            in
+              case ALOOKUP s.structs nm of
+                NONE => NONE
+              | SOME info =>
+                (let
+                   (field_names',field_shapes) = UNZIP info.fields
+                 in
+                   if field_names' = field_names then
+                     case OPT_MMAP (λa. eval s a) field_exps of
+                       NONE => NONE
+                     | SOME field_vals =>
+                       if
+                         EVERY (λ(s,v). s = shape_of v)
+                           (ZIP (field_shapes,field_vals))
+                       then
+                         SOME (NStruct nm (ZIP (field_names,field_vals)))
+                       else NONE
+                   else NONE))) ∧
+        (∀s fld e.
+           eval s (NField fld e) =
+           case eval s e of
+             NONE => NONE
+           | SOME (Val v6) => NONE
+           | SOME (RStruct v7) => NONE
+           | SOME (NStruct nm vflds) =>
+             if ALOOKUP s.structs nm ≠ NONE then ALOOKUP vflds fld
+             else NONE) ∧
+        (∀shape s addr.
+           eval s (Load shape addr) =
+           if is_wf_shape s.structs shape then
+             case eval s addr of
+               NONE => NONE
+             | SOME (ValWord w) =>
+               mem_load shape w s.memaddrs s.memory s.structs
+             | SOME (RStruct v7) => NONE
+             | SOME (NStruct v8 v9) => NONE
+           else NONE) ∧
+        (∀s addr.
+           eval s (Load32 addr) =
+           case eval s addr of
+             NONE => NONE
+           | SOME (ValWord w) =>
+             (case mem_load_32 s.memory s.memaddrs s.be w of
+                NONE => NONE
+              | SOME w => SOME (ValWord (w2w w)))
+           | SOME (RStruct v7) => NONE
+           | SOME (NStruct v8 v9) => NONE) ∧
+        (∀s addr.
+           eval s (LoadByte addr) =
+           case eval s addr of
+             NONE => NONE
+           | SOME (ValWord w) =>
+             (case mem_load_byte s.memory s.memaddrs s.be w of
+                NONE => NONE
+              | SOME w => SOME (ValWord (w2w w)))
+           | SOME (RStruct v7) => NONE
+           | SOME (NStruct v8 v9) => NONE) ∧
+        (∀s op es.
+           eval s (Op op es) =
+           case OPT_MMAP (λa. eval s a) es of
+             NONE => NONE
+           | SOME ws =>
+             if
+               EVERY
+                 (λw.
+                      case w of
+                        Val v4 => T
+                      | RStruct v5 => F
+                      | NStruct v6 v7 => F) ws
+             then
+               OPTION_MAP (λw. ValWord w)
+                 (word_op op
+                    (MAP
+                       (λw.
+                            case w of
+                              ValWord n => n
+                            | RStruct v1 => ARB
+                            | NStruct v3 v4 => ARB) ws))
+             else NONE) ∧
+        (∀s op es.
+           eval s (Panop op es) =
+           case OPT_MMAP (λa. eval s a) es of
+             NONE => NONE
+           | SOME ws =>
+             if
+               EVERY
+                 (λw.
+                      case w of
+                        Val v4 => T
+                      | RStruct v5 => F
+                      | NStruct v6 v7 => F) ws
+             then
+               OPTION_MAP (λw. ValWord w)
+                 (pan_op op
+                    (MAP
+                       (λw.
+                            case w of
+                              ValWord n => n
+                            | RStruct v1 => ARB
+                            | NStruct v3 v4 => ARB) ws))
+             else NONE) ∧
+        (∀s e2 e1 cmp.
+           eval s (Cmp cmp e1 e2) =
+           case (eval s e1,eval s e2) of
+             (NONE,v3) => NONE
+           | (SOME (Val v10),NONE) => NONE
+           | (SOME (ValWord w1),SOME (ValWord w2)) =>
+             SOME (ValWord (if word_cmp cmp w1 w2 then 1w else 0w))
+           | (SOME (Val v10),SOME (RStruct v21)) => NONE
+           | (SOME (Val v10),SOME (NStruct v22 v23)) => NONE
+           | (SOME (RStruct v11),v3) => NONE
+           | (SOME (NStruct v12 v13),v3) => NONE) ∧
+        (∀sh s n e.
+           eval s (Shift sh e n) =
+           case eval s e of
+             NONE => NONE
+           | SOME (ValWord w) =>
+             OPTION_MAP (λw. ValWord w) (word_sh sh w n)
+           | SOME (RStruct v7) => NONE
+           | SOME (NStruct v8 v9) => NONE) ∧
+        (∀s. eval s BaseAddr = SOME (ValWord s.base_addr)) ∧
+        (∀s. eval s TopAddr = SOME (ValWord s.top_addr)) ∧
+        ∀s. eval s BytesInWord = SOME (ValWord bytes_in_word)
+   
+   [eval_ind]  Theorem
+      
+      ⊢ ∀P. (∀s w. P s (Const w)) ∧ (∀s v. P s (Var Local v)) ∧
+            (∀s v. P s (Var Global v)) ∧
+            (∀s es. (∀a. MEM a es ⇒ P s a) ⇒ P s (RStruct es)) ∧
+            (∀s index e. P s e ⇒ P s (RField index e)) ∧
+            (∀s nm eflds.
+               (∀field_names field_exps info field_names' field_shapes a.
+                  (field_names,field_exps) = UNZIP eflds ∧
+                  ALOOKUP s.structs nm = SOME info ∧
+                  (field_names',field_shapes) = UNZIP info.fields ∧
+                  field_names' = field_names ∧ MEM a field_exps ⇒
+                  P s a) ⇒
+               P s (NStruct nm eflds)) ∧
+            (∀s fld e. P s e ⇒ P s (NField fld e)) ∧
+            (∀s shape addr.
+               (is_wf_shape s.structs shape ⇒ P s addr) ⇒
+               P s (Load shape addr)) ∧
+            (∀s addr. P s addr ⇒ P s (Load32 addr)) ∧
+            (∀s addr. P s addr ⇒ P s (LoadByte addr)) ∧
+            (∀s op es. (∀a. MEM a es ⇒ P s a) ⇒ P s (Op op es)) ∧
+            (∀s op es. (∀a. MEM a es ⇒ P s a) ⇒ P s (Panop op es)) ∧
+            (∀s cmp e1 e2. P s e1 ∧ P s e2 ⇒ P s (Cmp cmp e1 e2)) ∧
+            (∀s sh e n. P s e ⇒ P s (Shift sh e n)) ∧ (∀s. P s BaseAddr) ∧
+            (∀s. P s TopAddr) ∧ (∀s. P s BytesInWord) ⇒
+            ∀v v1. P v v1
+   
+   [evaluate_clock]  Theorem
+      
+      ⊢ ∀prog s r s'. evaluate (prog,s) = (r,s') ⇒ s'.clock ≤ s.clock
+   
+   [evaluate_decls_def]  Theorem
+      
+      ⊢ (∀s. evaluate_decls s [] = SOME s) ∧
+        (∀s nm flds ds.
+           evaluate_decls s (Name nm flds::ds) = evaluate_decls s ds) ∧
+        (∀v sh s e ds.
+           evaluate_decls s (Decl sh v e::ds) =
+           case eval (s with locals := FEMPTY) e of
+             NONE => NONE
+           | SOME res =>
+             if sh = shape_of res then
+               evaluate_decls (s with globals := s.globals⟨v ↦ res⟩) ds
+             else NONE) ∧
+        ∀s fi ds.
+          evaluate_decls s (Function fi::ds) =
+          if
+            EVERY (is_wf_shape s.structs ∘ SND) fi.params ∧
+            is_wf_shape s.structs fi.return
+          then
+            evaluate_decls
+              (s with code := s.code⟨fi.name ↦ (fi.params,fi.body)⟩) ds
+          else NONE
+   
+   [evaluate_decls_ind]  Theorem
+      
+      ⊢ ∀P. (∀s. P s []) ∧
+            (∀s nm flds ds. P s ds ⇒ P s (Name nm flds::ds)) ∧
+            (∀s sh v e ds.
+               (∀res.
+                  eval (s with locals := FEMPTY) e = SOME res ∧
+                  sh = shape_of res ⇒
+                  P (s with globals := s.globals⟨v ↦ res⟩) ds) ⇒
+               P s (Decl sh v e::ds)) ∧
+            (∀s fi ds.
+               (EVERY (is_wf_shape s.structs ∘ SND) fi.params ∧
+                is_wf_shape s.structs fi.return ⇒
+                P (s with code := s.code⟨fi.name ↦ (fi.params,fi.body)⟩) ds) ⇒
+               P s (Function fi::ds)) ⇒
+            ∀v v1. P v v1
+   
+   [evaluate_def]  Theorem
+      
+      ⊢ (∀s. evaluate (Skip,s) = (NONE,s)) ∧
+        (∀v sh s prog e.
+           evaluate (Dec v sh e prog,s) =
+           case eval s e of
+             NONE => (SOME Error,s)
+           | SOME value =>
+             if sh = shape_of value then
+               (let
+                  (res,st) =
+                    evaluate (prog,s with locals := s.locals⟨v ↦ value⟩)
+                in
+                  (res,
+                   st with
+                   locals := res_var st.locals (v,FLOOKUP s.locals v)))
+             else (SOME Error,s)) ∧
+        (∀vk v src s.
+           evaluate (Assign vk v src,s) =
+           case eval s src of
+             NONE => (SOME Error,s)
+           | SOME value =>
+             if is_valid_value s vk v value then
+               (NONE,set_kvar vk v value s)
+             else (SOME Error,s)) ∧
+        (∀v s pop es.
+           evaluate (Primitive v pop es,s) =
+           case OPT_MMAP (eval s) es of
+             NONE => (SOME Error,s)
+           | SOME vs =>
+             case pan_primop pop vs of
+               NONE => (SOME Error,s)
+             | SOME value =>
+               if is_valid_value s Local v value then
+                 (NONE,set_var v value s)
+               else (SOME Error,s)) ∧
+        (∀src s dst.
+           evaluate (Store dst src,s) =
+           case (eval s dst,eval s src) of
+             (NONE,v3) => (SOME Error,s)
+           | (SOME (Val v10),NONE) => (SOME Error,s)
+           | (SOME (ValWord addr),SOME value) =>
+             (case mem_stores addr (flatten value) s.memaddrs s.memory of
+                NONE => (SOME Error,s)
+              | SOME m => (NONE,s with memory := m))
+           | (SOME (RStruct v11),v3) => (SOME Error,s)
+           | (SOME (NStruct v12 v13),v3) => (SOME Error,s)) ∧
+        (∀src s dst.
+           evaluate (Store32 dst src,s) =
+           case (eval s dst,eval s src) of
+             (NONE,v3) => (SOME Error,s)
+           | (SOME (Val v10),NONE) => (SOME Error,s)
+           | (SOME (ValWord adr),SOME (ValWord w)) =>
+             (case mem_store_32 s.memory s.memaddrs s.be adr (w2w w) of
+                NONE => (SOME Error,s)
+              | SOME m => (NONE,s with memory := m))
+           | (SOME (Val v10),SOME (RStruct v21)) => (SOME Error,s)
+           | (SOME (Val v10),SOME (NStruct v22 v23)) => (SOME Error,s)
+           | (SOME (RStruct v11),v3) => (SOME Error,s)
+           | (SOME (NStruct v12 v13),v3) => (SOME Error,s)) ∧
+        (∀src s dst.
+           evaluate (StoreByte dst src,s) =
+           case (eval s dst,eval s src) of
+             (NONE,v3) => (SOME Error,s)
+           | (SOME (Val v10),NONE) => (SOME Error,s)
+           | (SOME (ValWord adr),SOME (ValWord w)) =>
+             (case mem_store_byte s.memory s.memaddrs s.be adr (w2w w) of
+                NONE => (SOME Error,s)
+              | SOME m => (NONE,s with memory := m))
+           | (SOME (Val v10),SOME (RStruct v21)) => (SOME Error,s)
+           | (SOME (Val v10),SOME (NStruct v22 v23)) => (SOME Error,s)
+           | (SOME (RStruct v11),v3) => (SOME Error,s)
+           | (SOME (NStruct v12 v13),v3) => (SOME Error,s)) ∧
+        (∀vk v s op ad.
+           evaluate (ShMemLoad op vk v ad,s) =
+           case eval s ad of
+             NONE => (SOME Error,s)
+           | SOME (ValWord addr) =>
+             (case lookup_kvar vk v s of
+                NONE => (SOME Error,s)
+              | SOME (Val v7) => sh_mem_load vk v addr (nb_op op) s
+              | SOME (RStruct v8) => (SOME Error,s)
+              | SOME (NStruct v9 v10) => (SOME Error,s))
+           | SOME (RStruct v13) => (SOME Error,s)
+           | SOME (NStruct v14 v15) => (SOME Error,s)) ∧
+        (∀s op e ad.
+           evaluate (ShMemStore op ad e,s) =
+           case (eval s ad,eval s e) of
+             (NONE,v3) => (SOME Error,s)
+           | (SOME (Val v10),NONE) => (SOME Error,s)
+           | (SOME (ValWord addr),SOME (ValWord bytes)) =>
+             sh_mem_store bytes addr (nb_op op) s
+           | (SOME (Val v10),SOME (RStruct v21)) => (SOME Error,s)
+           | (SOME (Val v10),SOME (NStruct v22 v23)) => (SOME Error,s)
+           | (SOME (RStruct v11),v3) => (SOME Error,s)
+           | (SOME (NStruct v12 v13),v3) => (SOME Error,s)) ∧
+        (∀s c2 c1.
+           evaluate (Seq c1 c2,s) =
+           (let
+              (res,s1) = evaluate (c1,s)
+            in
+              if res = NONE then evaluate (c2,s1) else (res,s1))) ∧
+        (∀s e c2 c1.
+           evaluate (If e c1 c2,s) =
+           case eval s e of
+             NONE => (SOME Error,s)
+           | SOME (ValWord w) => evaluate (if w ≠ 0w then c1 else c2,s)
+           | SOME (RStruct v7) => (SOME Error,s)
+           | SOME (NStruct v8 v9) => (SOME Error,s)) ∧
+        (∀s. evaluate (Break,s) = (SOME Break,s)) ∧
+        (∀s. evaluate (Continue,s) = (SOME Continue,s)) ∧
+        (∀s e c.
+           evaluate (While e c,s) =
+           case eval s e of
+             NONE => (SOME Error,s)
+           | SOME (ValWord w) =>
+             if w ≠ 0w then
+               if s.clock = 0 then (SOME TimeOut,empty_locals s)
+               else
+                 (let
+                    (res,s1) = evaluate (c,dec_clock s)
+                  in
+                    case res of
+                      NONE => evaluate (While e c,s1)
+                    | SOME Error => (res,s1)
+                    | SOME TimeOut => (res,s1)
+                    | SOME Break => (NONE,s1)
+                    | SOME Continue => evaluate (While e c,s1)
+                    | SOME (Return v6) => (res,s1)
+                    | SOME (Exception v7 v8) => (res,s1)
+                    | SOME (FinalFFI v9) => (res,s1))
+             else (NONE,s)
+           | SOME (RStruct v12) => (SOME Error,s)
+           | SOME (NStruct v13 v14) => (SOME Error,s)) ∧
+        (∀s e.
+           evaluate (Return e,s) =
+           case eval s e of
+             NONE => (SOME Error,s)
+           | SOME value =>
+             if size_of_sh_with_ctxt s.structs (shape_of value) ≤ 32 then
+               (SOME (Return value),empty_locals s)
+             else (SOME Error,s)) ∧
+        (∀s eid e.
+           evaluate (Raise eid e,s) =
+           case (FLOOKUP s.eshapes eid,eval s e) of
+             (NONE,v3) => (SOME Error,s)
+           | (SOME sh,NONE) => (SOME Error,s)
+           | (SOME sh,SOME value) =>
+             if
+               shape_of value = sh ∧
+               size_of_sh_with_ctxt s.structs (shape_of value) ≤ 32
+             then
+               (SOME (Exception eid value),empty_locals s)
+             else (SOME Error,s)) ∧
+        (∀s. evaluate (Tick,s) =
+             if s.clock = 0 then (SOME TimeOut,empty_locals s)
+             else (NONE,dec_clock s)) ∧
+        (∀v1 v0 s. evaluate (Annot v0 v1,s) = (NONE,s)) ∧
+        (∀s fname caltyp argexps.
+           evaluate (Call caltyp fname argexps,s) =
+           case OPT_MMAP (eval s) argexps of
+             NONE => (SOME Error,s)
+           | SOME args =>
+             case lookup_code s.code fname args of
+               NONE => (SOME Error,s)
+             | SOME (prog,newlocals) =>
+               if s.clock = 0 then (SOME TimeOut,empty_locals s)
+               else
+                 (let
+                    eval_prog =
+                      evaluate (prog,dec_clock s with locals := newlocals)
+                  in
+                    case eval_prog of
+                      (NONE,st) => (SOME Error,st)
+                    | (SOME Error,st) => (SOME Error,empty_locals st)
+                    | (SOME TimeOut,st) => (SOME TimeOut,empty_locals st)
+                    | (SOME Break,st) => (SOME Error,st)
+                    | (SOME Continue,st) => (SOME Error,st)
+                    | (SOME (Return retv),st) =>
+                      (case caltyp of
+                         NONE => (SOME (Return retv),empty_locals st)
+                       | SOME (NONE,v2) =>
+                         (NONE,st with locals := s.locals)
+                       | SOME (SOME (rk,rt),v2) =>
+                         if is_valid_value s rk rt retv then
+                           (NONE,
+                            set_kvar rk rt retv
+                              (st with locals := s.locals))
+                         else (SOME Error,st))
+                    | (SOME (Exception eid exn),st) =>
+                      (case caltyp of
+                         NONE => (SOME (Exception eid exn),empty_locals st)
+                       | SOME (v1,NONE) =>
+                         (SOME (Exception eid exn),empty_locals st)
+                       | SOME (v1,SOME (eid',evar,p)) =>
+                         if eid = eid' then
+                           case FLOOKUP s.eshapes eid of
+                             NONE => (SOME Error,st)
+                           | SOME sh =>
+                             if
+                               shape_of exn = sh ∧
+                               is_valid_value s Local evar exn
+                             then
+                               evaluate
+                                 (p,
+                                  set_var evar exn
+                                    (st with locals := s.locals))
+                             else (SOME Error,st)
+                         else (SOME (Exception eid exn),empty_locals st))
+                    | (SOME (FinalFFI v16),st) =>
+                      (SOME (FinalFFI v16),empty_locals st))) ∧
+        (∀shape s rt prog1 fname argexps.
+           evaluate (DecCall rt shape fname argexps prog1,s) =
+           case OPT_MMAP (eval s) argexps of
+             NONE => (SOME Error,s)
+           | SOME args =>
+             case lookup_code s.code fname args of
+               NONE => (SOME Error,s)
+             | SOME (prog,newlocals) =>
+               if s.clock = 0 then (SOME TimeOut,empty_locals s)
+               else
+                 (let
+                    eval_prog =
+                      evaluate (prog,dec_clock s with locals := newlocals)
+                  in
+                    case eval_prog of
+                      (NONE,st) => (SOME Error,st)
+                    | (SOME Error,st) => (SOME Error,empty_locals st)
+                    | (SOME TimeOut,st) => (SOME TimeOut,empty_locals st)
+                    | (SOME Break,st) => (SOME Error,st)
+                    | (SOME Continue,st) => (SOME Error,st)
+                    | (SOME (Return retv),st) =>
+                      if shape_of retv = shape then
+                        (let
+                           (res',st') =
+                             evaluate
+                               (prog1,
+                                set_var rt retv
+                                  (st with locals := s.locals))
+                         in
+                           (res',
+                            st' with
+                            locals :=
+                              res_var st'.locals (rt,FLOOKUP s.locals rt)))
+                      else (SOME Error,st)
+                    | (SOME (Exception v9 v10),st) =>
+                      (SOME (Exception v9 v10),empty_locals st)
+                    | (SOME (FinalFFI v11),st) =>
+                      (SOME (FinalFFI v11),empty_locals st))) ∧
+        ∀s ptr2 ptr1 len2 len1 ffi_index.
+          evaluate (ExtCall ffi_index ptr1 len1 ptr2 len2,s) =
+          case (eval s ptr1,eval s len1,eval s ptr2,eval s len2) of
+            (NONE,v5) => (SOME Error,s)
+          | (SOME (Val v12),NONE,v19) => (SOME Error,s)
+          | (SOME (Val v12),SOME (Val v26),NONE,v33) => (SOME Error,s)
+          | (SOME (Val v12),SOME (Val v26),SOME (Val v40),NONE) =>
+            (SOME Error,s)
+          | (SOME (ValWord sz1),SOME (ValWord ad1),SOME (ValWord sz2),
+           SOME (ValWord ad2)) =>
+            (case
+               (read_bytearray sz1 (w2n ad1)
+                  (mem_load_byte s.memory s.memaddrs s.be),
+                read_bytearray sz2 (w2n ad2)
+                  (mem_load_byte s.memory s.memaddrs s.be))
+             of
+               (NONE,v3) => (SOME Error,s)
+             | (SOME bytes,NONE) => (SOME Error,s)
+             | (SOME bytes,SOME bytes2) =>
+               case call_FFI s.ffi (ExtCall ffi_index) bytes bytes2 of
+                 FFI_return new_ffi new_bytes =>
+                   (let
+                      nmem =
+                        write_bytearray sz2 new_bytes s.memory s.memaddrs
+                          s.be
+                    in
+                      (NONE,s with <|memory := nmem; ffi := new_ffi|>))
+               | FFI_final outcome =>
+                 (SOME (FinalFFI outcome),empty_locals s))
+          | (SOME (Val v12),SOME (Val v26),SOME (Val v40),
+           SOME (RStruct v51)) =>
+            (SOME Error,s)
+          | (SOME (Val v12),SOME (Val v26),SOME (Val v40),
+           SOME (NStruct v52 v53)) =>
+            (SOME Error,s)
+          | (SOME (Val v12),SOME (Val v26),SOME (RStruct v41),v33) =>
+            (SOME Error,s)
+          | (SOME (Val v12),SOME (Val v26),SOME (NStruct v42 v43),v33) =>
+            (SOME Error,s)
+          | (SOME (Val v12),SOME (RStruct v27),v19) => (SOME Error,s)
+          | (SOME (Val v12),SOME (NStruct v28 v29),v19) => (SOME Error,s)
+          | (SOME (RStruct v13),v5) => (SOME Error,s)
+          | (SOME (NStruct v14 v15),v5) => (SOME Error,s)
+   
+   [evaluate_ind]  Theorem
+      
+      ⊢ ∀P. (∀s. P (Skip,s)) ∧
+            (∀v sh e prog s.
+               (∀value.
+                  eval s e = SOME value ∧ sh = shape_of value ⇒
+                  P (prog,s with locals := s.locals⟨v ↦ value⟩)) ⇒
+               P (Dec v sh e prog,s)) ∧
+            (∀vk v src s. P (Assign vk v src,s)) ∧
+            (∀v pop es s. P (Primitive v pop es,s)) ∧
+            (∀dst src s. P (Store dst src,s)) ∧
+            (∀dst src s. P (Store32 dst src,s)) ∧
+            (∀dst src s. P (StoreByte dst src,s)) ∧
+            (∀op vk v ad s. P (ShMemLoad op vk v ad,s)) ∧
+            (∀op ad e s. P (ShMemStore op ad e,s)) ∧
+            (∀c1 c2 s.
+               (∀res s1.
+                  (res,s1) = evaluate (c1,s) ∧ res = NONE ⇒ P (c2,s1)) ∧
+               P (c1,s) ⇒
+               P (Seq c1 c2,s)) ∧
+            (∀e c1 c2 s.
+               (∀v1 v6 w.
+                  eval s e = SOME v1 ∧ v1 = Val v6 ∧ v6 = Word w ⇒
+                  P (if w ≠ 0w then c1 else c2,s)) ⇒
+               P (If e c1 c2,s)) ∧ (∀s. P (Break,s)) ∧
+            (∀s. P (Continue,s)) ∧
+            (∀e c s.
+               (∀v2 v11 w res s1 v1.
+                  eval s e = SOME v2 ∧ v2 = Val v11 ∧ v11 = Word w ∧
+                  w ≠ 0w ∧ s.clock ≠ 0 ∧
+                  (res,s1) = evaluate (c,dec_clock s) ∧ res = SOME v1 ∧
+                  v1 = Continue ⇒
+                  P (While e c,s1)) ∧
+               (∀v2 v11 w res s1.
+                  eval s e = SOME v2 ∧ v2 = Val v11 ∧ v11 = Word w ∧
+                  w ≠ 0w ∧ s.clock ≠ 0 ∧
+                  (res,s1) = evaluate (c,dec_clock s) ∧ res = NONE ⇒
+                  P (While e c,s1)) ∧
+               (∀v2 v11 w.
+                  eval s e = SOME v2 ∧ v2 = Val v11 ∧ v11 = Word w ∧
+                  w ≠ 0w ∧ s.clock ≠ 0 ⇒
+                  P (c,dec_clock s)) ⇒
+               P (While e c,s)) ∧ (∀e s. P (Return e,s)) ∧
+            (∀eid e s. P (Raise eid e,s)) ∧ (∀s. P (Tick,s)) ∧
+            (∀v0 v1 s. P (Annot v0 v1,s)) ∧
+            (∀caltyp fname argexps s.
+               (∀args v7 prog newlocals eval_prog v4 st v8 eid exn v v1 v2
+                    v3 eid' v5 evar p sh.
+                  OPT_MMAP (eval s) argexps = SOME args ∧
+                  lookup_code s.code fname args = SOME v7 ∧
+                  v7 = (prog,newlocals) ∧ s.clock ≠ 0 ∧
+                  eval_prog =
+                  evaluate (prog,dec_clock s with locals := newlocals) ∧
+                  eval_prog = (v4,st) ∧ v4 = SOME v8 ∧
+                  v8 = Exception eid exn ∧ caltyp = SOME v ∧ v = (v1,v2) ∧
+                  v2 = SOME v3 ∧ v3 = (eid',v5) ∧ v5 = (evar,p) ∧
+                  eid = eid' ∧ FLOOKUP s.eshapes eid = SOME sh ∧
+                  shape_of exn = sh ∧ is_valid_value s Local evar exn ⇒
+                  P (p,set_var evar exn (st with locals := s.locals))) ∧
+               (∀args v7 prog newlocals.
+                  OPT_MMAP (eval s) argexps = SOME args ∧
+                  lookup_code s.code fname args = SOME v7 ∧
+                  v7 = (prog,newlocals) ∧ s.clock ≠ 0 ⇒
+                  P (prog,dec_clock s with locals := newlocals)) ⇒
+               P (Call caltyp fname argexps,s)) ∧
+            (∀rt shape fname argexps prog1 s.
+               (∀args v2 prog newlocals eval_prog v st v3 retv.
+                  OPT_MMAP (eval s) argexps = SOME args ∧
+                  lookup_code s.code fname args = SOME v2 ∧
+                  v2 = (prog,newlocals) ∧ s.clock ≠ 0 ∧
+                  eval_prog =
+                  evaluate (prog,dec_clock s with locals := newlocals) ∧
+                  eval_prog = (v,st) ∧ v = SOME v3 ∧ v3 = Return retv ∧
+                  shape_of retv = shape ⇒
+                  P (prog1,set_var rt retv (st with locals := s.locals))) ∧
+               (∀args v2 prog newlocals.
+                  OPT_MMAP (eval s) argexps = SOME args ∧
+                  lookup_code s.code fname args = SOME v2 ∧
+                  v2 = (prog,newlocals) ∧ s.clock ≠ 0 ⇒
+                  P (prog,dec_clock s with locals := newlocals)) ⇒
+               P (DecCall rt shape fname argexps prog1,s)) ∧
+            (∀ffi_index ptr1 len1 ptr2 len2 s.
+               P (ExtCall ffi_index ptr1 len1 ptr2 len2,s)) ⇒
+            ∀v v1. P (v,v1)
+   
+   [fix_clock_IMP_LESS_EQ]  Theorem
+      
+      ⊢ ∀x. fix_clock s x = (res,s1) ⇒ s1.clock ≤ s.clock
+   
+   [fix_clock_evaluate]  Theorem
+      
+      ⊢ fix_clock s (evaluate (prog,s)) = evaluate (prog,s)
+   
+   [flatten_def]  Theorem
+      
+      ⊢ (∀w. flatten (Val w) = [w]) ∧
+        (∀vs. flatten (RStruct vs) = FLAT (MAP (λa. flatten a) vs)) ∧
+        ∀nm flds.
+          flatten (NStruct nm flds) =
+          FLAT (MAP (λa. flatten a) (MAP SND flds))
+   
+   [flatten_ind]  Theorem
+      
+      ⊢ ∀P. (∀w. P (Val w)) ∧
+            (∀vs. (∀a. MEM a vs ⇒ P a) ⇒ P (RStruct vs)) ∧
+            (∀nm flds.
+               (∀a. MEM a (MAP SND flds) ⇒ P a) ⇒ P (NStruct nm flds)) ⇒
+            ∀v. P v
+   
+   [isValWord_def]  Theorem
+      
+      ⊢ (isValWord (ValWord v0) ⇔ T) ∧ (isValWord (RStruct v2) ⇔ F) ∧
+        (isValWord (NStruct v3 v4) ⇔ F)
+   
+   [isValWord_ind]  Theorem
+      
+      ⊢ ∀P. (∀v0. P (ValWord v0)) ∧ (∀v2. P (RStruct v2)) ∧
+            (∀v3 v4. P (NStruct v3 v4)) ⇒
+            ∀v. P v
+   
+   [isWord_def]  Theorem
+      
+      ⊢ isWord (Word v0) ⇔ T
+   
+   [isWord_ind]  Theorem
+      
+      ⊢ ∀P. (∀v0. P (Word v0)) ⇒ ∀v. P v
+   
+   [is_valid_value_simps]  Theorem
+      
+      ⊢ (is_valid_value s Local v value ⇔
+         case FLOOKUP s.locals v of
+           NONE => F
+         | SOME w => shape_of value = shape_of w) ∧
+        (is_valid_value s Global v value ⇔
+         case FLOOKUP s.globals v of
+           NONE => F
+         | SOME w => shape_of value = shape_of w)
+   
+   [is_valid_value_simps2]  Theorem
+      
+      ⊢ (is_valid_value (s with clock := k) vk v vl ⇔
+         is_valid_value s vk v vl) ∧
+        (is_valid_value (s with ffi := ffi) vk v vl ⇔
+         is_valid_value s vk v vl) ∧
+        (is_valid_value (s with code := cd) vk v vl ⇔
+         is_valid_value s vk v vl) ∧
+        (is_valid_value (s with memory := m) vk v vl ⇔
+         is_valid_value s vk v vl) ∧
+        lookup_kvar vk v (s with clock := k) = lookup_kvar vk v s ∧
+        lookup_kvar vk v (s with ffi := ffi) = lookup_kvar vk v s ∧
+        lookup_kvar vk v (s with code := cd) = lookup_kvar vk v s ∧
+        lookup_kvar vk v (s with memory := m) = lookup_kvar vk v s
+   
+   [kvar_defs]  Theorem
+      
+      ⊢ (∀v value s.
+           set_var v value s = s with locals := s.locals⟨v ↦ value⟩) ∧
+        (∀v value s.
+           set_global v value s = s with globals := s.globals⟨v ↦ value⟩) ∧
+        (∀vk v value s.
+           set_kvar vk v value s =
+           case vk of
+             Local => set_var v value s
+           | Global => set_global v value s) ∧
+        (∀s vk v value.
+           is_valid_value s vk v value ⇔
+           case lookup_kvar vk v s of
+             NONE => F
+           | SOME w => shape_of value = shape_of w) ∧
+        ∀vk v s.
+          lookup_kvar vk v s =
+          case vk of
+            Local => FLOOKUP s.locals v
+          | Global => FLOOKUP s.globals v
+   
+   [kvar_simps]  Theorem
+      
+      ⊢ set_kvar Local v value s = set_var v value s ∧
+        set_kvar Global v value s = set_global v value s ∧
+        lookup_kvar Local v s = FLOOKUP s.locals v ∧
+        lookup_kvar Global v s = FLOOKUP s.globals v
+   
+   [mem_load_32_alt]  Theorem
+      
+      ⊢ mem_load_32 m dm be w =
+        if aligned 2 w then
+          case m (byte_align w) of
+            Word v =>
+              if byte_align w ∈ dm then
+                (let
+                   b0 = get_byte w v be;
+                   b1 = get_byte (w + 1w) v be;
+                   b2 = get_byte (w + 2w) v be;
+                   b3 = get_byte (w + 3w) v be;
+                   v' =
+                     if be then
+                       w2w b0 ≪ 24 ‖ w2w b1 ≪ 16 ‖ w2w b2 ≪ 8 ‖ w2w b3
+                     else w2w b0 ‖ w2w b1 ≪ 8 ‖ w2w b2 ≪ 16 ‖ w2w b3 ≪ 24
+                 in
+                   SOME v')
+              else NONE
+        else NONE
+   
+   [mem_load_def]  Theorem
+      
+      ⊢ (∀stcs sh m dm addr.
+           mem_load sh addr dm m stcs =
+           case sh of
+             One => if addr ∈ dm then SOME (Val (m addr)) else NONE
+           | Comb shapes =>
+             (case mem_loads shapes addr dm m stcs of
+                NONE => NONE
+              | SOME vs => SOME (RStruct vs))
+           | Named nm =>
+             case dropWhile (λ(n,i). n ≠ nm) stcs of
+               [] => NONE
+             | (nm',info)::stcs' =>
+               case mem_load_flds info.fields addr dm m stcs' of
+                 NONE => NONE
+               | SOME vflds => SOME (NStruct nm' vflds)) ∧
+        (∀stcs m dm addr. mem_loads [] addr dm m stcs = SOME []) ∧
+        (∀stcs shapes shape m dm addr.
+           mem_loads (shape::shapes) addr dm m stcs =
+           case
+             (mem_load shape addr dm m stcs,
+              mem_loads shapes
+                (addr +
+                 bytes_in_word * n2w (size_of_sh_with_ctxt stcs shape)) dm
+                m stcs)
+           of
+             (NONE,v4) => NONE
+           | (SOME v,NONE) => NONE
+           | (SOME v,SOME vs) => SOME (v::vs)) ∧
+        (∀stcs m dm addr. mem_load_flds [] addr dm m stcs = SOME []) ∧
+        ∀stcs shape m fld fields dm addr.
+          mem_load_flds ((fld,shape)::fields) addr dm m stcs =
+          case
+            (mem_load shape addr dm m stcs,
+             mem_load_flds fields
+               (addr +
+                bytes_in_word * n2w (size_of_sh_with_ctxt stcs shape)) dm m
+               stcs)
+          of
+            (NONE,v4) => NONE
+          | (SOME v,NONE) => NONE
+          | (SOME v,SOME vflds) => SOME ((fld,v)::vflds)
+   
+   [mem_load_ind]  Theorem
+      
+      ⊢ ∀P0 P1 P2.
+          (∀sh addr dm m stcs.
+             (∀shapes. sh = Comb shapes ⇒ P1 shapes addr dm m stcs) ∧
+             (∀nm v2 stcs' nm' info.
+                sh = Named nm ∧
+                dropWhile (λ(n,i). n ≠ nm) stcs = v2::stcs' ∧
+                v2 = (nm',info) ⇒
+                P2 info.fields addr dm m stcs') ⇒
+             P0 sh addr dm m stcs) ∧
+          (∀addr dm m stcs. P1 [] addr dm m stcs) ∧
+          (∀shape shapes addr dm m stcs.
+             P0 shape addr dm m stcs ∧
+             P1 shapes
+               (addr +
+                bytes_in_word * n2w (size_of_sh_with_ctxt stcs shape)) dm m
+               stcs ⇒
+             P1 (shape::shapes) addr dm m stcs) ∧
+          (∀addr dm m stcs. P2 [] addr dm m stcs) ∧
+          (∀fld shape fields addr dm m stcs.
+             P0 shape addr dm m stcs ∧
+             P2 fields
+               (addr +
+                bytes_in_word * n2w (size_of_sh_with_ctxt stcs shape)) dm m
+               stcs ⇒
+             P2 ((fld,shape)::fields) addr dm m stcs) ⇒
+          (∀v0 v1 v2 v3 v4. P0 v0 v1 v2 v3 v4) ∧
+          (∀v0 v1 v2 v3 v4. P1 v0 v1 v2 v3 v4) ∧
+          ∀v0 v1 v2 v3 v4. P2 v0 v1 v2 v3 v4
+   
+   [mem_store_32_alt]  Theorem
+      
+      ⊢ mem_store_32 m dm be w hw =
+        if aligned 2 w then
+          case m (byte_align w) of
+            Word v =>
+              if byte_align w ∈ dm then
+                if be then
+                  (let
+                     v0 = set_byte w (w2w (hw ⋙ 24)) v be;
+                     v1 = set_byte (w + 1w) (w2w (hw ⋙ 16)) v0 be;
+                     v2 = set_byte (w + 2w) (w2w (hw ⋙ 8)) v1 be;
+                     v3 = set_byte (w + 3w) (w2w hw) v2 be
+                   in
+                     SOME m⦇byte_align w ↦ Word v3⦈)
+                else
+                  (let
+                     v0 = set_byte w (w2w hw) v be;
+                     v1 = set_byte (w + 1w) (w2w (hw ⋙ 8)) v0 be;
+                     v2 = set_byte (w + 2w) (w2w (hw ⋙ 16)) v1 be;
+                     v3 = set_byte (w + 3w) (w2w (hw ⋙ 24)) v2 be
+                   in
+                     SOME m⦇byte_align w ↦ Word v3⦈)
+              else NONE
+        else NONE
+   
+   [pan_op_def]  Theorem
+      
+      ⊢ pan_op Mul [w1; w2] = SOME (w1 * w2) ∧ pan_op Mul [] = NONE ∧
+        pan_op Mul [v3] = NONE ∧ pan_op Mul (v3::v7::v11::v12) = NONE
+   
+   [pan_op_ind]  Theorem
+      
+      ⊢ ∀P. (∀w1 w2. P Mul [w1; w2]) ∧ P Mul [] ∧ (∀v3. P Mul [v3]) ∧
+            (∀v3 v7 v11 v12. P Mul (v3::v7::v11::v12)) ⇒
+            ∀v v1. P v v1
+   
+   [res_var_def]  Theorem
+      
+      ⊢ res_var lc (n,NONE) = lc \\ n ∧ res_var lc (n,SOME v) = lc⟨n ↦ v⟩
+   
+   [res_var_ind]  Theorem
+      
+      ⊢ ∀P. (∀lc n. P lc (n,NONE)) ∧ (∀lc n v. P lc (n,SOME v)) ⇒
+            ∀v v1 v2. P v (v1,v2)
+   
+   [result_11]  Theorem
+      
+      ⊢ (∀a a'. Return a = Return a' ⇔ a = a') ∧
+        (∀a0 a1 a0' a1'.
+           Exception a0 a1 = Exception a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        ∀a a'. FinalFFI a = FinalFFI a' ⇔ a = a'
+   
+   [result_Axiom]  Theorem
+      
+      ⊢ ∀f0 f1 f2 f3 f4 f5 f6. ∃fn.
+          fn Error = f0 ∧ fn TimeOut = f1 ∧ fn Break = f2 ∧
+          fn Continue = f3 ∧ (∀a. fn (Return a) = f4 a) ∧
+          (∀a0 a1. fn (Exception a0 a1) = f5 a0 a1) ∧
+          ∀a. fn (FinalFFI a) = f6 a
+   
+   [result_case_cong]  Theorem
+      
+      ⊢ ∀M M' v v1 v2 v3 f f1 f2.
+          M = M' ∧ (M' = Error ⇒ v = v') ∧ (M' = TimeOut ⇒ v1 = v1') ∧
+          (M' = Break ⇒ v2 = v2') ∧ (M' = Continue ⇒ v3 = v3') ∧
+          (∀a. M' = Return a ⇒ f a = f' a) ∧
+          (∀a0 a1. M' = Exception a0 a1 ⇒ f1 a0 a1 = f1' a0 a1) ∧
+          (∀a. M' = FinalFFI a ⇒ f2 a = f2' a) ⇒
+          result_CASE M v v1 v2 v3 f f1 f2 =
+          result_CASE M' v' v1' v2' v3' f' f1' f2'
+   
+   [result_case_eq]  Theorem
+      
+      ⊢ result_CASE x v v1 v2 v3 f f1 f2 = v' ⇔
+        x = Error ∧ v = v' ∨ x = TimeOut ∧ v1 = v' ∨ x = Break ∧ v2 = v' ∨
+        x = Continue ∧ v3 = v' ∨ (∃v''. x = Return v'' ∧ f v'' = v') ∨
+        (∃m v''. x = Exception m v'' ∧ f1 m v'' = v') ∨
+        ∃f'. x = FinalFFI f' ∧ f2 f' = v'
+   
+   [result_distinct]  Theorem
+      
+      ⊢ Error ≠ TimeOut ∧ Error ≠ Break ∧ Error ≠ Continue ∧
+        (∀a. Error ≠ Return a) ∧ (∀a1 a0. Error ≠ Exception a0 a1) ∧
+        (∀a. Error ≠ FinalFFI a) ∧ TimeOut ≠ Break ∧ TimeOut ≠ Continue ∧
+        (∀a. TimeOut ≠ Return a) ∧ (∀a1 a0. TimeOut ≠ Exception a0 a1) ∧
+        (∀a. TimeOut ≠ FinalFFI a) ∧ Break ≠ Continue ∧
+        (∀a. Break ≠ Return a) ∧ (∀a1 a0. Break ≠ Exception a0 a1) ∧
+        (∀a. Break ≠ FinalFFI a) ∧ (∀a. Continue ≠ Return a) ∧
+        (∀a1 a0. Continue ≠ Exception a0 a1) ∧
+        (∀a. Continue ≠ FinalFFI a) ∧
+        (∀a1 a0 a. Return a ≠ Exception a0 a1) ∧
+        (∀a' a. Return a ≠ FinalFFI a') ∧
+        ∀a1 a0 a. Exception a0 a1 ≠ FinalFFI a
+   
+   [result_induction]  Theorem
+      
+      ⊢ ∀P. P Error ∧ P TimeOut ∧ P Break ∧ P Continue ∧
+            (∀v. P (Return v)) ∧ (∀m v. P (Exception m v)) ∧
+            (∀f. P (FinalFFI f)) ⇒
+            ∀r. P r
+   
+   [result_nchotomy]  Theorem
+      
+      ⊢ ∀rr.
+          rr = Error ∨ rr = TimeOut ∨ rr = Break ∨ rr = Continue ∨
+          (∃v. rr = Return v) ∨ (∃m v. rr = Exception m v) ∨
+          ∃f. rr = FinalFFI f
+   
+   [shape_of_def]  Theorem
+      
+      ⊢ (∀v0. shape_of (ValWord v0) = One) ∧
+        (∀vs. shape_of (RStruct vs) = Comb (MAP (λa. shape_of a) vs)) ∧
+        ∀v1 nm. shape_of (NStruct nm v1) = Named nm
+   
+   [shape_of_ind]  Theorem
+      
+      ⊢ ∀P. (∀v0. P (ValWord v0)) ∧
+            (∀vs. (∀a. MEM a vs ⇒ P a) ⇒ P (RStruct vs)) ∧
+            (∀nm v1. P (NStruct nm v1)) ⇒
+            ∀v. P v
+   
+   [state_11]  Theorem
+      
+      ⊢ ∀a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a0' a1' a2' a3' a4' a5'
+            a6' a7' a8' a9' a10' a11' a12'.
+          state a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 =
+          state a0' a1' a2' a3' a4' a5' a6' a7' a8' a9' a10' a11' a12' ⇔
+          a0 = a0' ∧ a1 = a1' ∧ a2 = a2' ∧ a3 = a3' ∧ a4 = a4' ∧ a5 = a5' ∧
+          a6 = a6' ∧ a7 = a7' ∧ a8 = a8' ∧ (a9 ⇔ a9') ∧ a10 = a10' ∧
+          a11 = a11' ∧ a12 = a12'
+   
+   [state_Axiom]  Theorem
+      
+      ⊢ ∀f. ∃fn. ∀a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12.
+          fn (state a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12) =
+          f a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12
+   
+   [state_accessors]  Theorem
+      
+      ⊢ (∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).locals = f) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).globals = f0) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).structs = l) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).code = f1) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).eshapes = f2) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).memory = f3) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).memaddrs = f4) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).sh_memaddrs = f5) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).clock = n) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).be ⇔ b) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).ffi = f6) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).base_addr = c) ∧
+        ∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0).top_addr = c0
+   
+   [state_accfupds]  Theorem
+      
+      ⊢ (∀s f. (s with globals updated_by f).locals = s.locals) ∧
+        (∀s f. (s with structs updated_by f).locals = s.locals) ∧
+        (∀s f. (s with code updated_by f).locals = s.locals) ∧
+        (∀s f. (s with eshapes updated_by f).locals = s.locals) ∧
+        (∀s f. (s with memory updated_by f).locals = s.locals) ∧
+        (∀s f. (s with memaddrs updated_by f).locals = s.locals) ∧
+        (∀s f. (s with sh_memaddrs updated_by f).locals = s.locals) ∧
+        (∀s f. (s with clock updated_by f).locals = s.locals) ∧
+        (∀s f. (s with be updated_by f).locals = s.locals) ∧
+        (∀s f. (s with ffi updated_by f).locals = s.locals) ∧
+        (∀s f. (s with base_addr updated_by f).locals = s.locals) ∧
+        (∀s f. (s with top_addr updated_by f).locals = s.locals) ∧
+        (∀s f. (s with locals updated_by f).globals = s.globals) ∧
+        (∀s f. (s with structs updated_by f).globals = s.globals) ∧
+        (∀s f. (s with code updated_by f).globals = s.globals) ∧
+        (∀s f. (s with eshapes updated_by f).globals = s.globals) ∧
+        (∀s f. (s with memory updated_by f).globals = s.globals) ∧
+        (∀s f. (s with memaddrs updated_by f).globals = s.globals) ∧
+        (∀s f. (s with sh_memaddrs updated_by f).globals = s.globals) ∧
+        (∀s f. (s with clock updated_by f).globals = s.globals) ∧
+        (∀s f. (s with be updated_by f).globals = s.globals) ∧
+        (∀s f. (s with ffi updated_by f).globals = s.globals) ∧
+        (∀s f. (s with base_addr updated_by f).globals = s.globals) ∧
+        (∀s f. (s with top_addr updated_by f).globals = s.globals) ∧
+        (∀s f. (s with locals updated_by f).structs = s.structs) ∧
+        (∀s f. (s with globals updated_by f).structs = s.structs) ∧
+        (∀s f. (s with code updated_by f).structs = s.structs) ∧
+        (∀s f. (s with eshapes updated_by f).structs = s.structs) ∧
+        (∀s f. (s with memory updated_by f).structs = s.structs) ∧
+        (∀s f. (s with memaddrs updated_by f).structs = s.structs) ∧
+        (∀s f. (s with sh_memaddrs updated_by f).structs = s.structs) ∧
+        (∀s f. (s with clock updated_by f).structs = s.structs) ∧
+        (∀s f. (s with be updated_by f).structs = s.structs) ∧
+        (∀s f. (s with ffi updated_by f).structs = s.structs) ∧
+        (∀s f. (s with base_addr updated_by f).structs = s.structs) ∧
+        (∀s f. (s with top_addr updated_by f).structs = s.structs) ∧
+        (∀s f. (s with locals updated_by f).code = s.code) ∧
+        (∀s f. (s with globals updated_by f).code = s.code) ∧
+        (∀s f. (s with structs updated_by f).code = s.code) ∧
+        (∀s f. (s with eshapes updated_by f).code = s.code) ∧
+        (∀s f. (s with memory updated_by f).code = s.code) ∧
+        (∀s f. (s with memaddrs updated_by f).code = s.code) ∧
+        (∀s f. (s with sh_memaddrs updated_by f).code = s.code) ∧
+        (∀s f. (s with clock updated_by f).code = s.code) ∧
+        (∀s f. (s with be updated_by f).code = s.code) ∧
+        (∀s f. (s with ffi updated_by f).code = s.code) ∧
+        (∀s f. (s with base_addr updated_by f).code = s.code) ∧
+        (∀s f. (s with top_addr updated_by f).code = s.code) ∧
+        (∀s f. (s with locals updated_by f).eshapes = s.eshapes) ∧
+        (∀s f. (s with globals updated_by f).eshapes = s.eshapes) ∧
+        (∀s f. (s with structs updated_by f).eshapes = s.eshapes) ∧
+        (∀s f. (s with code updated_by f).eshapes = s.eshapes) ∧
+        (∀s f. (s with memory updated_by f).eshapes = s.eshapes) ∧
+        (∀s f. (s with memaddrs updated_by f).eshapes = s.eshapes) ∧
+        (∀s f. (s with sh_memaddrs updated_by f).eshapes = s.eshapes) ∧
+        (∀s f. (s with clock updated_by f).eshapes = s.eshapes) ∧
+        (∀s f. (s with be updated_by f).eshapes = s.eshapes) ∧
+        (∀s f. (s with ffi updated_by f).eshapes = s.eshapes) ∧
+        (∀s f. (s with base_addr updated_by f).eshapes = s.eshapes) ∧
+        (∀s f. (s with top_addr updated_by f).eshapes = s.eshapes) ∧
+        (∀s f. (s with locals updated_by f).memory = s.memory) ∧
+        (∀s f. (s with globals updated_by f).memory = s.memory) ∧
+        (∀s f. (s with structs updated_by f).memory = s.memory) ∧
+        (∀s f. (s with code updated_by f).memory = s.memory) ∧
+        (∀s f. (s with eshapes updated_by f).memory = s.memory) ∧
+        (∀s f. (s with memaddrs updated_by f).memory = s.memory) ∧
+        (∀s f. (s with sh_memaddrs updated_by f).memory = s.memory) ∧
+        (∀s f. (s with clock updated_by f).memory = s.memory) ∧
+        (∀s f. (s with be updated_by f).memory = s.memory) ∧
+        (∀s f. (s with ffi updated_by f).memory = s.memory) ∧
+        (∀s f. (s with base_addr updated_by f).memory = s.memory) ∧
+        (∀s f. (s with top_addr updated_by f).memory = s.memory) ∧
+        (∀s f. (s with locals updated_by f).memaddrs = s.memaddrs) ∧
+        (∀s f. (s with globals updated_by f).memaddrs = s.memaddrs) ∧
+        (∀s f. (s with structs updated_by f).memaddrs = s.memaddrs) ∧
+        (∀s f. (s with code updated_by f).memaddrs = s.memaddrs) ∧
+        (∀s f. (s with eshapes updated_by f).memaddrs = s.memaddrs) ∧
+        (∀s f. (s with memory updated_by f).memaddrs = s.memaddrs) ∧
+        (∀s f. (s with sh_memaddrs updated_by f).memaddrs = s.memaddrs) ∧
+        (∀s f. (s with clock updated_by f).memaddrs = s.memaddrs) ∧
+        (∀s f. (s with be updated_by f).memaddrs = s.memaddrs) ∧
+        (∀s f. (s with ffi updated_by f).memaddrs = s.memaddrs) ∧
+        (∀s f. (s with base_addr updated_by f).memaddrs = s.memaddrs) ∧
+        (∀s f. (s with top_addr updated_by f).memaddrs = s.memaddrs) ∧
+        (∀s f. (s with locals updated_by f).sh_memaddrs = s.sh_memaddrs) ∧
+        (∀s f. (s with globals updated_by f).sh_memaddrs = s.sh_memaddrs) ∧
+        (∀s f. (s with structs updated_by f).sh_memaddrs = s.sh_memaddrs) ∧
+        (∀s f. (s with code updated_by f).sh_memaddrs = s.sh_memaddrs) ∧
+        (∀s f. (s with eshapes updated_by f).sh_memaddrs = s.sh_memaddrs) ∧
+        (∀s f. (s with memory updated_by f).sh_memaddrs = s.sh_memaddrs) ∧
+        (∀s f. (s with memaddrs updated_by f).sh_memaddrs = s.sh_memaddrs) ∧
+        (∀s f. (s with clock updated_by f).sh_memaddrs = s.sh_memaddrs) ∧
+        (∀s f. (s with be updated_by f).sh_memaddrs = s.sh_memaddrs) ∧
+        (∀s f. (s with ffi updated_by f).sh_memaddrs = s.sh_memaddrs) ∧
+        (∀s f. (s with base_addr updated_by f).sh_memaddrs = s.sh_memaddrs) ∧
+        (∀s f. (s with top_addr updated_by f).sh_memaddrs = s.sh_memaddrs) ∧
+        (∀s f. (s with locals updated_by f).clock = s.clock) ∧
+        (∀s f. (s with globals updated_by f).clock = s.clock) ∧
+        (∀s f. (s with structs updated_by f).clock = s.clock) ∧
+        (∀s f. (s with code updated_by f).clock = s.clock) ∧
+        (∀s f. (s with eshapes updated_by f).clock = s.clock) ∧
+        (∀s f. (s with memory updated_by f).clock = s.clock) ∧
+        (∀s f. (s with memaddrs updated_by f).clock = s.clock) ∧
+        (∀s f. (s with sh_memaddrs updated_by f).clock = s.clock) ∧
+        (∀s f. (s with be updated_by f).clock = s.clock) ∧
+        (∀s f. (s with ffi updated_by f).clock = s.clock) ∧
+        (∀s f. (s with base_addr updated_by f).clock = s.clock) ∧
+        (∀s f. (s with top_addr updated_by f).clock = s.clock) ∧
+        (∀s f. (s with locals updated_by f).be ⇔ s.be) ∧
+        (∀s f. (s with globals updated_by f).be ⇔ s.be) ∧
+        (∀s f. (s with structs updated_by f).be ⇔ s.be) ∧
+        (∀s f. (s with code updated_by f).be ⇔ s.be) ∧
+        (∀s f. (s with eshapes updated_by f).be ⇔ s.be) ∧
+        (∀s f. (s with memory updated_by f).be ⇔ s.be) ∧
+        (∀s f. (s with memaddrs updated_by f).be ⇔ s.be) ∧
+        (∀s f. (s with sh_memaddrs updated_by f).be ⇔ s.be) ∧
+        (∀s f. (s with clock updated_by f).be ⇔ s.be) ∧
+        (∀s f. (s with ffi updated_by f).be ⇔ s.be) ∧
+        (∀s f. (s with base_addr updated_by f).be ⇔ s.be) ∧
+        (∀s f. (s with top_addr updated_by f).be ⇔ s.be) ∧
+        (∀s f. (s with locals updated_by f).ffi = s.ffi) ∧
+        (∀s f. (s with globals updated_by f).ffi = s.ffi) ∧
+        (∀s f. (s with structs updated_by f).ffi = s.ffi) ∧
+        (∀s f. (s with code updated_by f).ffi = s.ffi) ∧
+        (∀s f. (s with eshapes updated_by f).ffi = s.ffi) ∧
+        (∀s f. (s with memory updated_by f).ffi = s.ffi) ∧
+        (∀s f. (s with memaddrs updated_by f).ffi = s.ffi) ∧
+        (∀s f. (s with sh_memaddrs updated_by f).ffi = s.ffi) ∧
+        (∀s f. (s with clock updated_by f).ffi = s.ffi) ∧
+        (∀s f. (s with be updated_by f).ffi = s.ffi) ∧
+        (∀s f. (s with base_addr updated_by f).ffi = s.ffi) ∧
+        (∀s f. (s with top_addr updated_by f).ffi = s.ffi) ∧
+        (∀s f. (s with locals updated_by f).base_addr = s.base_addr) ∧
+        (∀s f. (s with globals updated_by f).base_addr = s.base_addr) ∧
+        (∀s f. (s with structs updated_by f).base_addr = s.base_addr) ∧
+        (∀s f. (s with code updated_by f).base_addr = s.base_addr) ∧
+        (∀s f. (s with eshapes updated_by f).base_addr = s.base_addr) ∧
+        (∀s f. (s with memory updated_by f).base_addr = s.base_addr) ∧
+        (∀s f. (s with memaddrs updated_by f).base_addr = s.base_addr) ∧
+        (∀s f. (s with sh_memaddrs updated_by f).base_addr = s.base_addr) ∧
+        (∀s f. (s with clock updated_by f).base_addr = s.base_addr) ∧
+        (∀s f. (s with be updated_by f).base_addr = s.base_addr) ∧
+        (∀s f. (s with ffi updated_by f).base_addr = s.base_addr) ∧
+        (∀s f. (s with top_addr updated_by f).base_addr = s.base_addr) ∧
+        (∀s f. (s with locals updated_by f).top_addr = s.top_addr) ∧
+        (∀s f. (s with globals updated_by f).top_addr = s.top_addr) ∧
+        (∀s f. (s with structs updated_by f).top_addr = s.top_addr) ∧
+        (∀s f. (s with code updated_by f).top_addr = s.top_addr) ∧
+        (∀s f. (s with eshapes updated_by f).top_addr = s.top_addr) ∧
+        (∀s f. (s with memory updated_by f).top_addr = s.top_addr) ∧
+        (∀s f. (s with memaddrs updated_by f).top_addr = s.top_addr) ∧
+        (∀s f. (s with sh_memaddrs updated_by f).top_addr = s.top_addr) ∧
+        (∀s f. (s with clock updated_by f).top_addr = s.top_addr) ∧
+        (∀s f. (s with be updated_by f).top_addr = s.top_addr) ∧
+        (∀s f. (s with ffi updated_by f).top_addr = s.top_addr) ∧
+        (∀s f. (s with base_addr updated_by f).top_addr = s.top_addr) ∧
+        (∀s f. (s with locals updated_by f).locals = f s.locals) ∧
+        (∀s f. (s with globals updated_by f).globals = f s.globals) ∧
+        (∀s f. (s with structs updated_by f).structs = f s.structs) ∧
+        (∀s f. (s with code updated_by f).code = f s.code) ∧
+        (∀s f. (s with eshapes updated_by f).eshapes = f s.eshapes) ∧
+        (∀s f. (s with memory updated_by f).memory = f s.memory) ∧
+        (∀s f. (s with memaddrs updated_by f).memaddrs = f s.memaddrs) ∧
+        (∀s f.
+           (s with sh_memaddrs updated_by f).sh_memaddrs = f s.sh_memaddrs) ∧
+        (∀s f. (s with clock updated_by f).clock = f s.clock) ∧
+        (∀s f. (s with be updated_by f).be ⇔ f s.be) ∧
+        (∀s f. (s with ffi updated_by f).ffi = f s.ffi) ∧
+        (∀s f. (s with base_addr updated_by f).base_addr = f s.base_addr) ∧
+        ∀s f. (s with top_addr updated_by f).top_addr = f s.top_addr
+   
+   [state_case_cong]  Theorem
+      
+      ⊢ ∀M M' f.
+          M = M' ∧
+          (∀a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12.
+             M' = state a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 ⇒
+             f a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 =
+             f' a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12) ⇒
+          state_CASE M f = state_CASE M' f'
+   
+   [state_case_eq]  Theorem
+      
+      ⊢ state_CASE x f = v ⇔
+        ∃f' f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          x = state f' f0 l f1 f2 f3 f4 f5 n b f6 c c0 ∧
+          f f' f0 l f1 f2 f3 f4 f5 n b f6 c c0 = v
+   
+   [state_component_equality]  Theorem
+      
+      ⊢ ∀s1 s2.
+          s1 = s2 ⇔
+          s1.locals = s2.locals ∧ s1.globals = s2.globals ∧
+          s1.structs = s2.structs ∧ s1.code = s2.code ∧
+          s1.eshapes = s2.eshapes ∧ s1.memory = s2.memory ∧
+          s1.memaddrs = s2.memaddrs ∧ s1.sh_memaddrs = s2.sh_memaddrs ∧
+          s1.clock = s2.clock ∧ (s1.be ⇔ s2.be) ∧ s1.ffi = s2.ffi ∧
+          s1.base_addr = s2.base_addr ∧ s1.top_addr = s2.top_addr
+   
+   [state_fn_updates]  Theorem
+      
+      ⊢ (∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with
+           locals updated_by f7 =
+           state (f7 f) f0 l f1 f2 f3 f4 f5 n b f6 c c0) ∧
+        (∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with
+           globals updated_by f7 =
+           state f (f7 f0) l f1 f2 f3 f4 f5 n b f6 c c0) ∧
+        (∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with
+           structs updated_by f7 =
+           state f f0 (f7 l) f1 f2 f3 f4 f5 n b f6 c c0) ∧
+        (∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with code updated_by f7 =
+           state f f0 l (f7 f1) f2 f3 f4 f5 n b f6 c c0) ∧
+        (∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with
+           eshapes updated_by f7 =
+           state f f0 l f1 (f7 f2) f3 f4 f5 n b f6 c c0) ∧
+        (∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with
+           memory updated_by f7 =
+           state f f0 l f1 f2 (f7 f3) f4 f5 n b f6 c c0) ∧
+        (∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with
+           memaddrs updated_by f7 =
+           state f f0 l f1 f2 f3 (f7 f4) f5 n b f6 c c0) ∧
+        (∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with
+           sh_memaddrs updated_by f7 =
+           state f f0 l f1 f2 f3 f4 (f7 f5) n b f6 c c0) ∧
+        (∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with clock updated_by f7 =
+           state f f0 l f1 f2 f3 f4 f5 (f7 n) b f6 c c0) ∧
+        (∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with be updated_by f7 =
+           state f f0 l f1 f2 f3 f4 f5 n (f7 b) f6 c c0) ∧
+        (∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with ffi updated_by f7 =
+           state f f0 l f1 f2 f3 f4 f5 n b (f7 f6) c c0) ∧
+        (∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+           state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with
+           base_addr updated_by f7 =
+           state f f0 l f1 f2 f3 f4 f5 n b f6 (f7 c) c0) ∧
+        ∀f7 f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          state f f0 l f1 f2 f3 f4 f5 n b f6 c c0 with
+          top_addr updated_by f7 =
+          state f f0 l f1 f2 f3 f4 f5 n b f6 c (f7 c0)
+   
+   [state_fupdcanon]  Theorem
+      
+      ⊢ (∀s g f.
+           s with <|globals updated_by f; locals updated_by g|> =
+           s with <|locals updated_by g; globals updated_by f|>) ∧
+        (∀s g f.
+           s with <|structs updated_by f; locals updated_by g|> =
+           s with <|locals updated_by g; structs updated_by f|>) ∧
+        (∀s g f.
+           s with <|structs updated_by f; globals updated_by g|> =
+           s with <|globals updated_by g; structs updated_by f|>) ∧
+        (∀s g f.
+           s with <|code updated_by f; locals updated_by g|> =
+           s with <|locals updated_by g; code updated_by f|>) ∧
+        (∀s g f.
+           s with <|code updated_by f; globals updated_by g|> =
+           s with <|globals updated_by g; code updated_by f|>) ∧
+        (∀s g f.
+           s with <|code updated_by f; structs updated_by g|> =
+           s with <|structs updated_by g; code updated_by f|>) ∧
+        (∀s g f.
+           s with <|eshapes updated_by f; locals updated_by g|> =
+           s with <|locals updated_by g; eshapes updated_by f|>) ∧
+        (∀s g f.
+           s with <|eshapes updated_by f; globals updated_by g|> =
+           s with <|globals updated_by g; eshapes updated_by f|>) ∧
+        (∀s g f.
+           s with <|eshapes updated_by f; structs updated_by g|> =
+           s with <|structs updated_by g; eshapes updated_by f|>) ∧
+        (∀s g f.
+           s with <|eshapes updated_by f; code updated_by g|> =
+           s with <|code updated_by g; eshapes updated_by f|>) ∧
+        (∀s g f.
+           s with <|memory updated_by f; locals updated_by g|> =
+           s with <|locals updated_by g; memory updated_by f|>) ∧
+        (∀s g f.
+           s with <|memory updated_by f; globals updated_by g|> =
+           s with <|globals updated_by g; memory updated_by f|>) ∧
+        (∀s g f.
+           s with <|memory updated_by f; structs updated_by g|> =
+           s with <|structs updated_by g; memory updated_by f|>) ∧
+        (∀s g f.
+           s with <|memory updated_by f; code updated_by g|> =
+           s with <|code updated_by g; memory updated_by f|>) ∧
+        (∀s g f.
+           s with <|memory updated_by f; eshapes updated_by g|> =
+           s with <|eshapes updated_by g; memory updated_by f|>) ∧
+        (∀s g f.
+           s with <|memaddrs updated_by f; locals updated_by g|> =
+           s with <|locals updated_by g; memaddrs updated_by f|>) ∧
+        (∀s g f.
+           s with <|memaddrs updated_by f; globals updated_by g|> =
+           s with <|globals updated_by g; memaddrs updated_by f|>) ∧
+        (∀s g f.
+           s with <|memaddrs updated_by f; structs updated_by g|> =
+           s with <|structs updated_by g; memaddrs updated_by f|>) ∧
+        (∀s g f.
+           s with <|memaddrs updated_by f; code updated_by g|> =
+           s with <|code updated_by g; memaddrs updated_by f|>) ∧
+        (∀s g f.
+           s with <|memaddrs updated_by f; eshapes updated_by g|> =
+           s with <|eshapes updated_by g; memaddrs updated_by f|>) ∧
+        (∀s g f.
+           s with <|memaddrs updated_by f; memory updated_by g|> =
+           s with <|memory updated_by g; memaddrs updated_by f|>) ∧
+        (∀s g f.
+           s with <|sh_memaddrs updated_by f; locals updated_by g|> =
+           s with <|locals updated_by g; sh_memaddrs updated_by f|>) ∧
+        (∀s g f.
+           s with <|sh_memaddrs updated_by f; globals updated_by g|> =
+           s with <|globals updated_by g; sh_memaddrs updated_by f|>) ∧
+        (∀s g f.
+           s with <|sh_memaddrs updated_by f; structs updated_by g|> =
+           s with <|structs updated_by g; sh_memaddrs updated_by f|>) ∧
+        (∀s g f.
+           s with <|sh_memaddrs updated_by f; code updated_by g|> =
+           s with <|code updated_by g; sh_memaddrs updated_by f|>) ∧
+        (∀s g f.
+           s with <|sh_memaddrs updated_by f; eshapes updated_by g|> =
+           s with <|eshapes updated_by g; sh_memaddrs updated_by f|>) ∧
+        (∀s g f.
+           s with <|sh_memaddrs updated_by f; memory updated_by g|> =
+           s with <|memory updated_by g; sh_memaddrs updated_by f|>) ∧
+        (∀s g f.
+           s with <|sh_memaddrs updated_by f; memaddrs updated_by g|> =
+           s with <|memaddrs updated_by g; sh_memaddrs updated_by f|>) ∧
+        (∀s g f.
+           s with <|clock updated_by f; locals updated_by g|> =
+           s with <|locals updated_by g; clock updated_by f|>) ∧
+        (∀s g f.
+           s with <|clock updated_by f; globals updated_by g|> =
+           s with <|globals updated_by g; clock updated_by f|>) ∧
+        (∀s g f.
+           s with <|clock updated_by f; structs updated_by g|> =
+           s with <|structs updated_by g; clock updated_by f|>) ∧
+        (∀s g f.
+           s with <|clock updated_by f; code updated_by g|> =
+           s with <|code updated_by g; clock updated_by f|>) ∧
+        (∀s g f.
+           s with <|clock updated_by f; eshapes updated_by g|> =
+           s with <|eshapes updated_by g; clock updated_by f|>) ∧
+        (∀s g f.
+           s with <|clock updated_by f; memory updated_by g|> =
+           s with <|memory updated_by g; clock updated_by f|>) ∧
+        (∀s g f.
+           s with <|clock updated_by f; memaddrs updated_by g|> =
+           s with <|memaddrs updated_by g; clock updated_by f|>) ∧
+        (∀s g f.
+           s with <|clock updated_by f; sh_memaddrs updated_by g|> =
+           s with <|sh_memaddrs updated_by g; clock updated_by f|>) ∧
+        (∀s g f.
+           s with <|be updated_by f; locals updated_by g|> =
+           s with <|locals updated_by g; be updated_by f|>) ∧
+        (∀s g f.
+           s with <|be updated_by f; globals updated_by g|> =
+           s with <|globals updated_by g; be updated_by f|>) ∧
+        (∀s g f.
+           s with <|be updated_by f; structs updated_by g|> =
+           s with <|structs updated_by g; be updated_by f|>) ∧
+        (∀s g f.
+           s with <|be updated_by f; code updated_by g|> =
+           s with <|code updated_by g; be updated_by f|>) ∧
+        (∀s g f.
+           s with <|be updated_by f; eshapes updated_by g|> =
+           s with <|eshapes updated_by g; be updated_by f|>) ∧
+        (∀s g f.
+           s with <|be updated_by f; memory updated_by g|> =
+           s with <|memory updated_by g; be updated_by f|>) ∧
+        (∀s g f.
+           s with <|be updated_by f; memaddrs updated_by g|> =
+           s with <|memaddrs updated_by g; be updated_by f|>) ∧
+        (∀s g f.
+           s with <|be updated_by f; sh_memaddrs updated_by g|> =
+           s with <|sh_memaddrs updated_by g; be updated_by f|>) ∧
+        (∀s g f.
+           s with <|be updated_by f; clock updated_by g|> =
+           s with <|clock updated_by g; be updated_by f|>) ∧
+        (∀s g f.
+           s with <|ffi updated_by f; locals updated_by g|> =
+           s with <|locals updated_by g; ffi updated_by f|>) ∧
+        (∀s g f.
+           s with <|ffi updated_by f; globals updated_by g|> =
+           s with <|globals updated_by g; ffi updated_by f|>) ∧
+        (∀s g f.
+           s with <|ffi updated_by f; structs updated_by g|> =
+           s with <|structs updated_by g; ffi updated_by f|>) ∧
+        (∀s g f.
+           s with <|ffi updated_by f; code updated_by g|> =
+           s with <|code updated_by g; ffi updated_by f|>) ∧
+        (∀s g f.
+           s with <|ffi updated_by f; eshapes updated_by g|> =
+           s with <|eshapes updated_by g; ffi updated_by f|>) ∧
+        (∀s g f.
+           s with <|ffi updated_by f; memory updated_by g|> =
+           s with <|memory updated_by g; ffi updated_by f|>) ∧
+        (∀s g f.
+           s with <|ffi updated_by f; memaddrs updated_by g|> =
+           s with <|memaddrs updated_by g; ffi updated_by f|>) ∧
+        (∀s g f.
+           s with <|ffi updated_by f; sh_memaddrs updated_by g|> =
+           s with <|sh_memaddrs updated_by g; ffi updated_by f|>) ∧
+        (∀s g f.
+           s with <|ffi updated_by f; clock updated_by g|> =
+           s with <|clock updated_by g; ffi updated_by f|>) ∧
+        (∀s g f.
+           s with <|ffi updated_by f; be updated_by g|> =
+           s with <|be updated_by g; ffi updated_by f|>) ∧
+        (∀s g f.
+           s with <|base_addr updated_by f; locals updated_by g|> =
+           s with <|locals updated_by g; base_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|base_addr updated_by f; globals updated_by g|> =
+           s with <|globals updated_by g; base_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|base_addr updated_by f; structs updated_by g|> =
+           s with <|structs updated_by g; base_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|base_addr updated_by f; code updated_by g|> =
+           s with <|code updated_by g; base_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|base_addr updated_by f; eshapes updated_by g|> =
+           s with <|eshapes updated_by g; base_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|base_addr updated_by f; memory updated_by g|> =
+           s with <|memory updated_by g; base_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|base_addr updated_by f; memaddrs updated_by g|> =
+           s with <|memaddrs updated_by g; base_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|base_addr updated_by f; sh_memaddrs updated_by g|> =
+           s with <|sh_memaddrs updated_by g; base_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|base_addr updated_by f; clock updated_by g|> =
+           s with <|clock updated_by g; base_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|base_addr updated_by f; be updated_by g|> =
+           s with <|be updated_by g; base_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|base_addr updated_by f; ffi updated_by g|> =
+           s with <|ffi updated_by g; base_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|top_addr updated_by f; locals updated_by g|> =
+           s with <|locals updated_by g; top_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|top_addr updated_by f; globals updated_by g|> =
+           s with <|globals updated_by g; top_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|top_addr updated_by f; structs updated_by g|> =
+           s with <|structs updated_by g; top_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|top_addr updated_by f; code updated_by g|> =
+           s with <|code updated_by g; top_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|top_addr updated_by f; eshapes updated_by g|> =
+           s with <|eshapes updated_by g; top_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|top_addr updated_by f; memory updated_by g|> =
+           s with <|memory updated_by g; top_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|top_addr updated_by f; memaddrs updated_by g|> =
+           s with <|memaddrs updated_by g; top_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|top_addr updated_by f; sh_memaddrs updated_by g|> =
+           s with <|sh_memaddrs updated_by g; top_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|top_addr updated_by f; clock updated_by g|> =
+           s with <|clock updated_by g; top_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|top_addr updated_by f; be updated_by g|> =
+           s with <|be updated_by g; top_addr updated_by f|>) ∧
+        (∀s g f.
+           s with <|top_addr updated_by f; ffi updated_by g|> =
+           s with <|ffi updated_by g; top_addr updated_by f|>) ∧
+        ∀s g f.
+          s with <|top_addr updated_by f; base_addr updated_by g|> =
+          s with <|base_addr updated_by g; top_addr updated_by f|>
+   
+   [state_fupdcanon_comp]  Theorem
+      
+      ⊢ ((∀g f.
+            globals_fupd f ∘ locals_fupd g = locals_fupd g ∘ globals_fupd f) ∧
+         ∀h g f.
+           globals_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ globals_fupd f ∘ h) ∧
+        ((∀g f.
+            structs_fupd f ∘ locals_fupd g = locals_fupd g ∘ structs_fupd f) ∧
+         ∀h g f.
+           structs_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ structs_fupd f ∘ h) ∧
+        ((∀g f.
+            structs_fupd f ∘ globals_fupd g =
+            globals_fupd g ∘ structs_fupd f) ∧
+         ∀h g f.
+           structs_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ structs_fupd f ∘ h) ∧
+        ((∀g f. code_fupd f ∘ locals_fupd g = locals_fupd g ∘ code_fupd f) ∧
+         ∀h g f.
+           code_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ code_fupd f ∘ h) ∧
+        ((∀g f. code_fupd f ∘ globals_fupd g = globals_fupd g ∘ code_fupd f) ∧
+         ∀h g f.
+           code_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ code_fupd f ∘ h) ∧
+        ((∀g f. code_fupd f ∘ structs_fupd g = structs_fupd g ∘ code_fupd f) ∧
+         ∀h g f.
+           code_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ code_fupd f ∘ h) ∧
+        ((∀g f.
+            eshapes_fupd f ∘ locals_fupd g = locals_fupd g ∘ eshapes_fupd f) ∧
+         ∀h g f.
+           eshapes_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ eshapes_fupd f ∘ h) ∧
+        ((∀g f.
+            eshapes_fupd f ∘ globals_fupd g =
+            globals_fupd g ∘ eshapes_fupd f) ∧
+         ∀h g f.
+           eshapes_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ eshapes_fupd f ∘ h) ∧
+        ((∀g f.
+            eshapes_fupd f ∘ structs_fupd g =
+            structs_fupd g ∘ eshapes_fupd f) ∧
+         ∀h g f.
+           eshapes_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ eshapes_fupd f ∘ h) ∧
+        ((∀g f. eshapes_fupd f ∘ code_fupd g = code_fupd g ∘ eshapes_fupd f) ∧
+         ∀h g f.
+           eshapes_fupd f ∘ code_fupd g ∘ h =
+           code_fupd g ∘ eshapes_fupd f ∘ h) ∧
+        ((∀g f.
+            memory_fupd f ∘ locals_fupd g = locals_fupd g ∘ memory_fupd f) ∧
+         ∀h g f.
+           memory_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ memory_fupd f ∘ h) ∧
+        ((∀g f.
+            memory_fupd f ∘ globals_fupd g = globals_fupd g ∘ memory_fupd f) ∧
+         ∀h g f.
+           memory_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ memory_fupd f ∘ h) ∧
+        ((∀g f.
+            memory_fupd f ∘ structs_fupd g = structs_fupd g ∘ memory_fupd f) ∧
+         ∀h g f.
+           memory_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ memory_fupd f ∘ h) ∧
+        ((∀g f. memory_fupd f ∘ code_fupd g = code_fupd g ∘ memory_fupd f) ∧
+         ∀h g f.
+           memory_fupd f ∘ code_fupd g ∘ h =
+           code_fupd g ∘ memory_fupd f ∘ h) ∧
+        ((∀g f.
+            memory_fupd f ∘ eshapes_fupd g = eshapes_fupd g ∘ memory_fupd f) ∧
+         ∀h g f.
+           memory_fupd f ∘ eshapes_fupd g ∘ h =
+           eshapes_fupd g ∘ memory_fupd f ∘ h) ∧
+        ((∀g f.
+            memaddrs_fupd f ∘ locals_fupd g =
+            locals_fupd g ∘ memaddrs_fupd f) ∧
+         ∀h g f.
+           memaddrs_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            memaddrs_fupd f ∘ globals_fupd g =
+            globals_fupd g ∘ memaddrs_fupd f) ∧
+         ∀h g f.
+           memaddrs_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            memaddrs_fupd f ∘ structs_fupd g =
+            structs_fupd g ∘ memaddrs_fupd f) ∧
+         ∀h g f.
+           memaddrs_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            memaddrs_fupd f ∘ code_fupd g = code_fupd g ∘ memaddrs_fupd f) ∧
+         ∀h g f.
+           memaddrs_fupd f ∘ code_fupd g ∘ h =
+           code_fupd g ∘ memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            memaddrs_fupd f ∘ eshapes_fupd g =
+            eshapes_fupd g ∘ memaddrs_fupd f) ∧
+         ∀h g f.
+           memaddrs_fupd f ∘ eshapes_fupd g ∘ h =
+           eshapes_fupd g ∘ memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            memaddrs_fupd f ∘ memory_fupd g =
+            memory_fupd g ∘ memaddrs_fupd f) ∧
+         ∀h g f.
+           memaddrs_fupd f ∘ memory_fupd g ∘ h =
+           memory_fupd g ∘ memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            sh_memaddrs_fupd f ∘ locals_fupd g =
+            locals_fupd g ∘ sh_memaddrs_fupd f) ∧
+         ∀h g f.
+           sh_memaddrs_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ sh_memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            sh_memaddrs_fupd f ∘ globals_fupd g =
+            globals_fupd g ∘ sh_memaddrs_fupd f) ∧
+         ∀h g f.
+           sh_memaddrs_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ sh_memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            sh_memaddrs_fupd f ∘ structs_fupd g =
+            structs_fupd g ∘ sh_memaddrs_fupd f) ∧
+         ∀h g f.
+           sh_memaddrs_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ sh_memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            sh_memaddrs_fupd f ∘ code_fupd g =
+            code_fupd g ∘ sh_memaddrs_fupd f) ∧
+         ∀h g f.
+           sh_memaddrs_fupd f ∘ code_fupd g ∘ h =
+           code_fupd g ∘ sh_memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            sh_memaddrs_fupd f ∘ eshapes_fupd g =
+            eshapes_fupd g ∘ sh_memaddrs_fupd f) ∧
+         ∀h g f.
+           sh_memaddrs_fupd f ∘ eshapes_fupd g ∘ h =
+           eshapes_fupd g ∘ sh_memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            sh_memaddrs_fupd f ∘ memory_fupd g =
+            memory_fupd g ∘ sh_memaddrs_fupd f) ∧
+         ∀h g f.
+           sh_memaddrs_fupd f ∘ memory_fupd g ∘ h =
+           memory_fupd g ∘ sh_memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            sh_memaddrs_fupd f ∘ memaddrs_fupd g =
+            memaddrs_fupd g ∘ sh_memaddrs_fupd f) ∧
+         ∀h g f.
+           sh_memaddrs_fupd f ∘ memaddrs_fupd g ∘ h =
+           memaddrs_fupd g ∘ sh_memaddrs_fupd f ∘ h) ∧
+        ((∀g f. clock_fupd f ∘ locals_fupd g = locals_fupd g ∘ clock_fupd f) ∧
+         ∀h g f.
+           clock_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ clock_fupd f ∘ h) ∧
+        ((∀g f.
+            clock_fupd f ∘ globals_fupd g = globals_fupd g ∘ clock_fupd f) ∧
+         ∀h g f.
+           clock_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ clock_fupd f ∘ h) ∧
+        ((∀g f.
+            clock_fupd f ∘ structs_fupd g = structs_fupd g ∘ clock_fupd f) ∧
+         ∀h g f.
+           clock_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ clock_fupd f ∘ h) ∧
+        ((∀g f. clock_fupd f ∘ code_fupd g = code_fupd g ∘ clock_fupd f) ∧
+         ∀h g f.
+           clock_fupd f ∘ code_fupd g ∘ h = code_fupd g ∘ clock_fupd f ∘ h) ∧
+        ((∀g f.
+            clock_fupd f ∘ eshapes_fupd g = eshapes_fupd g ∘ clock_fupd f) ∧
+         ∀h g f.
+           clock_fupd f ∘ eshapes_fupd g ∘ h =
+           eshapes_fupd g ∘ clock_fupd f ∘ h) ∧
+        ((∀g f. clock_fupd f ∘ memory_fupd g = memory_fupd g ∘ clock_fupd f) ∧
+         ∀h g f.
+           clock_fupd f ∘ memory_fupd g ∘ h =
+           memory_fupd g ∘ clock_fupd f ∘ h) ∧
+        ((∀g f.
+            clock_fupd f ∘ memaddrs_fupd g = memaddrs_fupd g ∘ clock_fupd f) ∧
+         ∀h g f.
+           clock_fupd f ∘ memaddrs_fupd g ∘ h =
+           memaddrs_fupd g ∘ clock_fupd f ∘ h) ∧
+        ((∀g f.
+            clock_fupd f ∘ sh_memaddrs_fupd g =
+            sh_memaddrs_fupd g ∘ clock_fupd f) ∧
+         ∀h g f.
+           clock_fupd f ∘ sh_memaddrs_fupd g ∘ h =
+           sh_memaddrs_fupd g ∘ clock_fupd f ∘ h) ∧
+        ((∀g f. be_fupd f ∘ locals_fupd g = locals_fupd g ∘ be_fupd f) ∧
+         ∀h g f.
+           be_fupd f ∘ locals_fupd g ∘ h = locals_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f. be_fupd f ∘ globals_fupd g = globals_fupd g ∘ be_fupd f) ∧
+         ∀h g f.
+           be_fupd f ∘ globals_fupd g ∘ h = globals_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f. be_fupd f ∘ structs_fupd g = structs_fupd g ∘ be_fupd f) ∧
+         ∀h g f.
+           be_fupd f ∘ structs_fupd g ∘ h = structs_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f. be_fupd f ∘ code_fupd g = code_fupd g ∘ be_fupd f) ∧
+         ∀h g f. be_fupd f ∘ code_fupd g ∘ h = code_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f. be_fupd f ∘ eshapes_fupd g = eshapes_fupd g ∘ be_fupd f) ∧
+         ∀h g f.
+           be_fupd f ∘ eshapes_fupd g ∘ h = eshapes_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f. be_fupd f ∘ memory_fupd g = memory_fupd g ∘ be_fupd f) ∧
+         ∀h g f.
+           be_fupd f ∘ memory_fupd g ∘ h = memory_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f. be_fupd f ∘ memaddrs_fupd g = memaddrs_fupd g ∘ be_fupd f) ∧
+         ∀h g f.
+           be_fupd f ∘ memaddrs_fupd g ∘ h =
+           memaddrs_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f.
+            be_fupd f ∘ sh_memaddrs_fupd g = sh_memaddrs_fupd g ∘ be_fupd f) ∧
+         ∀h g f.
+           be_fupd f ∘ sh_memaddrs_fupd g ∘ h =
+           sh_memaddrs_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f. be_fupd f ∘ clock_fupd g = clock_fupd g ∘ be_fupd f) ∧
+         ∀h g f.
+           be_fupd f ∘ clock_fupd g ∘ h = clock_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f. ffi_fupd f ∘ locals_fupd g = locals_fupd g ∘ ffi_fupd f) ∧
+         ∀h g f.
+           ffi_fupd f ∘ locals_fupd g ∘ h = locals_fupd g ∘ ffi_fupd f ∘ h) ∧
+        ((∀g f. ffi_fupd f ∘ globals_fupd g = globals_fupd g ∘ ffi_fupd f) ∧
+         ∀h g f.
+           ffi_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ ffi_fupd f ∘ h) ∧
+        ((∀g f. ffi_fupd f ∘ structs_fupd g = structs_fupd g ∘ ffi_fupd f) ∧
+         ∀h g f.
+           ffi_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ ffi_fupd f ∘ h) ∧
+        ((∀g f. ffi_fupd f ∘ code_fupd g = code_fupd g ∘ ffi_fupd f) ∧
+         ∀h g f.
+           ffi_fupd f ∘ code_fupd g ∘ h = code_fupd g ∘ ffi_fupd f ∘ h) ∧
+        ((∀g f. ffi_fupd f ∘ eshapes_fupd g = eshapes_fupd g ∘ ffi_fupd f) ∧
+         ∀h g f.
+           ffi_fupd f ∘ eshapes_fupd g ∘ h =
+           eshapes_fupd g ∘ ffi_fupd f ∘ h) ∧
+        ((∀g f. ffi_fupd f ∘ memory_fupd g = memory_fupd g ∘ ffi_fupd f) ∧
+         ∀h g f.
+           ffi_fupd f ∘ memory_fupd g ∘ h = memory_fupd g ∘ ffi_fupd f ∘ h) ∧
+        ((∀g f. ffi_fupd f ∘ memaddrs_fupd g = memaddrs_fupd g ∘ ffi_fupd f) ∧
+         ∀h g f.
+           ffi_fupd f ∘ memaddrs_fupd g ∘ h =
+           memaddrs_fupd g ∘ ffi_fupd f ∘ h) ∧
+        ((∀g f.
+            ffi_fupd f ∘ sh_memaddrs_fupd g =
+            sh_memaddrs_fupd g ∘ ffi_fupd f) ∧
+         ∀h g f.
+           ffi_fupd f ∘ sh_memaddrs_fupd g ∘ h =
+           sh_memaddrs_fupd g ∘ ffi_fupd f ∘ h) ∧
+        ((∀g f. ffi_fupd f ∘ clock_fupd g = clock_fupd g ∘ ffi_fupd f) ∧
+         ∀h g f.
+           ffi_fupd f ∘ clock_fupd g ∘ h = clock_fupd g ∘ ffi_fupd f ∘ h) ∧
+        ((∀g f. ffi_fupd f ∘ be_fupd g = be_fupd g ∘ ffi_fupd f) ∧
+         ∀h g f. ffi_fupd f ∘ be_fupd g ∘ h = be_fupd g ∘ ffi_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ locals_fupd g =
+            locals_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ globals_fupd g =
+            globals_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ structs_fupd g =
+            structs_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ code_fupd g = code_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ code_fupd g ∘ h =
+           code_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ eshapes_fupd g =
+            eshapes_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ eshapes_fupd g ∘ h =
+           eshapes_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ memory_fupd g =
+            memory_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ memory_fupd g ∘ h =
+           memory_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ memaddrs_fupd g =
+            memaddrs_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ memaddrs_fupd g ∘ h =
+           memaddrs_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ sh_memaddrs_fupd g =
+            sh_memaddrs_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ sh_memaddrs_fupd g ∘ h =
+           sh_memaddrs_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ clock_fupd g =
+            clock_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ clock_fupd g ∘ h =
+           clock_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f. base_addr_fupd f ∘ be_fupd g = be_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ be_fupd g ∘ h =
+           be_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ ffi_fupd g = ffi_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ ffi_fupd g ∘ h =
+           ffi_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ locals_fupd g =
+            locals_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ globals_fupd g =
+            globals_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ structs_fupd g =
+            structs_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ code_fupd g = code_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ code_fupd g ∘ h =
+           code_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ eshapes_fupd g =
+            eshapes_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ eshapes_fupd g ∘ h =
+           eshapes_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ memory_fupd g =
+            memory_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ memory_fupd g ∘ h =
+           memory_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ memaddrs_fupd g =
+            memaddrs_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ memaddrs_fupd g ∘ h =
+           memaddrs_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ sh_memaddrs_fupd g =
+            sh_memaddrs_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ sh_memaddrs_fupd g ∘ h =
+           sh_memaddrs_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ clock_fupd g = clock_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ clock_fupd g ∘ h =
+           clock_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f. top_addr_fupd f ∘ be_fupd g = be_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ be_fupd g ∘ h =
+           be_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f. top_addr_fupd f ∘ ffi_fupd g = ffi_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ ffi_fupd g ∘ h =
+           ffi_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        (∀g f.
+           top_addr_fupd f ∘ base_addr_fupd g =
+           base_addr_fupd g ∘ top_addr_fupd f) ∧
+        ∀h g f.
+          top_addr_fupd f ∘ base_addr_fupd g ∘ h =
+          base_addr_fupd g ∘ top_addr_fupd f ∘ h
+   
+   [state_fupdfupds]  Theorem
+      
+      ⊢ (∀s g f.
+           s with <|locals updated_by f; locals updated_by g|> =
+           s with locals updated_by f ∘ g) ∧
+        (∀s g f.
+           s with <|globals updated_by f; globals updated_by g|> =
+           s with globals updated_by f ∘ g) ∧
+        (∀s g f.
+           s with <|structs updated_by f; structs updated_by g|> =
+           s with structs updated_by f ∘ g) ∧
+        (∀s g f.
+           s with <|code updated_by f; code updated_by g|> =
+           s with code updated_by f ∘ g) ∧
+        (∀s g f.
+           s with <|eshapes updated_by f; eshapes updated_by g|> =
+           s with eshapes updated_by f ∘ g) ∧
+        (∀s g f.
+           s with <|memory updated_by f; memory updated_by g|> =
+           s with memory updated_by f ∘ g) ∧
+        (∀s g f.
+           s with <|memaddrs updated_by f; memaddrs updated_by g|> =
+           s with memaddrs updated_by f ∘ g) ∧
+        (∀s g f.
+           s with <|sh_memaddrs updated_by f; sh_memaddrs updated_by g|> =
+           s with sh_memaddrs updated_by f ∘ g) ∧
+        (∀s g f.
+           s with <|clock updated_by f; clock updated_by g|> =
+           s with clock updated_by f ∘ g) ∧
+        (∀s g f.
+           s with <|be updated_by f; be updated_by g|> =
+           s with be updated_by f ∘ g) ∧
+        (∀s g f.
+           s with <|ffi updated_by f; ffi updated_by g|> =
+           s with ffi updated_by f ∘ g) ∧
+        (∀s g f.
+           s with <|base_addr updated_by f; base_addr updated_by g|> =
+           s with base_addr updated_by f ∘ g) ∧
+        ∀s g f.
+          s with <|top_addr updated_by f; top_addr updated_by g|> =
+          s with top_addr updated_by f ∘ g
+   
+   [state_fupdfupds_comp]  Theorem
+      
+      ⊢ ((∀g f. locals_fupd f ∘ locals_fupd g = locals_fupd (f ∘ g)) ∧
+         ∀h g f.
+           locals_fupd f ∘ locals_fupd g ∘ h = locals_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. globals_fupd f ∘ globals_fupd g = globals_fupd (f ∘ g)) ∧
+         ∀h g f.
+           globals_fupd f ∘ globals_fupd g ∘ h = globals_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. structs_fupd f ∘ structs_fupd g = structs_fupd (f ∘ g)) ∧
+         ∀h g f.
+           structs_fupd f ∘ structs_fupd g ∘ h = structs_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. code_fupd f ∘ code_fupd g = code_fupd (f ∘ g)) ∧
+         ∀h g f. code_fupd f ∘ code_fupd g ∘ h = code_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. eshapes_fupd f ∘ eshapes_fupd g = eshapes_fupd (f ∘ g)) ∧
+         ∀h g f.
+           eshapes_fupd f ∘ eshapes_fupd g ∘ h = eshapes_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. memory_fupd f ∘ memory_fupd g = memory_fupd (f ∘ g)) ∧
+         ∀h g f.
+           memory_fupd f ∘ memory_fupd g ∘ h = memory_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. memaddrs_fupd f ∘ memaddrs_fupd g = memaddrs_fupd (f ∘ g)) ∧
+         ∀h g f.
+           memaddrs_fupd f ∘ memaddrs_fupd g ∘ h =
+           memaddrs_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f.
+            sh_memaddrs_fupd f ∘ sh_memaddrs_fupd g =
+            sh_memaddrs_fupd (f ∘ g)) ∧
+         ∀h g f.
+           sh_memaddrs_fupd f ∘ sh_memaddrs_fupd g ∘ h =
+           sh_memaddrs_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. clock_fupd f ∘ clock_fupd g = clock_fupd (f ∘ g)) ∧
+         ∀h g f. clock_fupd f ∘ clock_fupd g ∘ h = clock_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. be_fupd f ∘ be_fupd g = be_fupd (f ∘ g)) ∧
+         ∀h g f. be_fupd f ∘ be_fupd g ∘ h = be_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. ffi_fupd f ∘ ffi_fupd g = ffi_fupd (f ∘ g)) ∧
+         ∀h g f. ffi_fupd f ∘ ffi_fupd g ∘ h = ffi_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ base_addr_fupd g = base_addr_fupd (f ∘ g)) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ base_addr_fupd g ∘ h =
+           base_addr_fupd (f ∘ g) ∘ h) ∧
+        (∀g f. top_addr_fupd f ∘ top_addr_fupd g = top_addr_fupd (f ∘ g)) ∧
+        ∀h g f.
+          top_addr_fupd f ∘ top_addr_fupd g ∘ h = top_addr_fupd (f ∘ g) ∘ h
+   
+   [state_induction]  Theorem
+      
+      ⊢ ∀P. (∀f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+               P (state f f0 l f1 f2 f3 f4 f5 n b f6 c c0)) ⇒
+            ∀s. P s
+   
+   [state_literal_11]  Theorem
+      
+      ⊢ ∀f61 f51 l1 f41 f31 f21 f11 f01 n1 b1 f1 c01 c1 f62 f52 l2 f42 f32
+            f22 f12 f02 n2 b2 f2 c02 c2.
+          <|locals := f61; globals := f51; structs := l1; code := f41;
+            eshapes := f31; memory := f21; memaddrs := f11;
+            sh_memaddrs := f01; clock := n1; be := b1; ffi := f1;
+            base_addr := c01; top_addr := c1|> =
+          <|locals := f62; globals := f52; structs := l2; code := f42;
+            eshapes := f32; memory := f22; memaddrs := f12;
+            sh_memaddrs := f02; clock := n2; be := b2; ffi := f2;
+            base_addr := c02; top_addr := c2|> ⇔
+          f61 = f62 ∧ f51 = f52 ∧ l1 = l2 ∧ f41 = f42 ∧ f31 = f32 ∧
+          f21 = f22 ∧ f11 = f12 ∧ f01 = f02 ∧ n1 = n2 ∧ (b1 ⇔ b2) ∧
+          f1 = f2 ∧ c01 = c02 ∧ c1 = c2
+   
+   [state_literal_nchotomy]  Theorem
+      
+      ⊢ ∀s. ∃f6 f5 l f4 f3 f2 f1 f0 n b f c0 c.
+          s =
+          <|locals := f6; globals := f5; structs := l; code := f4;
+            eshapes := f3; memory := f2; memaddrs := f1; sh_memaddrs := f0;
+            clock := n; be := b; ffi := f; base_addr := c0; top_addr := c|>
+   
+   [state_nchotomy]  Theorem
+      
+      ⊢ ∀ss. ∃f f0 l f1 f2 f3 f4 f5 n b f6 c c0.
+          ss = state f f0 l f1 f2 f3 f4 f5 n b f6 c c0
+   
+   [state_updates_eq_literal]  Theorem
+      
+      ⊢ ∀s f6 f5 l f4 f3 f2 f1 f0 n b f c0 c.
+          s with
+          <|locals := f6; globals := f5; structs := l; code := f4;
+            eshapes := f3; memory := f2; memaddrs := f1; sh_memaddrs := f0;
+            clock := n; be := b; ffi := f; base_addr := c0; top_addr := c|> =
+          <|locals := f6; globals := f5; structs := l; code := f4;
+            eshapes := f3; memory := f2; memaddrs := f1; sh_memaddrs := f0;
+            clock := n; be := b; ffi := f; base_addr := c0; top_addr := c|>
+   
+   [theValWord_def]  Theorem
+      
+      ⊢ theValWord (ValWord w) = w
+   
+   [theValWord_ind]  Theorem
+      
+      ⊢ ∀P. (∀w. P (ValWord w)) ∧ (∀v2. P (RStruct v2)) ∧
+            (∀v5 v6. P (NStruct v5 v6)) ⇒
+            ∀v. P v
+   
+   [v_11]  Theorem
+      
+      ⊢ (∀a a'. Val a = Val a' ⇔ a = a') ∧
+        (∀a a'. RStruct a = RStruct a' ⇔ a = a') ∧
+        ∀a0 a1 a0' a1'.
+          NStruct a0 a1 = NStruct a0' a1' ⇔ a0 = a0' ∧ a1 = a1'
+   
+   [v_Axiom]  Theorem
+      
+      ⊢ ∀f0 f1 f2 f3 f4 f5 f6 f7. ∃fn0 fn1 fn2 fn3.
+          (∀a. fn0 (Val a) = f0 a) ∧ (∀a. fn0 (RStruct a) = f1 a (fn3 a)) ∧
+          (∀a0 a1. fn0 (NStruct a0 a1) = f2 a0 a1 (fn1 a1)) ∧ fn1 [] = f3 ∧
+          (∀a0 a1. fn1 (a0::a1) = f4 a0 a1 (fn2 a0) (fn1 a1)) ∧
+          (∀a0 a1. fn2 (a0,a1) = f5 a0 a1 (fn0 a1)) ∧ fn3 [] = f6 ∧
+          ∀a0 a1. fn3 (a0::a1) = f7 a0 a1 (fn0 a0) (fn3 a1)
+   
+   [v_case_cong]  Theorem
+      
+      ⊢ ∀M M' f f1 f2.
+          M = M' ∧ (∀a. M' = Val a ⇒ f a = f' a) ∧
+          (∀a. M' = RStruct a ⇒ f1 a = f1' a) ∧
+          (∀a0 a1. M' = NStruct a0 a1 ⇒ f2 a0 a1 = f2' a0 a1) ⇒
+          v_CASE M f f1 f2 = v_CASE M' f' f1' f2'
+   
+   [v_case_eq]  Theorem
+      
+      ⊢ v_CASE x f f1 f2 = v ⇔
+        (∃w. x = Val w ∧ f w = v) ∨ (∃l. x = RStruct l ∧ f1 l = v) ∨
+        ∃m l. x = NStruct m l ∧ f2 m l = v
+   
+   [v_distinct]  Theorem
+      
+      ⊢ (∀a' a. Val a ≠ RStruct a') ∧ (∀a1 a0 a. Val a ≠ NStruct a0 a1) ∧
+        ∀a1 a0 a. RStruct a ≠ NStruct a0 a1
+   
+   [v_induction]  Theorem
+      
+      ⊢ ∀P0 P1 P2 P3.
+          (∀w. P0 (Val w)) ∧ (∀l. P3 l ⇒ P0 (RStruct l)) ∧
+          (∀l. P1 l ⇒ ∀m. P0 (NStruct m l)) ∧ P1 [] ∧
+          (∀p l. P2 p ∧ P1 l ⇒ P1 (p::l)) ∧ (∀v. P0 v ⇒ ∀m. P2 (m,v)) ∧
+          P3 [] ∧ (∀v l. P0 v ∧ P3 l ⇒ P3 (v::l)) ⇒
+          (∀v. P0 v) ∧ (∀l. P1 l) ∧ (∀p. P2 p) ∧ ∀l. P3 l
+   
+   [v_nchotomy]  Theorem
+      
+      ⊢ ∀vv.
+          (∃w. vv = Val w) ∨ (∃l. vv = RStruct l) ∨ ∃m l. vv = NStruct m l
+   
+   [vshapes_args_rel_imp_eq_len_MAP]  Theorem
+      
+      ⊢ ∀vshapes args.
+          LIST_REL (λvshape arg. SND vshape = shape_of arg) vshapes args ⇒
+          LENGTH vshapes = LENGTH args ∧
+          MAP SND vshapes = MAP shape_of args
+   
+   [word_lab_11]  Theorem
+      
+      ⊢ ∀a a'. Word a = Word a' ⇔ a = a'
+   
+   [word_lab_Axiom]  Theorem
+      
+      ⊢ ∀f. ∃fn. ∀a. fn (Word a) = f a
+   
+   [word_lab_case_cong]  Theorem
+      
+      ⊢ ∀M M' f.
+          M = M' ∧ (∀a. M' = Word a ⇒ f a = f' a) ⇒
+          word_lab_CASE M f = word_lab_CASE M' f'
+   
+   [word_lab_case_eq]  Theorem
+      
+      ⊢ word_lab_CASE x f = v ⇔ ∃c. x = Word c ∧ f c = v
+   
+   [word_lab_induction]  Theorem
+      
+      ⊢ ∀P. (∀c. P (Word c)) ⇒ ∀w. P w
+   
+   [word_lab_nchotomy]  Theorem
+      
+      ⊢ ∀ww. ∃c. ww = Word c
+   
+   

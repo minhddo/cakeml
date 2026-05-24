@@ -1,0 +1,142 @@
+[pan_itreeSem] Parent theory of "pan_itreeProps"
+   
+   [lnil_def]  Definition
+      
+      ⊢ lnil = LUNFOLD (λu. SOME ((),[||])) ()
+   
+   [comp_ffi_FUNPOW_Tau]  Theorem
+      
+      ⊢ comp_ffi fs (FUNPOW Tau n t) = comp_ffi fs t
+   
+   [comp_ffi_bind]  Theorem
+      
+      ⊢ ltree fs t = FUNPOW Tau n (Ret r) ⇒
+        comp_ffi fs (itree_bind t k) =
+        comp_ffi (FST fs,SND (comp_ffi fs t)) (k r)
+   
+   [div_FUNPOW_Tau]  Theorem
+      
+      ⊢ div fs (FUNPOW Tau n X) ⇔ div fs X
+   
+   [div_bind1]  Theorem
+      
+      ⊢ div fs X ⇒ div fs (itree_bind X Y)
+   
+   [div_bind2]  Theorem
+      
+      ⊢ ltree fs X = FUNPOW Tau n (Ret r) ⇒
+        (div fs (itree_bind X Y) ⇔ div (FST fs,SND (comp_ffi fs X)) (Y r))
+   
+   [div_bind_cases]  Theorem
+      
+      ⊢ div fs (itree_bind X k) ⇔
+        div fs X ∨
+        ∃n r.
+          ltree fs X = FUNPOW Tau n (Ret r) ∧
+          div (FST fs,SND (comp_ffi fs X)) (k r)
+   
+   [div_eq_ltree_spin]  Theorem
+      
+      ⊢ div fs t ⇔ ltree fs t = spin
+   
+   [div_imp_spin]  Theorem
+      
+      ⊢ div fs t ⇒ ltree fs t = spin
+   
+   [itree_unfold_spin]  Theorem
+      
+      ⊢ (∀u. f (Tau u) = Tau' u) ⇒ itree_unfold f spin = spin
+   
+   [lnil]  Theorem
+      
+      ⊢ [||]:::lnil = lnil
+   
+   [ltree_FUNPOW_Tau]  Theorem
+      
+      ⊢ ltree fs (FUNPOW Tau n t) = FUNPOW Tau n (ltree fs t)
+   
+   [ltree_bind]  Theorem
+      
+      ⊢ ltree fs (itree_bind t k) =
+        itree_bind (ltree fs t) (ltree (FST fs,SND (comp_ffi fs t)) ∘ k)
+   
+   [ltree_div_bind]  Theorem
+      
+      ⊢ div fs X ⇒ ltree fs (itree_bind X k) = ltree fs X
+   
+   [ltree_not_Vis]  Theorem
+      
+      ⊢ ∀n e k. ltree fs t ≠ FUNPOW Tau n (Vis e k)
+   
+   [ltree_spin]  Theorem
+      
+      ⊢ ltree fs spin = spin
+   
+   [nondiv_INR]  Theorem
+      
+      ⊢ ltree fs (mrec_sem p s) = FUNPOW Tau n (Ret r) ⇒ ∃x. r = INR x
+   
+   [nondiv_ltree_bind_lemma]  Theorem
+      
+      ⊢ itree_bind (ltree fs t) (ltree (FST fs,SND (comp_ffi fs t)) ∘ k) =
+        FUNPOW Tau n (Ret r) ⇒
+        ∃n' r'.
+          ltree fs t = FUNPOW Tau n' (Ret r') ∧
+          ∃n''.
+            ltree (FST fs,SND (comp_ffi fs t)) (k r') =
+            FUNPOW Tau n'' (Ret r) ∧ n' + n'' = n
+   
+   [nondiv_ltree_bind_lemma']  Theorem
+      
+      ⊢ itree_bind (ltree fs t) (ltree fs' ∘ k) = FUNPOW Tau n (Ret r) ∧
+        fs' = (FST fs,SND (comp_ffi fs t)) ⇒
+        ∃n' r'.
+          ltree fs t = FUNPOW Tau n' (Ret r') ∧
+          ∃n''.
+            ltree (FST fs,SND (comp_ffi fs t)) (k r') =
+            FUNPOW Tau n'' (Ret r) ∧ n' + n'' = n
+   
+   [trace_eq_lemma]  Theorem
+      
+      ⊢ trace_prefix0 fs
+          (itree_unfold
+             (λx.
+                  case x of
+                    Ret r => Ret' (case r of INL l => a | INR r => r)
+                  | Tau t => Tau' t
+                  | Vis e f => Vis' e (λx. f (INL x))) t) =
+        trace_prefix fs t
+   
+   [trace_prefix0_FUNPOW_Tau]  Theorem
+      
+      ⊢ trace_prefix0 fs (FUNPOW Tau n t) = trace_prefix0 fs t
+   
+   [trace_prefix0_eq_trace_prefix]  Theorem
+      
+      ⊢ trace_prefix0 fs (itree_evaluate (p,s)) =
+        trace_prefix fs (mrec_sem p s)
+   
+   [trace_prefix0_spin]  Theorem
+      
+      ⊢ trace_prefix0 fs spin = [||]
+   
+   [trace_prefix_FUNPOW_Tau]  Theorem
+      
+      ⊢ trace_prefix fs (FUNPOW Tau n t) = trace_prefix fs t
+   
+   [trace_prefix_bind_append]  Theorem
+      
+      ⊢ (∃n. ltree fs t = FUNPOW Tau n (Ret r)) ⇒
+        trace_prefix fs (itree_bind t k) =
+        trace_prefix fs t ++ₗ
+        trace_prefix (FST fs,SND (comp_ffi fs t)) (k r)
+   
+   [trace_prefix_bind_div]  Theorem
+      
+      ⊢ div fs t ⇒ trace_prefix fs (itree_bind t k) = trace_prefix fs t
+   
+   [trace_prefix_spin]  Theorem
+      
+      ⊢ trace_prefix fs spin = [||]
+   
+   

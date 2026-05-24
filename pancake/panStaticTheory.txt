@@ -1,0 +1,4631 @@
+[errorLogMonad] Parent theory of "panStatic"
+   
+   [mlint] Parent theory of "panStatic"
+   
+   [mlmap] Parent theory of "panStatic"
+   
+   [panLang] Parent theory of "panStatic"
+   
+   [add_primitive_hint_def]  Definition
+      
+      ⊢ ∀fname msg.
+          add_primitive_hint fname msg =
+          if MEM fname primitive_idents then
+            concat
+              [msg; «  note: »; fname;
+               « is a built-in primitive only available in »;
+               «declaration or assignment RHS positions\n»]
+          else msg
+   
+   [based_BIJ]  Definition
+      
+      ⊢ (∀a. num2based (based2num a) = a) ∧
+        ∀r. (λn. n < 4) r ⇔ based2num (num2based r) = r
+   
+   [based_CASE]  Definition
+      
+      ⊢ ∀x v0 v1 v2 v3.
+          (case x of
+             Based => v0
+           | NotBased => v1
+           | Trusted => v2
+           | NotTrusted => v3) =
+          (λm.
+               if m < 1 then v0
+               else if m < 2 then v1
+               else if m = 2 then v2
+               else v3) (based2num x)
+   
+   [based_TY_DEF]  Definition
+      
+      ⊢ ∃rep. TYPE_DEFINITION (λn. n < 4) rep
+   
+   [based_merge_def]  Definition
+      
+      ⊢ ∀x y.
+          based_merge x y =
+          case (x,y) of
+            (Based,v1) => Based
+          | (NotBased,Based) => Based
+          | (NotBased,NotBased) => NotBased
+          | (NotBased,Trusted) => Trusted
+          | (NotBased,NotTrusted) => NotTrusted
+          | (Trusted,Based) => Based
+          | (Trusted,NotBased) => Trusted
+          | (Trusted,Trusted) => Trusted
+          | (Trusted,NotTrusted) => NotTrusted
+          | (NotTrusted,Based) => Based
+          | (NotTrusted,NotBased) => NotTrusted
+          | (NotTrusted,Trusted) => NotTrusted
+          | (NotTrusted,NotTrusted) => NotTrusted
+   
+   [based_size_def]  Definition
+      
+      ⊢ ∀x. based_size x = 0
+   
+   [binop_to_str_def]  Definition
+      
+      ⊢ ∀op.
+          binop_to_str op =
+          case op of
+            Add => «Add»
+          | Sub => «Sub»
+          | And => «And»
+          | Or => «Or»
+          | Xor => «Xor»
+   
+   [branch_last_stmt_def]  Definition
+      
+      ⊢ ∀double_ret double_loop_exit.
+          branch_last_stmt double_ret double_loop_exit =
+          if double_ret ∨ double_loop_exit then CondExitLast else OtherLast
+   
+   [branch_loc_inf_def]  Definition
+      
+      ⊢ ∀vctxt x y.
+          branch_loc_inf vctxt x y =
+          (let
+             x' =
+               mapWithKey
+                 (λk v.
+                      v with
+                      vsh_bd :=
+                        if ¬member k y then
+                          case lookup vctxt k of
+                            NONE => sh_bd_from_bd NotTrusted v.vsh_bd
+                          | SOME v' => sh_bd_branch v.vsh_bd v'.vsh_bd
+                        else v.vsh_bd) x;
+             y' =
+               mapWithKey
+                 (λk v.
+                      v with
+                      vsh_bd :=
+                        if ¬member k x then
+                          case lookup vctxt k of
+                            NONE => sh_bd_from_bd NotTrusted v.vsh_bd
+                          | SOME v' => sh_bd_branch v.vsh_bd v'.vsh_bd
+                        else v.vsh_bd) y
+           in
+             unionWith
+               (λvx vy. vx with vsh_bd := sh_bd_branch vx.vsh_bd vy.vsh_bd)
+               x' y')
+   
+   [check_addcarry_args_def]  Definition
+      
+      ⊢ ∀ctxt sh_bds.
+          check_addcarry_args ctxt sh_bds =
+          (let
+             op_str = primop_to_str AddCarry;
+             nargs = LENGTH sh_bds
+           in
+             do
+               if nargs ≠ 3 then
+                 error
+                   (GenErr
+                      (get_oparg_msg T «3» (toString nargs) ctxt.loc op_str
+                         ctxt.scope))
+               else return ();
+               b <- check_operands ctxt op_str sh_bds;
+               return (StructB [WordB b; WordB NotBased])
+             od)
+   
+   [check_fun_name_def]  Definition
+      
+      ⊢ ∀ctxt fname.
+          check_fun_name ctxt fname =
+          case lookup ctxt.funcs fname of
+            NONE =>
+              error
+                (ScopeErr
+                   (add_primitive_hint fname
+                      (get_scope_msg Fun ctxt.loc fname ctxt.scope)))
+          | SOME f => return f
+   
+   [check_global_var_def]  Definition
+      
+      ⊢ ∀ctxt vname.
+          check_global_var ctxt vname =
+          case lookup ctxt.globals vname of
+            NONE =>
+              error
+                (ScopeErr (get_scope_msg Var ctxt.loc vname ctxt.scope))
+          | SOME v => return v
+   
+   [check_local_var_def]  Definition
+      
+      ⊢ ∀ctxt vname.
+          check_local_var ctxt vname =
+          case lookup ctxt.locals vname of
+            NONE =>
+              error
+                (ScopeErr (get_scope_msg Var ctxt.loc vname ctxt.scope))
+          | SOME v => return v
+   
+   [check_operands_def]  Definition
+      
+      ⊢ (∀ctxt op_str. check_operands ctxt op_str [] = return NotBased) ∧
+        ∀ctxt op_str sb sbs.
+          check_operands ctxt op_str (sb::sbs) =
+          case sb of
+            WordB b =>
+              do
+                b' <- check_operands ctxt op_str sbs;
+                return (based_merge b b')
+              od
+          | StructB v5 =>
+            error
+              (ShapeErr
+                 (get_non_word_msg
+                    (concat [«operation »; op_str; « operand»])
+                    (sh_bd_to_str sb) ctxt.loc ctxt.scope))
+          | NamedB v6 v7 =>
+            error
+              (ShapeErr
+                 (get_non_word_msg
+                    (concat [«operation »; op_str; « operand»])
+                    (sh_bd_to_str sb) ctxt.loc ctxt.scope))
+   
+   [check_redec_var_def]  Definition
+      
+      ⊢ ∀ctxt vname.
+          check_redec_var ctxt vname =
+          case (lookup ctxt.locals vname,lookup ctxt.globals vname) of
+            (NONE,NONE) => return ()
+          | (NONE,SOME v7) =>
+            log (WarningErr (get_redec_msg Var ctxt.loc vname ctxt.scope))
+          | (SOME v5,v3) =>
+            log (WarningErr (get_redec_msg Var ctxt.loc vname ctxt.scope))
+   
+   [check_shape_def]  Definition
+      
+      ⊢ (∀sctxt loc scope. check_shape sctxt loc scope One = return ()) ∧
+        (∀sctxt loc scope shs.
+           check_shape sctxt loc scope (Comb shs) =
+           check_shapes sctxt loc scope shs) ∧
+        (∀sctxt loc scope nm.
+           check_shape sctxt loc scope (Named nm) =
+           case ALOOKUP sctxt nm of
+             NONE => error (ScopeErr (get_scope_msg Stc loc nm scope))
+           | SOME flds => return ()) ∧
+        (∀sctxt loc scope. check_shapes sctxt loc scope [] = return ()) ∧
+        ∀sctxt loc scope sh shs.
+          check_shapes sctxt loc scope (sh::shs) =
+          do
+            check_shape sctxt loc scope sh;
+            check_shapes sctxt loc scope shs
+          od
+   
+   [context_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0'.
+                 ∀ $var$('context').
+                   (∀a0'.
+                      (∃a0 a1 a2 a3 a4 a5 a6 a7 a8.
+                         a0' =
+                         (λa0 a1 a2 a3 a4 a5 a6 a7 a8.
+                              ind_type$CONSTR 0
+                                (a0,a1,a2,a3,a4,a5,a6,a7,a8)
+                                (λn. ind_type$BOTTOM)) a0 a1 a2 a3 a4 a5 a6
+                           a7 a8) ⇒
+                      $var$('context') a0') ⇒
+                   $var$('context') a0') rep
+   
+   [context_case_def]  Definition
+      
+      ⊢ ∀a0 a1 a2 a3 a4 a5 a6 a7 a8 f.
+          context_CASE (context a0 a1 a2 a3 a4 a5 a6 a7 a8) f =
+          f a0 a1 a2 a3 a4 a5 a6 a7 a8
+   
+   [context_size_def]  Definition
+      
+      ⊢ ∀a0 a1 a2 a3 a4 a5 a6 a7 a8.
+          context_size (context a0 a1 a2 a3 a4 a5 a6 a7 a8) =
+          1 +
+          (map_size mlstring_size local_info_size a0 +
+           (map_size mlstring_size global_info_size a1 +
+            (map_size mlstring_size func_info_size a2 +
+             (list_size (pair_size mlstring_size struct_info_size) a3 +
+              (scope_size a4 +
+               (bool_size a5 +
+                (reachable_size a6 +
+                 (last_stmt_size a7 + mlstring_size a8))))))))
+   
+   [exp_return_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0.
+                 ∀ $var$('exp_return').
+                   (∀a0.
+                      (∃a. a0 =
+                           (λa. ind_type$CONSTR 0 a (λn. ind_type$BOTTOM))
+                             a) ⇒
+                      $var$('exp_return') a0) ⇒
+                   $var$('exp_return') a0) rep
+   
+   [exp_return_case_def]  Definition
+      
+      ⊢ ∀a f. exp_return_CASE (exp_return a) f = f a
+   
+   [exp_return_size_def]  Definition
+      
+      ⊢ ∀a. exp_return_size (exp_return a) = 1 + shaped_based_size a
+   
+   [exps_return_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0.
+                 ∀ $var$('exps_return').
+                   (∀a0.
+                      (∃a. a0 =
+                           (λa. ind_type$CONSTR 0 a (λn. ind_type$BOTTOM))
+                             a) ⇒
+                      $var$('exps_return') a0) ⇒
+                   $var$('exps_return') a0) rep
+   
+   [exps_return_case_def]  Definition
+      
+      ⊢ ∀a f. exps_return_CASE (exps_return a) f = f a
+   
+   [exps_return_size_def]  Definition
+      
+      ⊢ ∀a. exps_return_size (exps_return a) =
+            1 + list_size shaped_based_size a
+   
+   [field_sh_bd_def]  Definition
+      
+      ⊢ (∀fld b. field_sh_bd fld (WordB b) = NONE) ∧
+        (∀fld sbs. field_sh_bd fld (StructB sbs) = NONE) ∧
+        ∀fld nm flds. field_sh_bd fld (NamedB nm flds) = ALOOKUP flds fld
+   
+   [first_repeat_def_primitive]  Definition
+      
+      ⊢ first_repeat =
+        WFREC
+          (@R. WF R ∧
+               ∀xs x1 v3 x2 xs'.
+                 xs = x1::v3 ∧ v3 = x2::xs' ∧ x1 ≠ x2 ⇒ R (x2::xs') xs)
+          (λfirst_repeat a.
+               I
+                 (case a of
+                    [] => NONE
+                  | [x1] => NONE
+                  | x1::x2::xs =>
+                    if x1 = x2 then SOME x1 else first_repeat (x2::xs)))
+   
+   [func_info_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0'.
+                 ∀ $var$('func_info').
+                   (∀a0'.
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR 0 (a0,a1)
+                                (λn. ind_type$BOTTOM)) a0 a1) ⇒
+                      $var$('func_info') a0') ⇒
+                   $var$('func_info') a0') rep
+   
+   [func_info_case_def]  Definition
+      
+      ⊢ ∀a0 a1 f. func_info_CASE (func_info a0 a1) f = f a0 a1
+   
+   [func_info_size_def]  Definition
+      
+      ⊢ ∀a0 a1.
+          func_info_size (func_info a0 a1) =
+          1 +
+          (shape_size a0 +
+           list_size (pair_size mlstring_size shape_size) a1)
+   
+   [get_implementation_err_msg_def]  Definition
+      
+      ⊢ ∀desc loc scope.
+          get_implementation_err_msg desc loc scope =
+          concat
+            [loc; desc; « in »; get_scope_desc scope; «\n»;
+             «this should never happen. please report to a compiler developer\n»]
+   
+   [get_memop_msg_def]  Definition
+      
+      ⊢ ∀is_local is_load is_untrust loc scope.
+          get_memop_msg is_local is_load is_untrust loc scope =
+          (let
+             mem_type = if is_local then «local » else «shared »;
+             op_type = if is_load then «load » else «store »;
+             issue =
+               case (is_local,is_untrust) of
+                 (T,T) => «may not be »
+               | (T,F) => «is not »
+               | (F,T) => «may be »
+               | (F,F) => «is »
+           in
+             concat
+               [loc; mem_type; op_type; «address »; issue;
+                «calculated from base in »; get_scope_desc scope; «\n»])
+   
+   [get_non_word_msg_def]  Definition
+      
+      ⊢ ∀desc sh_str loc scope.
+          get_non_word_msg desc sh_str loc scope =
+          concat
+            [loc; desc; « has shape »; sh_str; « instead of a word in »;
+             get_scope_desc scope; «\n»]
+   
+   [get_oparg_msg_def]  Definition
+      
+      ⊢ ∀is_exact n_expected n_given loc op scope.
+          get_oparg_msg is_exact n_expected n_given loc op scope =
+          (let
+             issue =
+               if is_exact then « only accepts » else « requires at least »
+           in
+             concat
+               [loc; «operation »; op; issue; n_expected; « operands, »;
+                n_given; « provided in »; get_scope_desc scope; «\n»])
+   
+   [get_redec_msg_def]  Definition
+      
+      ⊢ ∀id_type loc id scope.
+          get_redec_msg id_type loc id scope =
+          (let
+             id_desc =
+               case id_type of
+                 Var => «variable »
+               | Fun => «function »
+               | Stc => «struct name »
+           in
+             concat
+               [loc; id_desc; id; « is redeclared in »;
+                get_scope_desc scope; «\n»])
+   
+   [get_rogue_msg_def]  Definition
+      
+      ⊢ ∀is_break loc scope.
+          get_rogue_msg is_break loc scope =
+          (let
+             stmt = if is_break then «break » else «continue »
+           in
+             concat
+               [loc; stmt; «statement outside loop in »;
+                get_scope_desc scope; «\n»])
+   
+   [get_scope_desc_def]  Definition
+      
+      ⊢ ∀scope.
+          get_scope_desc scope =
+          case scope of
+            FunScope fname desc => concat [«function »; fname; desc]
+          | DeclScope vname =>
+            concat [«initialisation of global variable »; vname]
+          | StcScope sname fld =>
+            concat
+              [«declaration of field »; fld; « in named struct »; sname]
+          | TopLevel => «top-level declaration»
+   
+   [get_scope_msg_def]  Definition
+      
+      ⊢ ∀id_type loc id scope.
+          get_scope_msg id_type loc id scope =
+          (let
+             id_desc =
+               case id_type of
+                 Var => «variable »
+               | Fun => «function »
+               | Stc => «struct name »
+           in
+             concat
+               [loc; id_desc; id; « is not in scope in »;
+                get_scope_desc scope; «\n»])
+   
+   [get_shape_mismatch_msg_def]  Definition
+      
+      ⊢ ∀desc sh_str_actual sh_str_expect loc scope.
+          get_shape_mismatch_msg desc sh_str_actual sh_str_expect loc scope =
+          concat
+            [loc; desc; « has shape »; sh_str_actual;
+             « instead of declared shape »; sh_str_expect; « in »;
+             get_scope_desc scope; «\n»]
+   
+   [get_unreach_msg_def]  Definition
+      
+      ⊢ ∀loc last scope.
+          get_unreach_msg loc last scope =
+          concat
+            [loc; «unreachable statement(s) after »; last; « in »;
+             get_scope_desc scope; «\n»]
+   
+   [global_info_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0.
+                 ∀ $var$('global_info').
+                   (∀a0.
+                      (∃a. a0 =
+                           (λa. ind_type$CONSTR 0 a (λn. ind_type$BOTTOM))
+                             a) ⇒
+                      $var$('global_info') a0) ⇒
+                   $var$('global_info') a0) rep
+   
+   [global_info_case_def]  Definition
+      
+      ⊢ ∀a f. global_info_CASE (global_info a) f = f a
+   
+   [global_info_size_def]  Definition
+      
+      ⊢ ∀a. global_info_size (global_info a) = 1 + shape_size a
+   
+   [index_sh_bd_def]  Definition
+      
+      ⊢ (∀i b. index_sh_bd i (WordB b) = NONE) ∧
+        (∀i sbs. index_sh_bd i (StructB sbs) = LLOOKUP sbs i) ∧
+        ∀i nm flds. index_sh_bd i (NamedB nm flds) = NONE
+   
+   [last_stmt_BIJ]  Definition
+      
+      ⊢ (∀a. num2last_stmt (last_stmt2num a) = a) ∧
+        ∀r. (λn. n < 8) r ⇔ last_stmt2num (num2last_stmt r) = r
+   
+   [last_stmt_CASE]  Definition
+      
+      ⊢ ∀x v0 v1 v2 v3 v4 v5 v6 v7.
+          (case x of
+             RetLast => v0
+           | RaiseLast => v1
+           | TailLast => v2
+           | BreakLast => v3
+           | ContLast => v4
+           | CondExitLast => v5
+           | InvisLast => v6
+           | OtherLast => v7) =
+          (λm.
+               if m < 3 then if m < 1 then v0 else if m = 1 then v1 else v2
+               else if m < 5 then if m = 3 then v3 else v4
+               else if m < 6 then v5
+               else if m = 6 then v6
+               else v7) (last_stmt2num x)
+   
+   [last_stmt_TY_DEF]  Definition
+      
+      ⊢ ∃rep. TYPE_DEFINITION (λn. n < 8) rep
+   
+   [last_stmt_size_def]  Definition
+      
+      ⊢ ∀x. last_stmt_size x = 0
+   
+   [last_to_str_def]  Definition
+      
+      ⊢ ∀l. last_to_str l =
+            case l of
+              RetLast => «return»
+            | RaiseLast => «raise»
+            | TailLast => «tail call»
+            | BreakLast => «break»
+            | ContLast => «continue»
+            | CondExitLast => «exiting conditional»
+            | InvisLast => «»
+            | OtherLast => «»
+   
+   [local_info_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0.
+                 ∀ $var$('local_info').
+                   (∀a0.
+                      (∃a. a0 =
+                           (λa. ind_type$CONSTR 0 a (λn. ind_type$BOTTOM))
+                             a) ⇒
+                      $var$('local_info') a0) ⇒
+                   $var$('local_info') a0) rep
+   
+   [local_info_case_def]  Definition
+      
+      ⊢ ∀a f. local_info_CASE (local_info a) f = f a
+   
+   [local_info_size_def]  Definition
+      
+      ⊢ ∀a. local_info_size (local_info a) = 1 + shaped_based_size a
+   
+   [next_is_reachable_def]  Definition
+      
+      ⊢ ∀r x.
+          next_is_reachable r x =
+          case r of
+            IsReach =>
+              if ¬(x = InvisLast ∨ x = OtherLast) then WarnReach
+              else IsReach
+          | NotReach => r
+          | WarnReach => r
+   
+   [next_now_unreachable_def]  Definition
+      
+      ⊢ ∀r r'. next_now_unreachable r r' ⇔ r = IsReach ∧ r' ≠ IsReach
+   
+   [panop_to_str_def]  Definition
+      
+      ⊢ ∀op. panop_to_str op = «Mul»
+   
+   [primitive_idents_def]  Definition
+      
+      ⊢ primitive_idents = [«__add_with_carry__»]
+   
+   [primop_to_str_def]  Definition
+      
+      ⊢ ∀pop. primop_to_str pop = «AddCarry»
+   
+   [prog_return_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0'.
+                 ∀ $var$('prog_return').
+                   (∀a0'.
+                      (∃a0 a1 a2 a3 a4.
+                         a0' =
+                         (λa0 a1 a2 a3 a4.
+                              ind_type$CONSTR 0 (a0,a1,a2,a3,a4)
+                                (λn. ind_type$BOTTOM)) a0 a1 a2 a3 a4) ⇒
+                      $var$('prog_return') a0') ⇒
+                   $var$('prog_return') a0') rep
+   
+   [prog_return_case_def]  Definition
+      
+      ⊢ ∀a0 a1 a2 a3 a4 f.
+          prog_return_CASE (prog_return a0 a1 a2 a3 a4) f =
+          f a0 a1 a2 a3 a4
+   
+   [prog_return_size_def]  Definition
+      
+      ⊢ ∀a0 a1 a2 a3 a4.
+          prog_return_size (prog_return a0 a1 a2 a3 a4) =
+          1 +
+          (bool_size a0 +
+           (bool_size a1 +
+            (last_stmt_size a2 +
+             (map_size mlstring_size local_info_size a3 + mlstring_size a4))))
+   
+   [reachable_BIJ]  Definition
+      
+      ⊢ (∀a. num2reachable (reachable2num a) = a) ∧
+        ∀r. (λn. n < 3) r ⇔ reachable2num (num2reachable r) = r
+   
+   [reachable_CASE]  Definition
+      
+      ⊢ ∀x v0 v1 v2.
+          (case x of IsReach => v0 | NotReach => v1 | WarnReach => v2) =
+          (λm. if m < 1 then v0 else if m = 1 then v1 else v2)
+            (reachable2num x)
+   
+   [reachable_TY_DEF]  Definition
+      
+      ⊢ ∃rep. TYPE_DEFINITION (λn. n < 3) rep
+   
+   [reachable_size_def]  Definition
+      
+      ⊢ ∀x. reachable_size x = 0
+   
+   [reached_warnable_def]  Definition
+      
+      ⊢ ∀s ctxt.
+          reached_warnable s ctxt =
+          case s of
+            Skip =>
+              if ctxt.is_reachable = WarnReach then
+                (SOME ctxt.last,ctxt with is_reachable := NotReach)
+              else (NONE,ctxt)
+          | Dec v48 v49 v50 v51 =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | Assign v52 v53 v54 =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | Primitive v55 v56 v57 =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | Store v58 v59 =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | Store32 v60 v61 =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | StoreByte v62 v63 =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | Seq prog1 prog2 => (NONE,ctxt)
+          | If v66 v67 v68 =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | While v69 v70 =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | Break =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | Continue =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | Call v71 v72 v73 =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | DecCall v74 v75 v76 v77 v78 =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | ExtCall v79 v80 v81 v82 v83 =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | Raise v84 v85 =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | Return v86 =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | ShMemLoad v87 v88 v89 v90 =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | ShMemStore v91 v92 v93 =>
+            if ctxt.is_reachable = WarnReach then
+              (SOME ctxt.last,ctxt with is_reachable := NotReach)
+            else (NONE,ctxt)
+          | Tick => (NONE,ctxt)
+          | Annot str1 str2 => (NONE,ctxt)
+   
+   [recordtype_context_seldef_funcs_def]  Definition
+      
+      ⊢ ∀m m0 m1 l s b r l0 m2. (context m m0 m1 l s b r l0 m2).funcs = m1
+   
+   [recordtype_context_seldef_funcs_fupd_def]  Definition
+      
+      ⊢ ∀f m m0 m1 l s b r l0 m2.
+          context m m0 m1 l s b r l0 m2 with funcs updated_by f =
+          context m m0 (f m1) l s b r l0 m2
+   
+   [recordtype_context_seldef_globals_def]  Definition
+      
+      ⊢ ∀m m0 m1 l s b r l0 m2.
+          (context m m0 m1 l s b r l0 m2).globals = m0
+   
+   [recordtype_context_seldef_globals_fupd_def]  Definition
+      
+      ⊢ ∀f m m0 m1 l s b r l0 m2.
+          context m m0 m1 l s b r l0 m2 with globals updated_by f =
+          context m (f m0) m1 l s b r l0 m2
+   
+   [recordtype_context_seldef_in_loop_def]  Definition
+      
+      ⊢ ∀m m0 m1 l s b r l0 m2. (context m m0 m1 l s b r l0 m2).in_loop ⇔ b
+   
+   [recordtype_context_seldef_in_loop_fupd_def]  Definition
+      
+      ⊢ ∀f m m0 m1 l s b r l0 m2.
+          context m m0 m1 l s b r l0 m2 with in_loop updated_by f =
+          context m m0 m1 l s (f b) r l0 m2
+   
+   [recordtype_context_seldef_is_reachable_def]  Definition
+      
+      ⊢ ∀m m0 m1 l s b r l0 m2.
+          (context m m0 m1 l s b r l0 m2).is_reachable = r
+   
+   [recordtype_context_seldef_is_reachable_fupd_def]  Definition
+      
+      ⊢ ∀f m m0 m1 l s b r l0 m2.
+          context m m0 m1 l s b r l0 m2 with is_reachable updated_by f =
+          context m m0 m1 l s b (f r) l0 m2
+   
+   [recordtype_context_seldef_last_def]  Definition
+      
+      ⊢ ∀m m0 m1 l s b r l0 m2. (context m m0 m1 l s b r l0 m2).last = l0
+   
+   [recordtype_context_seldef_last_fupd_def]  Definition
+      
+      ⊢ ∀f m m0 m1 l s b r l0 m2.
+          context m m0 m1 l s b r l0 m2 with last updated_by f =
+          context m m0 m1 l s b r (f l0) m2
+   
+   [recordtype_context_seldef_loc_def]  Definition
+      
+      ⊢ ∀m m0 m1 l s b r l0 m2. (context m m0 m1 l s b r l0 m2).loc = m2
+   
+   [recordtype_context_seldef_loc_fupd_def]  Definition
+      
+      ⊢ ∀f m m0 m1 l s b r l0 m2.
+          context m m0 m1 l s b r l0 m2 with loc updated_by f =
+          context m m0 m1 l s b r l0 (f m2)
+   
+   [recordtype_context_seldef_locals_def]  Definition
+      
+      ⊢ ∀m m0 m1 l s b r l0 m2. (context m m0 m1 l s b r l0 m2).locals = m
+   
+   [recordtype_context_seldef_locals_fupd_def]  Definition
+      
+      ⊢ ∀f m m0 m1 l s b r l0 m2.
+          context m m0 m1 l s b r l0 m2 with locals updated_by f =
+          context (f m) m0 m1 l s b r l0 m2
+   
+   [recordtype_context_seldef_scope_def]  Definition
+      
+      ⊢ ∀m m0 m1 l s b r l0 m2. (context m m0 m1 l s b r l0 m2).scope = s
+   
+   [recordtype_context_seldef_scope_fupd_def]  Definition
+      
+      ⊢ ∀f m m0 m1 l s b r l0 m2.
+          context m m0 m1 l s b r l0 m2 with scope updated_by f =
+          context m m0 m1 l (f s) b r l0 m2
+   
+   [recordtype_context_seldef_structs_def]  Definition
+      
+      ⊢ ∀m m0 m1 l s b r l0 m2. (context m m0 m1 l s b r l0 m2).structs = l
+   
+   [recordtype_context_seldef_structs_fupd_def]  Definition
+      
+      ⊢ ∀f m m0 m1 l s b r l0 m2.
+          context m m0 m1 l s b r l0 m2 with structs updated_by f =
+          context m m0 m1 (f l) s b r l0 m2
+   
+   [recordtype_exp_return_seldef_sh_bd_def]  Definition
+      
+      ⊢ ∀s. (exp_return s).sh_bd = s
+   
+   [recordtype_exp_return_seldef_sh_bd_fupd_def]  Definition
+      
+      ⊢ ∀f s. exp_return s with sh_bd updated_by f = exp_return (f s)
+   
+   [recordtype_exps_return_seldef_sh_bds_def]  Definition
+      
+      ⊢ ∀l. (exps_return l).sh_bds = l
+   
+   [recordtype_exps_return_seldef_sh_bds_fupd_def]  Definition
+      
+      ⊢ ∀f l. exps_return l with sh_bds updated_by f = exps_return (f l)
+   
+   [recordtype_func_info_seldef_params_def]  Definition
+      
+      ⊢ ∀s l. (func_info s l).params = l
+   
+   [recordtype_func_info_seldef_params_fupd_def]  Definition
+      
+      ⊢ ∀f s l. func_info s l with params updated_by f = func_info s (f l)
+   
+   [recordtype_func_info_seldef_ret_shape_def]  Definition
+      
+      ⊢ ∀s l. (func_info s l).ret_shape = s
+   
+   [recordtype_func_info_seldef_ret_shape_fupd_def]  Definition
+      
+      ⊢ ∀f s l.
+          func_info s l with ret_shape updated_by f = func_info (f s) l
+   
+   [recordtype_global_info_seldef_vshape_def]  Definition
+      
+      ⊢ ∀s. (global_info s).vshape = s
+   
+   [recordtype_global_info_seldef_vshape_fupd_def]  Definition
+      
+      ⊢ ∀f s. global_info s with vshape updated_by f = global_info (f s)
+   
+   [recordtype_local_info_seldef_vsh_bd_def]  Definition
+      
+      ⊢ ∀s. (local_info s).vsh_bd = s
+   
+   [recordtype_local_info_seldef_vsh_bd_fupd_def]  Definition
+      
+      ⊢ ∀f s. local_info s with vsh_bd updated_by f = local_info (f s)
+   
+   [recordtype_prog_return_seldef_curr_loc_def]  Definition
+      
+      ⊢ ∀b b0 l m m0. (prog_return b b0 l m m0).curr_loc = m0
+   
+   [recordtype_prog_return_seldef_curr_loc_fupd_def]  Definition
+      
+      ⊢ ∀f b b0 l m m0.
+          prog_return b b0 l m m0 with curr_loc updated_by f =
+          prog_return b b0 l m (f m0)
+   
+   [recordtype_prog_return_seldef_exits_fun_def]  Definition
+      
+      ⊢ ∀b b0 l m m0. (prog_return b b0 l m m0).exits_fun ⇔ b
+   
+   [recordtype_prog_return_seldef_exits_fun_fupd_def]  Definition
+      
+      ⊢ ∀f b b0 l m m0.
+          prog_return b b0 l m m0 with exits_fun updated_by f =
+          prog_return (f b) b0 l m m0
+   
+   [recordtype_prog_return_seldef_exits_loop_def]  Definition
+      
+      ⊢ ∀b b0 l m m0. (prog_return b b0 l m m0).exits_loop ⇔ b0
+   
+   [recordtype_prog_return_seldef_exits_loop_fupd_def]  Definition
+      
+      ⊢ ∀f b b0 l m m0.
+          prog_return b b0 l m m0 with exits_loop updated_by f =
+          prog_return b (f b0) l m m0
+   
+   [recordtype_prog_return_seldef_last_def]  Definition
+      
+      ⊢ ∀b b0 l m m0. (prog_return b b0 l m m0).last = l
+   
+   [recordtype_prog_return_seldef_last_fupd_def]  Definition
+      
+      ⊢ ∀f b b0 l m m0.
+          prog_return b b0 l m m0 with last updated_by f =
+          prog_return b b0 (f l) m m0
+   
+   [recordtype_prog_return_seldef_var_delta_def]  Definition
+      
+      ⊢ ∀b b0 l m m0. (prog_return b b0 l m m0).var_delta = m
+   
+   [recordtype_prog_return_seldef_var_delta_fupd_def]  Definition
+      
+      ⊢ ∀f b b0 l m m0.
+          prog_return b b0 l m m0 with var_delta updated_by f =
+          prog_return b b0 l (f m) m0
+   
+   [scope_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0'.
+                 ∀ $var$('scope').
+                   (∀a0'.
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR 0 (a0,a1)
+                                (λn. ind_type$BOTTOM)) a0 a1) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR (SUC 0) (a,ARB)
+                                  (λn. ind_type$BOTTOM)) a) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR (SUC (SUC 0)) (a0,a1)
+                                (λn. ind_type$BOTTOM)) a0 a1) ∨
+                      a0' =
+                      ind_type$CONSTR (SUC (SUC (SUC 0))) (ARB,ARB)
+                        (λn. ind_type$BOTTOM) ⇒
+                      $var$('scope') a0') ⇒
+                   $var$('scope') a0') rep
+   
+   [scope_case_def]  Definition
+      
+      ⊢ (∀a0 a1 f f1 f2 v. scope_CASE (FunScope a0 a1) f f1 f2 v = f a0 a1) ∧
+        (∀a f f1 f2 v. scope_CASE (DeclScope a) f f1 f2 v = f1 a) ∧
+        (∀a0 a1 f f1 f2 v. scope_CASE (StcScope a0 a1) f f1 f2 v = f2 a0 a1) ∧
+        ∀f f1 f2 v. scope_CASE TopLevel f f1 f2 v = v
+   
+   [scope_size_def]  Definition
+      
+      ⊢ (∀a0 a1.
+           scope_size (FunScope a0 a1) =
+           1 + (mlstring_size a0 + mlstring_size a1)) ∧
+        (∀a. scope_size (DeclScope a) = 1 + mlstring_size a) ∧
+        (∀a0 a1.
+           scope_size (StcScope a0 a1) =
+           1 + (mlstring_size a0 + mlstring_size a1)) ∧
+        scope_size TopLevel = 0
+   
+   [scoped_id_BIJ]  Definition
+      
+      ⊢ (∀a. num2scoped_id (scoped_id2num a) = a) ∧
+        ∀r. (λn. n < 3) r ⇔ scoped_id2num (num2scoped_id r) = r
+   
+   [scoped_id_CASE]  Definition
+      
+      ⊢ ∀x v0 v1 v2.
+          (case x of Var => v0 | Fun => v1 | Stc => v2) =
+          (λm. if m < 1 then v0 else if m = 1 then v1 else v2)
+            (scoped_id2num x)
+   
+   [scoped_id_TY_DEF]  Definition
+      
+      ⊢ ∃rep. TYPE_DEFINITION (λn. n < 3) rep
+   
+   [scoped_id_size_def]  Definition
+      
+      ⊢ ∀x. scoped_id_size x = 0
+   
+   [seq_last_stmt_def]  Definition
+      
+      ⊢ ∀x y. seq_last_stmt x y = if y = InvisLast then x else y
+   
+   [seq_loc_inf_def]  Definition
+      
+      ⊢ ∀x y. seq_loc_inf x y = union y x
+   
+   [sh_bd_branch_def]  Definition
+      
+      ⊢ ∀x y.
+          sh_bd_branch x y =
+          if x = y then x else sh_bd_from_bd NotTrusted x
+   
+   [sh_bd_to_str_def_primitive]  Definition
+      
+      ⊢ sh_bd_to_str =
+        WFREC
+          (@R. WF R ∧ (∀x xs a. MEM a xs ⇒ R a (StructB (x::xs))) ∧
+               ∀xs x. R x (StructB (x::xs)))
+          (λsh_bd_to_str a'.
+               case a' of
+                 WordB b => I «1»
+               | StructB [] => I «{}»
+               | StructB (x::xs) =>
+                 I
+                   (concat
+                      («{»::sh_bd_to_str x::
+                         MAP (λx. «,» ^ x) (MAP (λa. sh_bd_to_str a) xs) ++
+                       [«}»]))
+               | NamedB nm flds => I nm)
+   
+   [shaped_based_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0'.
+                 ∀ $var$('shaped_based')
+                     $var$('@temp@ind_typepanStatic6list')
+                     $var$('@temp@ind_typepanStatic7prod')
+                     $var$('@temp@ind_typepanStatic8list').
+                   (∀a0'.
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR 0 (a,ARB)
+                                  (λn. ind_type$BOTTOM)) a) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR (SUC 0) (ARB,ARB)
+                                  (ind_type$FCONS a (λn. ind_type$BOTTOM)))
+                             a ∧ $var$('@temp@ind_typepanStatic8list') a) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR (SUC (SUC 0)) (ARB,a0)
+                                (ind_type$FCONS a1 (λn. ind_type$BOTTOM)))
+                           a0 a1 ∧ $var$('@temp@ind_typepanStatic6list') a1) ⇒
+                      $var$('shaped_based') a0') ∧
+                   (∀a1'.
+                      a1' =
+                      ind_type$CONSTR (SUC (SUC (SUC 0))) (ARB,ARB)
+                        (λn. ind_type$BOTTOM) ∨
+                      (∃a0 a1.
+                         a1' =
+                         (λa0 a1.
+                              ind_type$CONSTR (SUC (SUC (SUC (SUC 0))))
+                                (ARB,ARB)
+                                (ind_type$FCONS a0
+                                   (ind_type$FCONS a1 (λn. ind_type$BOTTOM))))
+                           a0 a1 ∧
+                         $var$('@temp@ind_typepanStatic7prod') a0 ∧
+                         $var$('@temp@ind_typepanStatic6list') a1) ⇒
+                      $var$('@temp@ind_typepanStatic6list') a1') ∧
+                   (∀a2.
+                      (∃a0 a1.
+                         a2 =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC (SUC (SUC (SUC (SUC 0))))) (ARB,a0)
+                                (ind_type$FCONS a1 (λn. ind_type$BOTTOM)))
+                           a0 a1 ∧ $var$('shaped_based') a1) ⇒
+                      $var$('@temp@ind_typepanStatic7prod') a2) ∧
+                   (∀a3.
+                      a3 =
+                      ind_type$CONSTR (SUC (SUC (SUC (SUC (SUC (SUC 0))))))
+                        (ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      (∃a0 a1.
+                         a3 =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC (SUC (SUC (SUC (SUC (SUC (SUC 0)))))))
+                                (ARB,ARB)
+                                (ind_type$FCONS a0
+                                   (ind_type$FCONS a1 (λn. ind_type$BOTTOM))))
+                           a0 a1 ∧ $var$('shaped_based') a0 ∧
+                         $var$('@temp@ind_typepanStatic8list') a1) ⇒
+                      $var$('@temp@ind_typepanStatic8list') a3) ⇒
+                   $var$('shaped_based') a0') rep
+   
+   [shaped_based_case_def]  Definition
+      
+      ⊢ (∀a f f1 f2. shaped_based_CASE (WordB a) f f1 f2 = f a) ∧
+        (∀a f f1 f2. shaped_based_CASE (StructB a) f f1 f2 = f1 a) ∧
+        ∀a0 a1 f f1 f2. shaped_based_CASE (NamedB a0 a1) f f1 f2 = f2 a0 a1
+   
+   [shaped_based_size_def]  Definition
+      
+      ⊢ (∀a. shaped_based_size (WordB a) = 1 + based_size a) ∧
+        (∀a. shaped_based_size (StructB a) = 1 + shaped_based3_size a) ∧
+        (∀a0 a1.
+           shaped_based_size (NamedB a0 a1) =
+           1 + (mlstring_size a0 + shaped_based1_size a1)) ∧
+        shaped_based1_size [] = 0 ∧
+        (∀a0 a1.
+           shaped_based1_size (a0::a1) =
+           1 + (shaped_based2_size a0 + shaped_based1_size a1)) ∧
+        (∀a0 a1.
+           shaped_based2_size (a0,a1) =
+           1 + (mlstring_size a0 + shaped_based_size a1)) ∧
+        shaped_based3_size [] = 0 ∧
+        ∀a0 a1.
+          shaped_based3_size (a0::a1) =
+          1 + (shaped_based_size a0 + shaped_based3_size a1)
+   
+   [staterr_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0.
+                 ∀ $var$('staterr').
+                   (∀a0.
+                      (∃a. a0 =
+                           (λa. ind_type$CONSTR 0 a (λn. ind_type$BOTTOM))
+                             a) ∨
+                      (∃a. a0 =
+                           (λa.
+                                ind_type$CONSTR (SUC 0) a
+                                  (λn. ind_type$BOTTOM)) a) ∨
+                      (∃a. a0 =
+                           (λa.
+                                ind_type$CONSTR (SUC (SUC 0)) a
+                                  (λn. ind_type$BOTTOM)) a) ∨
+                      (∃a. a0 =
+                           (λa.
+                                ind_type$CONSTR (SUC (SUC (SUC 0))) a
+                                  (λn. ind_type$BOTTOM)) a) ⇒
+                      $var$('staterr') a0) ⇒
+                   $var$('staterr') a0) rep
+   
+   [staterr_case_def]  Definition
+      
+      ⊢ (∀a f f1 f2 f3. staterr_CASE (ScopeErr a) f f1 f2 f3 = f a) ∧
+        (∀a f f1 f2 f3. staterr_CASE (WarningErr a) f f1 f2 f3 = f1 a) ∧
+        (∀a f f1 f2 f3. staterr_CASE (GenErr a) f f1 f2 f3 = f2 a) ∧
+        ∀a f f1 f2 f3. staterr_CASE (ShapeErr a) f f1 f2 f3 = f3 a
+   
+   [staterr_size_def]  Definition
+      
+      ⊢ (∀a. staterr_size (ScopeErr a) = 1 + mlstring_size a) ∧
+        (∀a. staterr_size (WarningErr a) = 1 + mlstring_size a) ∧
+        (∀a. staterr_size (GenErr a) = 1 + mlstring_size a) ∧
+        ∀a. staterr_size (ShapeErr a) = 1 + mlstring_size a
+   
+   [static_check_def]  Definition
+      
+      ⊢ ∀decls.
+          static_check decls =
+          do
+            sctxt <- static_check_names [] decls;
+            (fctxt,gctxt) <-
+              static_check_decls (empty compare) (empty compare) sctxt
+                decls;
+            static_check_progs fctxt gctxt sctxt decls
+          od
+   
+   [EXISTS_context]  Theorem
+      
+      ⊢ ∀P. (∃c. P c) ⇔
+            ∃m2 m1 m0 l0 s b r l m.
+              P
+                <|locals := m2; globals := m1; funcs := m0; structs := l0;
+                  scope := s; in_loop := b; is_reachable := r; last := l;
+                  loc := m|>
+   
+   [EXISTS_exp_return]  Theorem
+      
+      ⊢ ∀P. (∃e. P e) ⇔ ∃s. P <|sh_bd := s|>
+   
+   [EXISTS_exps_return]  Theorem
+      
+      ⊢ ∀P. (∃e. P e) ⇔ ∃l. P <|sh_bds := l|>
+   
+   [EXISTS_func_info]  Theorem
+      
+      ⊢ ∀P. (∃f. P f) ⇔ ∃s l. P <|ret_shape := s; params := l|>
+   
+   [EXISTS_global_info]  Theorem
+      
+      ⊢ ∀P. (∃g. P g) ⇔ ∃s. P <|vshape := s|>
+   
+   [EXISTS_local_info]  Theorem
+      
+      ⊢ ∀P. (∃l. P l) ⇔ ∃s. P <|vsh_bd := s|>
+   
+   [EXISTS_prog_return]  Theorem
+      
+      ⊢ ∀P. (∃p. P p) ⇔
+            ∃b0 b l m0 m.
+              P
+                <|exits_fun := b0; exits_loop := b; last := l;
+                  var_delta := m0; curr_loc := m|>
+   
+   [FORALL_context]  Theorem
+      
+      ⊢ ∀P. (∀c. P c) ⇔
+            ∀m2 m1 m0 l0 s b r l m.
+              P
+                <|locals := m2; globals := m1; funcs := m0; structs := l0;
+                  scope := s; in_loop := b; is_reachable := r; last := l;
+                  loc := m|>
+   
+   [FORALL_exp_return]  Theorem
+      
+      ⊢ ∀P. (∀e. P e) ⇔ ∀s. P <|sh_bd := s|>
+   
+   [FORALL_exps_return]  Theorem
+      
+      ⊢ ∀P. (∀e. P e) ⇔ ∀l. P <|sh_bds := l|>
+   
+   [FORALL_func_info]  Theorem
+      
+      ⊢ ∀P. (∀f. P f) ⇔ ∀s l. P <|ret_shape := s; params := l|>
+   
+   [FORALL_global_info]  Theorem
+      
+      ⊢ ∀P. (∀g. P g) ⇔ ∀s. P <|vshape := s|>
+   
+   [FORALL_local_info]  Theorem
+      
+      ⊢ ∀P. (∀l. P l) ⇔ ∀s. P <|vsh_bd := s|>
+   
+   [FORALL_prog_return]  Theorem
+      
+      ⊢ ∀P. (∀p. P p) ⇔
+            ∀b0 b l m0 m.
+              P
+                <|exits_fun := b0; exits_loop := b; last := l;
+                  var_delta := m0; curr_loc := m|>
+   
+   [based2num_11]  Theorem
+      
+      ⊢ ∀a a'. based2num a = based2num a' ⇔ a = a'
+   
+   [based2num_ONTO]  Theorem
+      
+      ⊢ ∀r. r < 4 ⇔ ∃a. r = based2num a
+   
+   [based2num_num2based]  Theorem
+      
+      ⊢ ∀r. r < 4 ⇔ based2num (num2based r) = r
+   
+   [based2num_thm]  Theorem
+      
+      ⊢ based2num Based = 0 ∧ based2num NotBased = 1 ∧
+        based2num Trusted = 2 ∧ based2num NotTrusted = 3
+   
+   [based_Axiom]  Theorem
+      
+      ⊢ ∀x0 x1 x2 x3. ∃f.
+          f Based = x0 ∧ f NotBased = x1 ∧ f Trusted = x2 ∧
+          f NotTrusted = x3
+   
+   [based_EQ_based]  Theorem
+      
+      ⊢ ∀a a'. a = a' ⇔ based2num a = based2num a'
+   
+   [based_case_cong]  Theorem
+      
+      ⊢ ∀M M' v0 v1 v2 v3.
+          M = M' ∧ (M' = Based ⇒ v0 = v0') ∧ (M' = NotBased ⇒ v1 = v1') ∧
+          (M' = Trusted ⇒ v2 = v2') ∧ (M' = NotTrusted ⇒ v3 = v3') ⇒
+          (case M of
+             Based => v0
+           | NotBased => v1
+           | Trusted => v2
+           | NotTrusted => v3) =
+          case M' of
+            Based => v0'
+          | NotBased => v1'
+          | Trusted => v2'
+          | NotTrusted => v3'
+   
+   [based_case_def]  Theorem
+      
+      ⊢ (∀v0 v1 v2 v3.
+           (case Based of
+              Based => v0
+            | NotBased => v1
+            | Trusted => v2
+            | NotTrusted => v3) = v0) ∧
+        (∀v0 v1 v2 v3.
+           (case NotBased of
+              Based => v0
+            | NotBased => v1
+            | Trusted => v2
+            | NotTrusted => v3) = v1) ∧
+        (∀v0 v1 v2 v3.
+           (case Trusted of
+              Based => v0
+            | NotBased => v1
+            | Trusted => v2
+            | NotTrusted => v3) = v2) ∧
+        ∀v0 v1 v2 v3.
+          (case NotTrusted of
+             Based => v0
+           | NotBased => v1
+           | Trusted => v2
+           | NotTrusted => v3) = v3
+   
+   [based_case_eq]  Theorem
+      
+      ⊢ (case x of
+           Based => v0
+         | NotBased => v1
+         | Trusted => v2
+         | NotTrusted => v3) = v ⇔
+        x = Based ∧ v0 = v ∨ x = NotBased ∧ v1 = v ∨ x = Trusted ∧ v2 = v ∨
+        x = NotTrusted ∧ v3 = v
+   
+   [based_distinct]  Theorem
+      
+      ⊢ Based ≠ NotBased ∧ Based ≠ Trusted ∧ Based ≠ NotTrusted ∧
+        NotBased ≠ Trusted ∧ NotBased ≠ NotTrusted ∧ Trusted ≠ NotTrusted
+   
+   [based_induction]  Theorem
+      
+      ⊢ ∀P. P Based ∧ P NotBased ∧ P NotTrusted ∧ P Trusted ⇒ ∀a. P a
+   
+   [based_nchotomy]  Theorem
+      
+      ⊢ ∀a. a = Based ∨ a = NotBased ∨ a = Trusted ∨ a = NotTrusted
+   
+   [check_export_params_def]  Theorem
+      
+      ⊢ (∀scope loc. check_export_params loc scope [] = return ()) ∧
+        ∀vname shape scope ps loc.
+          check_export_params loc scope ((vname,shape)::ps) =
+          if shape ≠ One then
+            error
+              (ShapeErr
+                 (get_non_word_msg
+                    (concat [«exported function parameter »; vname])
+                    (shape_to_str shape) loc scope))
+          else check_export_params loc scope ps
+   
+   [check_export_params_ind]  Theorem
+      
+      ⊢ ∀P. (∀loc scope. P loc scope []) ∧
+            (∀loc scope vname shape ps.
+               (¬(shape ≠ One) ⇒ P loc scope ps) ⇒
+               P loc scope ((vname,shape)::ps)) ⇒
+            ∀v v1 v2. P v v1 v2
+   
+   [check_func_args_def]  Theorem
+      
+      ⊢ ∀sh_bds params fname ctxt.
+          check_func_args ctxt fname params sh_bds =
+          case (params,sh_bds) of
+            ([],[]) => return ()
+          | ([],sb'::sbs') =>
+            error
+              (GenErr
+                 (concat
+                    [ctxt.loc; «extra arguments given to function »; fname;
+                     « in »; get_scope_desc ctxt.scope; «\n»]))
+          | ((p,s)::ps,[]) =>
+            error
+              (GenErr
+                 (concat
+                    [ctxt.loc; «argument »; p; « for call to function »;
+                     fname; « is missing in »; get_scope_desc ctxt.scope;
+                     «\n»]))
+          | ((p,s)::ps,sb::sbs) =>
+            if ¬sh_bd_has_shape s sb then
+              error
+                (ShapeErr
+                   (get_shape_mismatch_msg
+                      (concat
+                         [«value for argument »; p; « given to function »;
+                          fname]) (sh_bd_to_str sb) (shape_to_str s)
+                      ctxt.loc ctxt.scope))
+            else check_func_args ctxt fname ps sbs
+   
+   [check_func_args_ind]  Theorem
+      
+      ⊢ ∀P. (∀ctxt fname params sh_bds.
+               (∀v v1 v2 ps p s sb sbs.
+                  (params,sh_bds) = (v,v1) ∧ v = v2::ps ∧ v2 = (p,s) ∧
+                  v1 = sb::sbs ∧ ¬¬sh_bd_has_shape s sb ⇒
+                  P ctxt fname ps sbs) ⇒
+               P ctxt fname params sh_bds) ⇒
+            ∀v v1 v2 v3. P v v1 v2 v3
+   
+   [check_id_shapes_def]  Theorem
+      
+      ⊢ (∀sctxt scope loc. check_id_shapes sctxt loc scope [] = return ()) ∧
+        ∀shape sctxt scope loc ids id.
+          check_id_shapes sctxt loc scope ((id,shape)::ids) =
+          do
+            scope' <-
+              case scope of
+                FunScope fname v6 =>
+                  return (FunScope fname (concat [« parameter »; id]))
+              | DeclScope v7 =>
+                error
+                  (GenErr
+                     (get_implementation_err_msg
+                        «parameter or field found in unexpected scope» loc
+                        scope))
+              | StcScope sname v9 => return (StcScope sname id)
+              | TopLevel =>
+                error
+                  (GenErr
+                     (get_implementation_err_msg
+                        «parameter or field found in unexpected scope» loc
+                        scope));
+            check_shape sctxt loc scope' shape;
+            check_id_shapes sctxt loc scope ids
+          od
+   
+   [check_id_shapes_ind]  Theorem
+      
+      ⊢ ∀P. (∀sctxt loc scope. P sctxt loc scope []) ∧
+            (∀sctxt loc scope id shape ids.
+               P sctxt loc scope ids ⇒ P sctxt loc scope ((id,shape)::ids)) ⇒
+            ∀v v1 v2 v3. P v v1 v2 v3
+   
+   [check_struct_fields_def]  Theorem
+      
+      ⊢ ∀sname fsbs fields ctxt.
+          check_struct_fields ctxt sname fields fsbs =
+          case (fields,fsbs) of
+            ([],[]) => return ()
+          | ([],fsb::fsbs') =>
+            error
+              (GenErr
+                 (concat
+                    [ctxt.loc; «unexpected field »; FST fsb;
+                     « given to named struct »; sname; « in »;
+                     get_scope_desc ctxt.scope; «\n»]))
+          | ((fld,sh)::fss,fsbs') =>
+            do
+              sb <-
+                case FILTER (λ(fld',sb). fld = fld') fsbs' of
+                  [] =>
+                    error
+                      (ShapeErr
+                         (concat
+                            [ctxt.loc; «missing field »; fld;
+                             « in named struct »; sname; « constant in »;
+                             get_scope_desc ctxt.scope; «\n»]))
+                | [(v10,v11)] => return v11
+                | v2::v6::v7 =>
+                  error
+                    (ShapeErr
+                       (concat
+                          [ctxt.loc; «multiple values for field »; fld;
+                           « in named struct »; sname; « constant in »;
+                           get_scope_desc ctxt.scope; «\n»]));
+              if ¬sh_bd_has_shape sh sb then
+                error
+                  (ShapeErr
+                     (get_shape_mismatch_msg
+                        (concat
+                           [«value for field »; fld;
+                            « given to named struct »; sname])
+                        (sh_bd_to_str sb) (shape_to_str sh) ctxt.loc
+                        ctxt.scope))
+              else check_struct_fields ctxt sname fss (ADELKEY fld fsbs')
+            od
+   
+   [check_struct_fields_ind]  Theorem
+      
+      ⊢ ∀P. (∀ctxt sname fields fsbs.
+               (∀v fsbs' v4 fss fld sh sb.
+                  (fields,fsbs) = (v,fsbs') ∧ v = v4::fss ∧ v4 = (fld,sh) ∧
+                  ¬¬sh_bd_has_shape sh sb ⇒
+                  P ctxt sname fss (ADELKEY fld fsbs')) ⇒
+               P ctxt sname fields fsbs) ⇒
+            ∀v v1 v2 v3. P v v1 v2 v3
+   
+   [context_11]  Theorem
+      
+      ⊢ ∀a0 a1 a2 a3 a4 a5 a6 a7 a8 a0' a1' a2' a3' a4' a5' a6' a7' a8'.
+          context a0 a1 a2 a3 a4 a5 a6 a7 a8 =
+          context a0' a1' a2' a3' a4' a5' a6' a7' a8' ⇔
+          a0 = a0' ∧ a1 = a1' ∧ a2 = a2' ∧ a3 = a3' ∧ a4 = a4' ∧
+          (a5 ⇔ a5') ∧ a6 = a6' ∧ a7 = a7' ∧ a8 = a8'
+   
+   [context_Axiom]  Theorem
+      
+      ⊢ ∀f. ∃fn. ∀a0 a1 a2 a3 a4 a5 a6 a7 a8.
+          fn (context a0 a1 a2 a3 a4 a5 a6 a7 a8) =
+          f a0 a1 a2 a3 a4 a5 a6 a7 a8
+   
+   [context_accessors]  Theorem
+      
+      ⊢ (∀m m0 m1 l s b r l0 m2. (context m m0 m1 l s b r l0 m2).locals = m) ∧
+        (∀m m0 m1 l s b r l0 m2.
+           (context m m0 m1 l s b r l0 m2).globals = m0) ∧
+        (∀m m0 m1 l s b r l0 m2. (context m m0 m1 l s b r l0 m2).funcs = m1) ∧
+        (∀m m0 m1 l s b r l0 m2.
+           (context m m0 m1 l s b r l0 m2).structs = l) ∧
+        (∀m m0 m1 l s b r l0 m2. (context m m0 m1 l s b r l0 m2).scope = s) ∧
+        (∀m m0 m1 l s b r l0 m2.
+           (context m m0 m1 l s b r l0 m2).in_loop ⇔ b) ∧
+        (∀m m0 m1 l s b r l0 m2.
+           (context m m0 m1 l s b r l0 m2).is_reachable = r) ∧
+        (∀m m0 m1 l s b r l0 m2. (context m m0 m1 l s b r l0 m2).last = l0) ∧
+        ∀m m0 m1 l s b r l0 m2. (context m m0 m1 l s b r l0 m2).loc = m2
+   
+   [context_accfupds]  Theorem
+      
+      ⊢ (∀f c. (c with globals updated_by f).locals = c.locals) ∧
+        (∀f c. (c with funcs updated_by f).locals = c.locals) ∧
+        (∀f c. (c with structs updated_by f).locals = c.locals) ∧
+        (∀f c. (c with scope updated_by f).locals = c.locals) ∧
+        (∀f c. (c with in_loop updated_by f).locals = c.locals) ∧
+        (∀f c. (c with is_reachable updated_by f).locals = c.locals) ∧
+        (∀f c. (c with last updated_by f).locals = c.locals) ∧
+        (∀f c. (c with loc updated_by f).locals = c.locals) ∧
+        (∀f c. (c with locals updated_by f).globals = c.globals) ∧
+        (∀f c. (c with funcs updated_by f).globals = c.globals) ∧
+        (∀f c. (c with structs updated_by f).globals = c.globals) ∧
+        (∀f c. (c with scope updated_by f).globals = c.globals) ∧
+        (∀f c. (c with in_loop updated_by f).globals = c.globals) ∧
+        (∀f c. (c with is_reachable updated_by f).globals = c.globals) ∧
+        (∀f c. (c with last updated_by f).globals = c.globals) ∧
+        (∀f c. (c with loc updated_by f).globals = c.globals) ∧
+        (∀f c. (c with locals updated_by f).funcs = c.funcs) ∧
+        (∀f c. (c with globals updated_by f).funcs = c.funcs) ∧
+        (∀f c. (c with structs updated_by f).funcs = c.funcs) ∧
+        (∀f c. (c with scope updated_by f).funcs = c.funcs) ∧
+        (∀f c. (c with in_loop updated_by f).funcs = c.funcs) ∧
+        (∀f c. (c with is_reachable updated_by f).funcs = c.funcs) ∧
+        (∀f c. (c with last updated_by f).funcs = c.funcs) ∧
+        (∀f c. (c with loc updated_by f).funcs = c.funcs) ∧
+        (∀f c. (c with locals updated_by f).structs = c.structs) ∧
+        (∀f c. (c with globals updated_by f).structs = c.structs) ∧
+        (∀f c. (c with funcs updated_by f).structs = c.structs) ∧
+        (∀f c. (c with scope updated_by f).structs = c.structs) ∧
+        (∀f c. (c with in_loop updated_by f).structs = c.structs) ∧
+        (∀f c. (c with is_reachable updated_by f).structs = c.structs) ∧
+        (∀f c. (c with last updated_by f).structs = c.structs) ∧
+        (∀f c. (c with loc updated_by f).structs = c.structs) ∧
+        (∀f c. (c with locals updated_by f).scope = c.scope) ∧
+        (∀f c. (c with globals updated_by f).scope = c.scope) ∧
+        (∀f c. (c with funcs updated_by f).scope = c.scope) ∧
+        (∀f c. (c with structs updated_by f).scope = c.scope) ∧
+        (∀f c. (c with in_loop updated_by f).scope = c.scope) ∧
+        (∀f c. (c with is_reachable updated_by f).scope = c.scope) ∧
+        (∀f c. (c with last updated_by f).scope = c.scope) ∧
+        (∀f c. (c with loc updated_by f).scope = c.scope) ∧
+        (∀f c. (c with locals updated_by f).in_loop ⇔ c.in_loop) ∧
+        (∀f c. (c with globals updated_by f).in_loop ⇔ c.in_loop) ∧
+        (∀f c. (c with funcs updated_by f).in_loop ⇔ c.in_loop) ∧
+        (∀f c. (c with structs updated_by f).in_loop ⇔ c.in_loop) ∧
+        (∀f c. (c with scope updated_by f).in_loop ⇔ c.in_loop) ∧
+        (∀f c. (c with is_reachable updated_by f).in_loop ⇔ c.in_loop) ∧
+        (∀f c. (c with last updated_by f).in_loop ⇔ c.in_loop) ∧
+        (∀f c. (c with loc updated_by f).in_loop ⇔ c.in_loop) ∧
+        (∀f c. (c with locals updated_by f).is_reachable = c.is_reachable) ∧
+        (∀f c. (c with globals updated_by f).is_reachable = c.is_reachable) ∧
+        (∀f c. (c with funcs updated_by f).is_reachable = c.is_reachable) ∧
+        (∀f c. (c with structs updated_by f).is_reachable = c.is_reachable) ∧
+        (∀f c. (c with scope updated_by f).is_reachable = c.is_reachable) ∧
+        (∀f c. (c with in_loop updated_by f).is_reachable = c.is_reachable) ∧
+        (∀f c. (c with last updated_by f).is_reachable = c.is_reachable) ∧
+        (∀f c. (c with loc updated_by f).is_reachable = c.is_reachable) ∧
+        (∀f c. (c with locals updated_by f).last = c.last) ∧
+        (∀f c. (c with globals updated_by f).last = c.last) ∧
+        (∀f c. (c with funcs updated_by f).last = c.last) ∧
+        (∀f c. (c with structs updated_by f).last = c.last) ∧
+        (∀f c. (c with scope updated_by f).last = c.last) ∧
+        (∀f c. (c with in_loop updated_by f).last = c.last) ∧
+        (∀f c. (c with is_reachable updated_by f).last = c.last) ∧
+        (∀f c. (c with loc updated_by f).last = c.last) ∧
+        (∀f c. (c with locals updated_by f).loc = c.loc) ∧
+        (∀f c. (c with globals updated_by f).loc = c.loc) ∧
+        (∀f c. (c with funcs updated_by f).loc = c.loc) ∧
+        (∀f c. (c with structs updated_by f).loc = c.loc) ∧
+        (∀f c. (c with scope updated_by f).loc = c.loc) ∧
+        (∀f c. (c with in_loop updated_by f).loc = c.loc) ∧
+        (∀f c. (c with is_reachable updated_by f).loc = c.loc) ∧
+        (∀f c. (c with last updated_by f).loc = c.loc) ∧
+        (∀f c. (c with locals updated_by f).locals = f c.locals) ∧
+        (∀f c. (c with globals updated_by f).globals = f c.globals) ∧
+        (∀f c. (c with funcs updated_by f).funcs = f c.funcs) ∧
+        (∀f c. (c with structs updated_by f).structs = f c.structs) ∧
+        (∀f c. (c with scope updated_by f).scope = f c.scope) ∧
+        (∀f c. (c with in_loop updated_by f).in_loop ⇔ f c.in_loop) ∧
+        (∀f c.
+           (c with is_reachable updated_by f).is_reachable =
+           f c.is_reachable) ∧
+        (∀f c. (c with last updated_by f).last = f c.last) ∧
+        ∀f c. (c with loc updated_by f).loc = f c.loc
+   
+   [context_case_cong]  Theorem
+      
+      ⊢ ∀M M' f.
+          M = M' ∧
+          (∀a0 a1 a2 a3 a4 a5 a6 a7 a8.
+             M' = context a0 a1 a2 a3 a4 a5 a6 a7 a8 ⇒
+             f a0 a1 a2 a3 a4 a5 a6 a7 a8 = f' a0 a1 a2 a3 a4 a5 a6 a7 a8) ⇒
+          context_CASE M f = context_CASE M' f'
+   
+   [context_case_eq]  Theorem
+      
+      ⊢ context_CASE x f = v ⇔
+        ∃m m0 m1 l s b r l0 m2.
+          x = context m m0 m1 l s b r l0 m2 ∧ f m m0 m1 l s b r l0 m2 = v
+   
+   [context_component_equality]  Theorem
+      
+      ⊢ ∀c1 c2.
+          c1 = c2 ⇔
+          c1.locals = c2.locals ∧ c1.globals = c2.globals ∧
+          c1.funcs = c2.funcs ∧ c1.structs = c2.structs ∧
+          c1.scope = c2.scope ∧ (c1.in_loop ⇔ c2.in_loop) ∧
+          c1.is_reachable = c2.is_reachable ∧ c1.last = c2.last ∧
+          c1.loc = c2.loc
+   
+   [context_fn_updates]  Theorem
+      
+      ⊢ (∀f m m0 m1 l s b r l0 m2.
+           context m m0 m1 l s b r l0 m2 with locals updated_by f =
+           context (f m) m0 m1 l s b r l0 m2) ∧
+        (∀f m m0 m1 l s b r l0 m2.
+           context m m0 m1 l s b r l0 m2 with globals updated_by f =
+           context m (f m0) m1 l s b r l0 m2) ∧
+        (∀f m m0 m1 l s b r l0 m2.
+           context m m0 m1 l s b r l0 m2 with funcs updated_by f =
+           context m m0 (f m1) l s b r l0 m2) ∧
+        (∀f m m0 m1 l s b r l0 m2.
+           context m m0 m1 l s b r l0 m2 with structs updated_by f =
+           context m m0 m1 (f l) s b r l0 m2) ∧
+        (∀f m m0 m1 l s b r l0 m2.
+           context m m0 m1 l s b r l0 m2 with scope updated_by f =
+           context m m0 m1 l (f s) b r l0 m2) ∧
+        (∀f m m0 m1 l s b r l0 m2.
+           context m m0 m1 l s b r l0 m2 with in_loop updated_by f =
+           context m m0 m1 l s (f b) r l0 m2) ∧
+        (∀f m m0 m1 l s b r l0 m2.
+           context m m0 m1 l s b r l0 m2 with is_reachable updated_by f =
+           context m m0 m1 l s b (f r) l0 m2) ∧
+        (∀f m m0 m1 l s b r l0 m2.
+           context m m0 m1 l s b r l0 m2 with last updated_by f =
+           context m m0 m1 l s b r (f l0) m2) ∧
+        ∀f m m0 m1 l s b r l0 m2.
+          context m m0 m1 l s b r l0 m2 with loc updated_by f =
+          context m m0 m1 l s b r l0 (f m2)
+   
+   [context_fupdcanon]  Theorem
+      
+      ⊢ (∀g f c.
+           c with <|globals updated_by f; locals updated_by g|> =
+           c with <|locals updated_by g; globals updated_by f|>) ∧
+        (∀g f c.
+           c with <|funcs updated_by f; locals updated_by g|> =
+           c with <|locals updated_by g; funcs updated_by f|>) ∧
+        (∀g f c.
+           c with <|funcs updated_by f; globals updated_by g|> =
+           c with <|globals updated_by g; funcs updated_by f|>) ∧
+        (∀g f c.
+           c with <|structs updated_by f; locals updated_by g|> =
+           c with <|locals updated_by g; structs updated_by f|>) ∧
+        (∀g f c.
+           c with <|structs updated_by f; globals updated_by g|> =
+           c with <|globals updated_by g; structs updated_by f|>) ∧
+        (∀g f c.
+           c with <|structs updated_by f; funcs updated_by g|> =
+           c with <|funcs updated_by g; structs updated_by f|>) ∧
+        (∀g f c.
+           c with <|scope updated_by f; locals updated_by g|> =
+           c with <|locals updated_by g; scope updated_by f|>) ∧
+        (∀g f c.
+           c with <|scope updated_by f; globals updated_by g|> =
+           c with <|globals updated_by g; scope updated_by f|>) ∧
+        (∀g f c.
+           c with <|scope updated_by f; funcs updated_by g|> =
+           c with <|funcs updated_by g; scope updated_by f|>) ∧
+        (∀g f c.
+           c with <|scope updated_by f; structs updated_by g|> =
+           c with <|structs updated_by g; scope updated_by f|>) ∧
+        (∀g f c.
+           c with <|in_loop updated_by f; locals updated_by g|> =
+           c with <|locals updated_by g; in_loop updated_by f|>) ∧
+        (∀g f c.
+           c with <|in_loop updated_by f; globals updated_by g|> =
+           c with <|globals updated_by g; in_loop updated_by f|>) ∧
+        (∀g f c.
+           c with <|in_loop updated_by f; funcs updated_by g|> =
+           c with <|funcs updated_by g; in_loop updated_by f|>) ∧
+        (∀g f c.
+           c with <|in_loop updated_by f; structs updated_by g|> =
+           c with <|structs updated_by g; in_loop updated_by f|>) ∧
+        (∀g f c.
+           c with <|in_loop updated_by f; scope updated_by g|> =
+           c with <|scope updated_by g; in_loop updated_by f|>) ∧
+        (∀g f c.
+           c with <|is_reachable updated_by f; locals updated_by g|> =
+           c with <|locals updated_by g; is_reachable updated_by f|>) ∧
+        (∀g f c.
+           c with <|is_reachable updated_by f; globals updated_by g|> =
+           c with <|globals updated_by g; is_reachable updated_by f|>) ∧
+        (∀g f c.
+           c with <|is_reachable updated_by f; funcs updated_by g|> =
+           c with <|funcs updated_by g; is_reachable updated_by f|>) ∧
+        (∀g f c.
+           c with <|is_reachable updated_by f; structs updated_by g|> =
+           c with <|structs updated_by g; is_reachable updated_by f|>) ∧
+        (∀g f c.
+           c with <|is_reachable updated_by f; scope updated_by g|> =
+           c with <|scope updated_by g; is_reachable updated_by f|>) ∧
+        (∀g f c.
+           c with <|is_reachable updated_by f; in_loop updated_by g|> =
+           c with <|in_loop updated_by g; is_reachable updated_by f|>) ∧
+        (∀g f c.
+           c with <|last updated_by f; locals updated_by g|> =
+           c with <|locals updated_by g; last updated_by f|>) ∧
+        (∀g f c.
+           c with <|last updated_by f; globals updated_by g|> =
+           c with <|globals updated_by g; last updated_by f|>) ∧
+        (∀g f c.
+           c with <|last updated_by f; funcs updated_by g|> =
+           c with <|funcs updated_by g; last updated_by f|>) ∧
+        (∀g f c.
+           c with <|last updated_by f; structs updated_by g|> =
+           c with <|structs updated_by g; last updated_by f|>) ∧
+        (∀g f c.
+           c with <|last updated_by f; scope updated_by g|> =
+           c with <|scope updated_by g; last updated_by f|>) ∧
+        (∀g f c.
+           c with <|last updated_by f; in_loop updated_by g|> =
+           c with <|in_loop updated_by g; last updated_by f|>) ∧
+        (∀g f c.
+           c with <|last updated_by f; is_reachable updated_by g|> =
+           c with <|is_reachable updated_by g; last updated_by f|>) ∧
+        (∀g f c.
+           c with <|loc updated_by f; locals updated_by g|> =
+           c with <|locals updated_by g; loc updated_by f|>) ∧
+        (∀g f c.
+           c with <|loc updated_by f; globals updated_by g|> =
+           c with <|globals updated_by g; loc updated_by f|>) ∧
+        (∀g f c.
+           c with <|loc updated_by f; funcs updated_by g|> =
+           c with <|funcs updated_by g; loc updated_by f|>) ∧
+        (∀g f c.
+           c with <|loc updated_by f; structs updated_by g|> =
+           c with <|structs updated_by g; loc updated_by f|>) ∧
+        (∀g f c.
+           c with <|loc updated_by f; scope updated_by g|> =
+           c with <|scope updated_by g; loc updated_by f|>) ∧
+        (∀g f c.
+           c with <|loc updated_by f; in_loop updated_by g|> =
+           c with <|in_loop updated_by g; loc updated_by f|>) ∧
+        (∀g f c.
+           c with <|loc updated_by f; is_reachable updated_by g|> =
+           c with <|is_reachable updated_by g; loc updated_by f|>) ∧
+        ∀g f c.
+          c with <|loc updated_by f; last updated_by g|> =
+          c with <|last updated_by g; loc updated_by f|>
+   
+   [context_fupdcanon_comp]  Theorem
+      
+      ⊢ ((∀g f.
+            globals_fupd f ∘ locals_fupd g = locals_fupd g ∘ globals_fupd f) ∧
+         ∀h g f.
+           globals_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ globals_fupd f ∘ h) ∧
+        ((∀g f. funcs_fupd f ∘ locals_fupd g = locals_fupd g ∘ funcs_fupd f) ∧
+         ∀h g f.
+           funcs_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ funcs_fupd f ∘ h) ∧
+        ((∀g f.
+            funcs_fupd f ∘ globals_fupd g = globals_fupd g ∘ funcs_fupd f) ∧
+         ∀h g f.
+           funcs_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ funcs_fupd f ∘ h) ∧
+        ((∀g f.
+            structs_fupd f ∘ locals_fupd g = locals_fupd g ∘ structs_fupd f) ∧
+         ∀h g f.
+           structs_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ structs_fupd f ∘ h) ∧
+        ((∀g f.
+            structs_fupd f ∘ globals_fupd g =
+            globals_fupd g ∘ structs_fupd f) ∧
+         ∀h g f.
+           structs_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ structs_fupd f ∘ h) ∧
+        ((∀g f.
+            structs_fupd f ∘ funcs_fupd g = funcs_fupd g ∘ structs_fupd f) ∧
+         ∀h g f.
+           structs_fupd f ∘ funcs_fupd g ∘ h =
+           funcs_fupd g ∘ structs_fupd f ∘ h) ∧
+        ((∀g f. scope_fupd f ∘ locals_fupd g = locals_fupd g ∘ scope_fupd f) ∧
+         ∀h g f.
+           scope_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ scope_fupd f ∘ h) ∧
+        ((∀g f.
+            scope_fupd f ∘ globals_fupd g = globals_fupd g ∘ scope_fupd f) ∧
+         ∀h g f.
+           scope_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ scope_fupd f ∘ h) ∧
+        ((∀g f. scope_fupd f ∘ funcs_fupd g = funcs_fupd g ∘ scope_fupd f) ∧
+         ∀h g f.
+           scope_fupd f ∘ funcs_fupd g ∘ h =
+           funcs_fupd g ∘ scope_fupd f ∘ h) ∧
+        ((∀g f.
+            scope_fupd f ∘ structs_fupd g = structs_fupd g ∘ scope_fupd f) ∧
+         ∀h g f.
+           scope_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ scope_fupd f ∘ h) ∧
+        ((∀g f.
+            in_loop_fupd f ∘ locals_fupd g = locals_fupd g ∘ in_loop_fupd f) ∧
+         ∀h g f.
+           in_loop_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ in_loop_fupd f ∘ h) ∧
+        ((∀g f.
+            in_loop_fupd f ∘ globals_fupd g =
+            globals_fupd g ∘ in_loop_fupd f) ∧
+         ∀h g f.
+           in_loop_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ in_loop_fupd f ∘ h) ∧
+        ((∀g f.
+            in_loop_fupd f ∘ funcs_fupd g = funcs_fupd g ∘ in_loop_fupd f) ∧
+         ∀h g f.
+           in_loop_fupd f ∘ funcs_fupd g ∘ h =
+           funcs_fupd g ∘ in_loop_fupd f ∘ h) ∧
+        ((∀g f.
+            in_loop_fupd f ∘ structs_fupd g =
+            structs_fupd g ∘ in_loop_fupd f) ∧
+         ∀h g f.
+           in_loop_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ in_loop_fupd f ∘ h) ∧
+        ((∀g f.
+            in_loop_fupd f ∘ scope_fupd g = scope_fupd g ∘ in_loop_fupd f) ∧
+         ∀h g f.
+           in_loop_fupd f ∘ scope_fupd g ∘ h =
+           scope_fupd g ∘ in_loop_fupd f ∘ h) ∧
+        ((∀g f.
+            is_reachable_fupd f ∘ locals_fupd g =
+            locals_fupd g ∘ is_reachable_fupd f) ∧
+         ∀h g f.
+           is_reachable_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ is_reachable_fupd f ∘ h) ∧
+        ((∀g f.
+            is_reachable_fupd f ∘ globals_fupd g =
+            globals_fupd g ∘ is_reachable_fupd f) ∧
+         ∀h g f.
+           is_reachable_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ is_reachable_fupd f ∘ h) ∧
+        ((∀g f.
+            is_reachable_fupd f ∘ funcs_fupd g =
+            funcs_fupd g ∘ is_reachable_fupd f) ∧
+         ∀h g f.
+           is_reachable_fupd f ∘ funcs_fupd g ∘ h =
+           funcs_fupd g ∘ is_reachable_fupd f ∘ h) ∧
+        ((∀g f.
+            is_reachable_fupd f ∘ structs_fupd g =
+            structs_fupd g ∘ is_reachable_fupd f) ∧
+         ∀h g f.
+           is_reachable_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ is_reachable_fupd f ∘ h) ∧
+        ((∀g f.
+            is_reachable_fupd f ∘ scope_fupd g =
+            scope_fupd g ∘ is_reachable_fupd f) ∧
+         ∀h g f.
+           is_reachable_fupd f ∘ scope_fupd g ∘ h =
+           scope_fupd g ∘ is_reachable_fupd f ∘ h) ∧
+        ((∀g f.
+            is_reachable_fupd f ∘ in_loop_fupd g =
+            in_loop_fupd g ∘ is_reachable_fupd f) ∧
+         ∀h g f.
+           is_reachable_fupd f ∘ in_loop_fupd g ∘ h =
+           in_loop_fupd g ∘ is_reachable_fupd f ∘ h) ∧
+        ((∀g f. last_fupd f ∘ locals_fupd g = locals_fupd g ∘ last_fupd f) ∧
+         ∀h g f.
+           last_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ last_fupd f ∘ h) ∧
+        ((∀g f. last_fupd f ∘ globals_fupd g = globals_fupd g ∘ last_fupd f) ∧
+         ∀h g f.
+           last_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ last_fupd f ∘ h) ∧
+        ((∀g f. last_fupd f ∘ funcs_fupd g = funcs_fupd g ∘ last_fupd f) ∧
+         ∀h g f.
+           last_fupd f ∘ funcs_fupd g ∘ h = funcs_fupd g ∘ last_fupd f ∘ h) ∧
+        ((∀g f. last_fupd f ∘ structs_fupd g = structs_fupd g ∘ last_fupd f) ∧
+         ∀h g f.
+           last_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ last_fupd f ∘ h) ∧
+        ((∀g f. last_fupd f ∘ scope_fupd g = scope_fupd g ∘ last_fupd f) ∧
+         ∀h g f.
+           last_fupd f ∘ scope_fupd g ∘ h = scope_fupd g ∘ last_fupd f ∘ h) ∧
+        ((∀g f. last_fupd f ∘ in_loop_fupd g = in_loop_fupd g ∘ last_fupd f) ∧
+         ∀h g f.
+           last_fupd f ∘ in_loop_fupd g ∘ h =
+           in_loop_fupd g ∘ last_fupd f ∘ h) ∧
+        ((∀g f.
+            last_fupd f ∘ is_reachable_fupd g =
+            is_reachable_fupd g ∘ last_fupd f) ∧
+         ∀h g f.
+           last_fupd f ∘ is_reachable_fupd g ∘ h =
+           is_reachable_fupd g ∘ last_fupd f ∘ h) ∧
+        ((∀g f. loc_fupd f ∘ locals_fupd g = locals_fupd g ∘ loc_fupd f) ∧
+         ∀h g f.
+           loc_fupd f ∘ locals_fupd g ∘ h = locals_fupd g ∘ loc_fupd f ∘ h) ∧
+        ((∀g f. loc_fupd f ∘ globals_fupd g = globals_fupd g ∘ loc_fupd f) ∧
+         ∀h g f.
+           loc_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ loc_fupd f ∘ h) ∧
+        ((∀g f. loc_fupd f ∘ funcs_fupd g = funcs_fupd g ∘ loc_fupd f) ∧
+         ∀h g f.
+           loc_fupd f ∘ funcs_fupd g ∘ h = funcs_fupd g ∘ loc_fupd f ∘ h) ∧
+        ((∀g f. loc_fupd f ∘ structs_fupd g = structs_fupd g ∘ loc_fupd f) ∧
+         ∀h g f.
+           loc_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ loc_fupd f ∘ h) ∧
+        ((∀g f. loc_fupd f ∘ scope_fupd g = scope_fupd g ∘ loc_fupd f) ∧
+         ∀h g f.
+           loc_fupd f ∘ scope_fupd g ∘ h = scope_fupd g ∘ loc_fupd f ∘ h) ∧
+        ((∀g f. loc_fupd f ∘ in_loop_fupd g = in_loop_fupd g ∘ loc_fupd f) ∧
+         ∀h g f.
+           loc_fupd f ∘ in_loop_fupd g ∘ h =
+           in_loop_fupd g ∘ loc_fupd f ∘ h) ∧
+        ((∀g f.
+            loc_fupd f ∘ is_reachable_fupd g =
+            is_reachable_fupd g ∘ loc_fupd f) ∧
+         ∀h g f.
+           loc_fupd f ∘ is_reachable_fupd g ∘ h =
+           is_reachable_fupd g ∘ loc_fupd f ∘ h) ∧
+        (∀g f. loc_fupd f ∘ last_fupd g = last_fupd g ∘ loc_fupd f) ∧
+        ∀h g f. loc_fupd f ∘ last_fupd g ∘ h = last_fupd g ∘ loc_fupd f ∘ h
+   
+   [context_fupdfupds]  Theorem
+      
+      ⊢ (∀g f c.
+           c with <|locals updated_by f; locals updated_by g|> =
+           c with locals updated_by f ∘ g) ∧
+        (∀g f c.
+           c with <|globals updated_by f; globals updated_by g|> =
+           c with globals updated_by f ∘ g) ∧
+        (∀g f c.
+           c with <|funcs updated_by f; funcs updated_by g|> =
+           c with funcs updated_by f ∘ g) ∧
+        (∀g f c.
+           c with <|structs updated_by f; structs updated_by g|> =
+           c with structs updated_by f ∘ g) ∧
+        (∀g f c.
+           c with <|scope updated_by f; scope updated_by g|> =
+           c with scope updated_by f ∘ g) ∧
+        (∀g f c.
+           c with <|in_loop updated_by f; in_loop updated_by g|> =
+           c with in_loop updated_by f ∘ g) ∧
+        (∀g f c.
+           c with <|is_reachable updated_by f; is_reachable updated_by g|> =
+           c with is_reachable updated_by f ∘ g) ∧
+        (∀g f c.
+           c with <|last updated_by f; last updated_by g|> =
+           c with last updated_by f ∘ g) ∧
+        ∀g f c.
+          c with <|loc updated_by f; loc updated_by g|> =
+          c with loc updated_by f ∘ g
+   
+   [context_fupdfupds_comp]  Theorem
+      
+      ⊢ ((∀g f. locals_fupd f ∘ locals_fupd g = locals_fupd (f ∘ g)) ∧
+         ∀h g f.
+           locals_fupd f ∘ locals_fupd g ∘ h = locals_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. globals_fupd f ∘ globals_fupd g = globals_fupd (f ∘ g)) ∧
+         ∀h g f.
+           globals_fupd f ∘ globals_fupd g ∘ h = globals_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. funcs_fupd f ∘ funcs_fupd g = funcs_fupd (f ∘ g)) ∧
+         ∀h g f. funcs_fupd f ∘ funcs_fupd g ∘ h = funcs_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. structs_fupd f ∘ structs_fupd g = structs_fupd (f ∘ g)) ∧
+         ∀h g f.
+           structs_fupd f ∘ structs_fupd g ∘ h = structs_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. scope_fupd f ∘ scope_fupd g = scope_fupd (f ∘ g)) ∧
+         ∀h g f. scope_fupd f ∘ scope_fupd g ∘ h = scope_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. in_loop_fupd f ∘ in_loop_fupd g = in_loop_fupd (f ∘ g)) ∧
+         ∀h g f.
+           in_loop_fupd f ∘ in_loop_fupd g ∘ h = in_loop_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f.
+            is_reachable_fupd f ∘ is_reachable_fupd g =
+            is_reachable_fupd (f ∘ g)) ∧
+         ∀h g f.
+           is_reachable_fupd f ∘ is_reachable_fupd g ∘ h =
+           is_reachable_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. last_fupd f ∘ last_fupd g = last_fupd (f ∘ g)) ∧
+         ∀h g f. last_fupd f ∘ last_fupd g ∘ h = last_fupd (f ∘ g) ∘ h) ∧
+        (∀g f. loc_fupd f ∘ loc_fupd g = loc_fupd (f ∘ g)) ∧
+        ∀h g f. loc_fupd f ∘ loc_fupd g ∘ h = loc_fupd (f ∘ g) ∘ h
+   
+   [context_induction]  Theorem
+      
+      ⊢ ∀P. (∀m m0 m1 l s b r l0 m2. P (context m m0 m1 l s b r l0 m2)) ⇒
+            ∀c. P c
+   
+   [context_literal_11]  Theorem
+      
+      ⊢ ∀m21 m11 m01 l01 s1 b1 r1 l1 m1 m22 m12 m02 l02 s2 b2 r2 l2 m2.
+          <|locals := m21; globals := m11; funcs := m01; structs := l01;
+            scope := s1; in_loop := b1; is_reachable := r1; last := l1;
+            loc := m1|> =
+          <|locals := m22; globals := m12; funcs := m02; structs := l02;
+            scope := s2; in_loop := b2; is_reachable := r2; last := l2;
+            loc := m2|> ⇔
+          m21 = m22 ∧ m11 = m12 ∧ m01 = m02 ∧ l01 = l02 ∧ s1 = s2 ∧
+          (b1 ⇔ b2) ∧ r1 = r2 ∧ l1 = l2 ∧ m1 = m2
+   
+   [context_literal_nchotomy]  Theorem
+      
+      ⊢ ∀c. ∃m2 m1 m0 l0 s b r l m.
+          c =
+          <|locals := m2; globals := m1; funcs := m0; structs := l0;
+            scope := s; in_loop := b; is_reachable := r; last := l;
+            loc := m|>
+   
+   [context_nchotomy]  Theorem
+      
+      ⊢ ∀cc. ∃m m0 m1 l s b r l0 m2. cc = context m m0 m1 l s b r l0 m2
+   
+   [context_updates_eq_literal]  Theorem
+      
+      ⊢ ∀c m2 m1 m0 l0 s b r l m.
+          c with
+          <|locals := m2; globals := m1; funcs := m0; structs := l0;
+            scope := s; in_loop := b; is_reachable := r; last := l;
+            loc := m|> =
+          <|locals := m2; globals := m1; funcs := m0; structs := l0;
+            scope := s; in_loop := b; is_reachable := r; last := l;
+            loc := m|>
+   
+   [datatype_based]  Theorem
+      
+      ⊢ DATATYPE (based Based NotBased Trusted NotTrusted)
+   
+   [datatype_context]  Theorem
+      
+      ⊢ DATATYPE
+          (record context locals globals funcs structs scope in_loop
+             is_reachable last loc)
+   
+   [datatype_exp_return]  Theorem
+      
+      ⊢ DATATYPE (record exp_return sh_bd)
+   
+   [datatype_exps_return]  Theorem
+      
+      ⊢ DATATYPE (record exps_return sh_bds)
+   
+   [datatype_func_info]  Theorem
+      
+      ⊢ DATATYPE (record func_info ret_shape params)
+   
+   [datatype_global_info]  Theorem
+      
+      ⊢ DATATYPE (record global_info vshape)
+   
+   [datatype_last_stmt]  Theorem
+      
+      ⊢ DATATYPE
+          (last_stmt RetLast RaiseLast TailLast BreakLast ContLast
+             CondExitLast InvisLast OtherLast)
+   
+   [datatype_local_info]  Theorem
+      
+      ⊢ DATATYPE (record local_info vsh_bd)
+   
+   [datatype_prog_return]  Theorem
+      
+      ⊢ DATATYPE
+          (record prog_return exits_fun exits_loop last var_delta curr_loc)
+   
+   [datatype_reachable]  Theorem
+      
+      ⊢ DATATYPE (reachable IsReach NotReach WarnReach)
+   
+   [datatype_scope]  Theorem
+      
+      ⊢ DATATYPE (scope FunScope DeclScope StcScope TopLevel)
+   
+   [datatype_scoped_id]  Theorem
+      
+      ⊢ DATATYPE (scoped_id Var Fun Stc)
+   
+   [datatype_shaped_based]  Theorem
+      
+      ⊢ DATATYPE (shaped_based WordB StructB NamedB)
+   
+   [datatype_staterr]  Theorem
+      
+      ⊢ DATATYPE (staterr ScopeErr WarningErr GenErr ShapeErr)
+   
+   [exp_return_11]  Theorem
+      
+      ⊢ ∀a a'. exp_return a = exp_return a' ⇔ a = a'
+   
+   [exp_return_Axiom]  Theorem
+      
+      ⊢ ∀f. ∃fn. ∀a. fn (exp_return a) = f a
+   
+   [exp_return_accessors]  Theorem
+      
+      ⊢ ∀s. (exp_return s).sh_bd = s
+   
+   [exp_return_accfupds]  Theorem
+      
+      ⊢ ∀f e. (e with sh_bd updated_by f).sh_bd = f e.sh_bd
+   
+   [exp_return_case_cong]  Theorem
+      
+      ⊢ ∀M M' f.
+          M = M' ∧ (∀a. M' = exp_return a ⇒ f a = f' a) ⇒
+          exp_return_CASE M f = exp_return_CASE M' f'
+   
+   [exp_return_case_eq]  Theorem
+      
+      ⊢ exp_return_CASE x f = v ⇔ ∃s. x = exp_return s ∧ f s = v
+   
+   [exp_return_component_equality]  Theorem
+      
+      ⊢ ∀e1 e2. e1 = e2 ⇔ e1.sh_bd = e2.sh_bd
+   
+   [exp_return_fn_updates]  Theorem
+      
+      ⊢ ∀f s. exp_return s with sh_bd updated_by f = exp_return (f s)
+   
+   [exp_return_fupdfupds]  Theorem
+      
+      ⊢ ∀g f e.
+          e with <|sh_bd updated_by f; sh_bd updated_by g|> =
+          e with sh_bd updated_by f ∘ g
+   
+   [exp_return_fupdfupds_comp]  Theorem
+      
+      ⊢ (∀g f. sh_bd_fupd f ∘ sh_bd_fupd g = sh_bd_fupd (f ∘ g)) ∧
+        ∀h g f. sh_bd_fupd f ∘ sh_bd_fupd g ∘ h = sh_bd_fupd (f ∘ g) ∘ h
+   
+   [exp_return_induction]  Theorem
+      
+      ⊢ ∀P. (∀s. P (exp_return s)) ⇒ ∀e. P e
+   
+   [exp_return_literal_11]  Theorem
+      
+      ⊢ ∀s1 s2. <|sh_bd := s1|> = <|sh_bd := s2|> ⇔ s1 = s2
+   
+   [exp_return_literal_nchotomy]  Theorem
+      
+      ⊢ ∀e. ∃s. e = <|sh_bd := s|>
+   
+   [exp_return_nchotomy]  Theorem
+      
+      ⊢ ∀ee. ∃s. ee = exp_return s
+   
+   [exp_return_updates_eq_literal]  Theorem
+      
+      ⊢ ∀e s. e with sh_bd := s = <|sh_bd := s|>
+   
+   [exps_return_11]  Theorem
+      
+      ⊢ ∀a a'. exps_return a = exps_return a' ⇔ a = a'
+   
+   [exps_return_Axiom]  Theorem
+      
+      ⊢ ∀f. ∃fn. ∀a. fn (exps_return a) = f a
+   
+   [exps_return_accessors]  Theorem
+      
+      ⊢ ∀l. (exps_return l).sh_bds = l
+   
+   [exps_return_accfupds]  Theorem
+      
+      ⊢ ∀f e. (e with sh_bds updated_by f).sh_bds = f e.sh_bds
+   
+   [exps_return_case_cong]  Theorem
+      
+      ⊢ ∀M M' f.
+          M = M' ∧ (∀a. M' = exps_return a ⇒ f a = f' a) ⇒
+          exps_return_CASE M f = exps_return_CASE M' f'
+   
+   [exps_return_case_eq]  Theorem
+      
+      ⊢ exps_return_CASE x f = v ⇔ ∃l. x = exps_return l ∧ f l = v
+   
+   [exps_return_component_equality]  Theorem
+      
+      ⊢ ∀e1 e2. e1 = e2 ⇔ e1.sh_bds = e2.sh_bds
+   
+   [exps_return_fn_updates]  Theorem
+      
+      ⊢ ∀f l. exps_return l with sh_bds updated_by f = exps_return (f l)
+   
+   [exps_return_fupdfupds]  Theorem
+      
+      ⊢ ∀g f e.
+          e with <|sh_bds updated_by f; sh_bds updated_by g|> =
+          e with sh_bds updated_by f ∘ g
+   
+   [exps_return_fupdfupds_comp]  Theorem
+      
+      ⊢ (∀g f. sh_bds_fupd f ∘ sh_bds_fupd g = sh_bds_fupd (f ∘ g)) ∧
+        ∀h g f. sh_bds_fupd f ∘ sh_bds_fupd g ∘ h = sh_bds_fupd (f ∘ g) ∘ h
+   
+   [exps_return_induction]  Theorem
+      
+      ⊢ ∀P. (∀l. P (exps_return l)) ⇒ ∀e. P e
+   
+   [exps_return_literal_11]  Theorem
+      
+      ⊢ ∀l1 l2. <|sh_bds := l1|> = <|sh_bds := l2|> ⇔ l1 = l2
+   
+   [exps_return_literal_nchotomy]  Theorem
+      
+      ⊢ ∀e. ∃l. e = <|sh_bds := l|>
+   
+   [exps_return_nchotomy]  Theorem
+      
+      ⊢ ∀ee. ∃l. ee = exps_return l
+   
+   [exps_return_updates_eq_literal]  Theorem
+      
+      ⊢ ∀e l. e with sh_bds := l = <|sh_bds := l|>
+   
+   [first_repeat_def]  Theorem
+      
+      ⊢ ∀xs.
+          first_repeat xs =
+          case xs of
+            [] => NONE
+          | [x1] => NONE
+          | x1::x2::xs' =>
+            if x1 = x2 then SOME x1 else first_repeat (x2::xs')
+   
+   [first_repeat_ind]  Theorem
+      
+      ⊢ ∀P. (∀xs.
+               (∀x1 v3 x2 xs'.
+                  xs = x1::v3 ∧ v3 = x2::xs' ∧ x1 ≠ x2 ⇒ P (x2::xs')) ⇒
+               P xs) ⇒
+            ∀v. P v
+   
+   [func_info_11]  Theorem
+      
+      ⊢ ∀a0 a1 a0' a1'.
+          func_info a0 a1 = func_info a0' a1' ⇔ a0 = a0' ∧ a1 = a1'
+   
+   [func_info_Axiom]  Theorem
+      
+      ⊢ ∀f. ∃fn. ∀a0 a1. fn (func_info a0 a1) = f a0 a1
+   
+   [func_info_accessors]  Theorem
+      
+      ⊢ (∀s l. (func_info s l).ret_shape = s) ∧
+        ∀s l. (func_info s l).params = l
+   
+   [func_info_accfupds]  Theorem
+      
+      ⊢ (∀f0 f. (f with params updated_by f0).ret_shape = f.ret_shape) ∧
+        (∀f0 f. (f with ret_shape updated_by f0).params = f.params) ∧
+        (∀f0 f. (f with ret_shape updated_by f0).ret_shape = f0 f.ret_shape) ∧
+        ∀f0 f. (f with params updated_by f0).params = f0 f.params
+   
+   [func_info_case_cong]  Theorem
+      
+      ⊢ ∀M M' f.
+          M = M' ∧ (∀a0 a1. M' = func_info a0 a1 ⇒ f a0 a1 = f' a0 a1) ⇒
+          func_info_CASE M f = func_info_CASE M' f'
+   
+   [func_info_case_eq]  Theorem
+      
+      ⊢ func_info_CASE x f = v ⇔ ∃s l. x = func_info s l ∧ f s l = v
+   
+   [func_info_component_equality]  Theorem
+      
+      ⊢ ∀f1 f2.
+          f1 = f2 ⇔ f1.ret_shape = f2.ret_shape ∧ f1.params = f2.params
+   
+   [func_info_fn_updates]  Theorem
+      
+      ⊢ (∀f s l.
+           func_info s l with ret_shape updated_by f = func_info (f s) l) ∧
+        ∀f s l. func_info s l with params updated_by f = func_info s (f l)
+   
+   [func_info_fupdcanon]  Theorem
+      
+      ⊢ ∀g f0 f.
+          f with <|params updated_by f0; ret_shape updated_by g|> =
+          f with <|ret_shape updated_by g; params updated_by f0|>
+   
+   [func_info_fupdcanon_comp]  Theorem
+      
+      ⊢ (∀g f0.
+           params_fupd f0 ∘ ret_shape_fupd g =
+           ret_shape_fupd g ∘ params_fupd f0) ∧
+        ∀h g f0.
+          params_fupd f0 ∘ ret_shape_fupd g ∘ h =
+          ret_shape_fupd g ∘ params_fupd f0 ∘ h
+   
+   [func_info_fupdfupds]  Theorem
+      
+      ⊢ (∀g f0 f.
+           f with <|ret_shape updated_by f0; ret_shape updated_by g|> =
+           f with ret_shape updated_by f0 ∘ g) ∧
+        ∀g f0 f.
+          f with <|params updated_by f0; params updated_by g|> =
+          f with params updated_by f0 ∘ g
+   
+   [func_info_fupdfupds_comp]  Theorem
+      
+      ⊢ ((∀g f0.
+            ret_shape_fupd f0 ∘ ret_shape_fupd g = ret_shape_fupd (f0 ∘ g)) ∧
+         ∀h g f0.
+           ret_shape_fupd f0 ∘ ret_shape_fupd g ∘ h =
+           ret_shape_fupd (f0 ∘ g) ∘ h) ∧
+        (∀g f0. params_fupd f0 ∘ params_fupd g = params_fupd (f0 ∘ g)) ∧
+        ∀h g f0.
+          params_fupd f0 ∘ params_fupd g ∘ h = params_fupd (f0 ∘ g) ∘ h
+   
+   [func_info_induction]  Theorem
+      
+      ⊢ ∀P. (∀s l. P (func_info s l)) ⇒ ∀f. P f
+   
+   [func_info_literal_11]  Theorem
+      
+      ⊢ ∀s1 l1 s2 l2.
+          <|ret_shape := s1; params := l1|> =
+          <|ret_shape := s2; params := l2|> ⇔ s1 = s2 ∧ l1 = l2
+   
+   [func_info_literal_nchotomy]  Theorem
+      
+      ⊢ ∀f. ∃s l. f = <|ret_shape := s; params := l|>
+   
+   [func_info_nchotomy]  Theorem
+      
+      ⊢ ∀ff. ∃s l. ff = func_info s l
+   
+   [func_info_updates_eq_literal]  Theorem
+      
+      ⊢ ∀f s l.
+          f with <|ret_shape := s; params := l|> =
+          <|ret_shape := s; params := l|>
+   
+   [global_info_11]  Theorem
+      
+      ⊢ ∀a a'. global_info a = global_info a' ⇔ a = a'
+   
+   [global_info_Axiom]  Theorem
+      
+      ⊢ ∀f. ∃fn. ∀a. fn (global_info a) = f a
+   
+   [global_info_accessors]  Theorem
+      
+      ⊢ ∀s. (global_info s).vshape = s
+   
+   [global_info_accfupds]  Theorem
+      
+      ⊢ ∀g f. (g with vshape updated_by f).vshape = f g.vshape
+   
+   [global_info_case_cong]  Theorem
+      
+      ⊢ ∀M M' f.
+          M = M' ∧ (∀a. M' = global_info a ⇒ f a = f' a) ⇒
+          global_info_CASE M f = global_info_CASE M' f'
+   
+   [global_info_case_eq]  Theorem
+      
+      ⊢ global_info_CASE x f = v ⇔ ∃s. x = global_info s ∧ f s = v
+   
+   [global_info_component_equality]  Theorem
+      
+      ⊢ ∀g1 g2. g1 = g2 ⇔ g1.vshape = g2.vshape
+   
+   [global_info_fn_updates]  Theorem
+      
+      ⊢ ∀f s. global_info s with vshape updated_by f = global_info (f s)
+   
+   [global_info_fupdfupds]  Theorem
+      
+      ⊢ ∀g0 g f.
+          g with <|vshape updated_by f; vshape updated_by g0|> =
+          g with vshape updated_by f ∘ g0
+   
+   [global_info_fupdfupds_comp]  Theorem
+      
+      ⊢ (∀g0 f. vshape_fupd f ∘ vshape_fupd g0 = vshape_fupd (f ∘ g0)) ∧
+        ∀h g0 f.
+          vshape_fupd f ∘ vshape_fupd g0 ∘ h = vshape_fupd (f ∘ g0) ∘ h
+   
+   [global_info_induction]  Theorem
+      
+      ⊢ ∀P. (∀s. P (global_info s)) ⇒ ∀g. P g
+   
+   [global_info_literal_11]  Theorem
+      
+      ⊢ ∀s1 s2. <|vshape := s1|> = <|vshape := s2|> ⇔ s1 = s2
+   
+   [global_info_literal_nchotomy]  Theorem
+      
+      ⊢ ∀g. ∃s. g = <|vshape := s|>
+   
+   [global_info_nchotomy]  Theorem
+      
+      ⊢ ∀gg. ∃s. gg = global_info s
+   
+   [global_info_updates_eq_literal]  Theorem
+      
+      ⊢ ∀g s. g with vshape := s = <|vshape := s|>
+   
+   [last_stmt2num_11]  Theorem
+      
+      ⊢ ∀a a'. last_stmt2num a = last_stmt2num a' ⇔ a = a'
+   
+   [last_stmt2num_ONTO]  Theorem
+      
+      ⊢ ∀r. r < 8 ⇔ ∃a. r = last_stmt2num a
+   
+   [last_stmt2num_num2last_stmt]  Theorem
+      
+      ⊢ ∀r. r < 8 ⇔ last_stmt2num (num2last_stmt r) = r
+   
+   [last_stmt2num_thm]  Theorem
+      
+      ⊢ last_stmt2num RetLast = 0 ∧ last_stmt2num RaiseLast = 1 ∧
+        last_stmt2num TailLast = 2 ∧ last_stmt2num BreakLast = 3 ∧
+        last_stmt2num ContLast = 4 ∧ last_stmt2num CondExitLast = 5 ∧
+        last_stmt2num InvisLast = 6 ∧ last_stmt2num OtherLast = 7
+   
+   [last_stmt_Axiom]  Theorem
+      
+      ⊢ ∀x0 x1 x2 x3 x4 x5 x6 x7. ∃f.
+          f RetLast = x0 ∧ f RaiseLast = x1 ∧ f TailLast = x2 ∧
+          f BreakLast = x3 ∧ f ContLast = x4 ∧ f CondExitLast = x5 ∧
+          f InvisLast = x6 ∧ f OtherLast = x7
+   
+   [last_stmt_EQ_last_stmt]  Theorem
+      
+      ⊢ ∀a a'. a = a' ⇔ last_stmt2num a = last_stmt2num a'
+   
+   [last_stmt_case_cong]  Theorem
+      
+      ⊢ ∀M M' v0 v1 v2 v3 v4 v5 v6 v7.
+          M = M' ∧ (M' = RetLast ⇒ v0 = v0') ∧
+          (M' = RaiseLast ⇒ v1 = v1') ∧ (M' = TailLast ⇒ v2 = v2') ∧
+          (M' = BreakLast ⇒ v3 = v3') ∧ (M' = ContLast ⇒ v4 = v4') ∧
+          (M' = CondExitLast ⇒ v5 = v5') ∧ (M' = InvisLast ⇒ v6 = v6') ∧
+          (M' = OtherLast ⇒ v7 = v7') ⇒
+          (case M of
+             RetLast => v0
+           | RaiseLast => v1
+           | TailLast => v2
+           | BreakLast => v3
+           | ContLast => v4
+           | CondExitLast => v5
+           | InvisLast => v6
+           | OtherLast => v7) =
+          case M' of
+            RetLast => v0'
+          | RaiseLast => v1'
+          | TailLast => v2'
+          | BreakLast => v3'
+          | ContLast => v4'
+          | CondExitLast => v5'
+          | InvisLast => v6'
+          | OtherLast => v7'
+   
+   [last_stmt_case_def]  Theorem
+      
+      ⊢ (∀v0 v1 v2 v3 v4 v5 v6 v7.
+           (case RetLast of
+              RetLast => v0
+            | RaiseLast => v1
+            | TailLast => v2
+            | BreakLast => v3
+            | ContLast => v4
+            | CondExitLast => v5
+            | InvisLast => v6
+            | OtherLast => v7) = v0) ∧
+        (∀v0 v1 v2 v3 v4 v5 v6 v7.
+           (case RaiseLast of
+              RetLast => v0
+            | RaiseLast => v1
+            | TailLast => v2
+            | BreakLast => v3
+            | ContLast => v4
+            | CondExitLast => v5
+            | InvisLast => v6
+            | OtherLast => v7) = v1) ∧
+        (∀v0 v1 v2 v3 v4 v5 v6 v7.
+           (case TailLast of
+              RetLast => v0
+            | RaiseLast => v1
+            | TailLast => v2
+            | BreakLast => v3
+            | ContLast => v4
+            | CondExitLast => v5
+            | InvisLast => v6
+            | OtherLast => v7) = v2) ∧
+        (∀v0 v1 v2 v3 v4 v5 v6 v7.
+           (case BreakLast of
+              RetLast => v0
+            | RaiseLast => v1
+            | TailLast => v2
+            | BreakLast => v3
+            | ContLast => v4
+            | CondExitLast => v5
+            | InvisLast => v6
+            | OtherLast => v7) = v3) ∧
+        (∀v0 v1 v2 v3 v4 v5 v6 v7.
+           (case ContLast of
+              RetLast => v0
+            | RaiseLast => v1
+            | TailLast => v2
+            | BreakLast => v3
+            | ContLast => v4
+            | CondExitLast => v5
+            | InvisLast => v6
+            | OtherLast => v7) = v4) ∧
+        (∀v0 v1 v2 v3 v4 v5 v6 v7.
+           (case CondExitLast of
+              RetLast => v0
+            | RaiseLast => v1
+            | TailLast => v2
+            | BreakLast => v3
+            | ContLast => v4
+            | CondExitLast => v5
+            | InvisLast => v6
+            | OtherLast => v7) = v5) ∧
+        (∀v0 v1 v2 v3 v4 v5 v6 v7.
+           (case InvisLast of
+              RetLast => v0
+            | RaiseLast => v1
+            | TailLast => v2
+            | BreakLast => v3
+            | ContLast => v4
+            | CondExitLast => v5
+            | InvisLast => v6
+            | OtherLast => v7) = v6) ∧
+        ∀v0 v1 v2 v3 v4 v5 v6 v7.
+          (case OtherLast of
+             RetLast => v0
+           | RaiseLast => v1
+           | TailLast => v2
+           | BreakLast => v3
+           | ContLast => v4
+           | CondExitLast => v5
+           | InvisLast => v6
+           | OtherLast => v7) = v7
+   
+   [last_stmt_case_eq]  Theorem
+      
+      ⊢ (case x of
+           RetLast => v0
+         | RaiseLast => v1
+         | TailLast => v2
+         | BreakLast => v3
+         | ContLast => v4
+         | CondExitLast => v5
+         | InvisLast => v6
+         | OtherLast => v7) = v ⇔
+        x = RetLast ∧ v0 = v ∨ x = RaiseLast ∧ v1 = v ∨
+        x = TailLast ∧ v2 = v ∨ x = BreakLast ∧ v3 = v ∨
+        x = ContLast ∧ v4 = v ∨ x = CondExitLast ∧ v5 = v ∨
+        x = InvisLast ∧ v6 = v ∨ x = OtherLast ∧ v7 = v
+   
+   [last_stmt_distinct]  Theorem
+      
+      ⊢ RetLast ≠ RaiseLast ∧ RetLast ≠ TailLast ∧ RetLast ≠ BreakLast ∧
+        RetLast ≠ ContLast ∧ RetLast ≠ CondExitLast ∧ RetLast ≠ InvisLast ∧
+        RetLast ≠ OtherLast ∧ RaiseLast ≠ TailLast ∧
+        RaiseLast ≠ BreakLast ∧ RaiseLast ≠ ContLast ∧
+        RaiseLast ≠ CondExitLast ∧ RaiseLast ≠ InvisLast ∧
+        RaiseLast ≠ OtherLast ∧ TailLast ≠ BreakLast ∧
+        TailLast ≠ ContLast ∧ TailLast ≠ CondExitLast ∧
+        TailLast ≠ InvisLast ∧ TailLast ≠ OtherLast ∧
+        BreakLast ≠ ContLast ∧ BreakLast ≠ CondExitLast ∧
+        BreakLast ≠ InvisLast ∧ BreakLast ≠ OtherLast ∧
+        ContLast ≠ CondExitLast ∧ ContLast ≠ InvisLast ∧
+        ContLast ≠ OtherLast ∧ CondExitLast ≠ InvisLast ∧
+        CondExitLast ≠ OtherLast ∧ InvisLast ≠ OtherLast
+   
+   [last_stmt_induction]  Theorem
+      
+      ⊢ ∀P. P BreakLast ∧ P CondExitLast ∧ P ContLast ∧ P InvisLast ∧
+            P OtherLast ∧ P RaiseLast ∧ P RetLast ∧ P TailLast ⇒
+            ∀a. P a
+   
+   [last_stmt_nchotomy]  Theorem
+      
+      ⊢ ∀a. a = RetLast ∨ a = RaiseLast ∨ a = TailLast ∨ a = BreakLast ∨
+            a = ContLast ∨ a = CondExitLast ∨ a = InvisLast ∨ a = OtherLast
+   
+   [local_info_11]  Theorem
+      
+      ⊢ ∀a a'. local_info a = local_info a' ⇔ a = a'
+   
+   [local_info_Axiom]  Theorem
+      
+      ⊢ ∀f. ∃fn. ∀a. fn (local_info a) = f a
+   
+   [local_info_accessors]  Theorem
+      
+      ⊢ ∀s. (local_info s).vsh_bd = s
+   
+   [local_info_accfupds]  Theorem
+      
+      ⊢ ∀l f. (l with vsh_bd updated_by f).vsh_bd = f l.vsh_bd
+   
+   [local_info_case_cong]  Theorem
+      
+      ⊢ ∀M M' f.
+          M = M' ∧ (∀a. M' = local_info a ⇒ f a = f' a) ⇒
+          local_info_CASE M f = local_info_CASE M' f'
+   
+   [local_info_case_eq]  Theorem
+      
+      ⊢ local_info_CASE x f = v ⇔ ∃s. x = local_info s ∧ f s = v
+   
+   [local_info_component_equality]  Theorem
+      
+      ⊢ ∀l1 l2. l1 = l2 ⇔ l1.vsh_bd = l2.vsh_bd
+   
+   [local_info_fn_updates]  Theorem
+      
+      ⊢ ∀f s. local_info s with vsh_bd updated_by f = local_info (f s)
+   
+   [local_info_fupdfupds]  Theorem
+      
+      ⊢ ∀l g f.
+          l with <|vsh_bd updated_by f; vsh_bd updated_by g|> =
+          l with vsh_bd updated_by f ∘ g
+   
+   [local_info_fupdfupds_comp]  Theorem
+      
+      ⊢ (∀g f. vsh_bd_fupd f ∘ vsh_bd_fupd g = vsh_bd_fupd (f ∘ g)) ∧
+        ∀h g f. vsh_bd_fupd f ∘ vsh_bd_fupd g ∘ h = vsh_bd_fupd (f ∘ g) ∘ h
+   
+   [local_info_induction]  Theorem
+      
+      ⊢ ∀P. (∀s. P (local_info s)) ⇒ ∀l. P l
+   
+   [local_info_literal_11]  Theorem
+      
+      ⊢ ∀s1 s2. <|vsh_bd := s1|> = <|vsh_bd := s2|> ⇔ s1 = s2
+   
+   [local_info_literal_nchotomy]  Theorem
+      
+      ⊢ ∀l. ∃s. l = <|vsh_bd := s|>
+   
+   [local_info_nchotomy]  Theorem
+      
+      ⊢ ∀ll. ∃s. ll = local_info s
+   
+   [local_info_updates_eq_literal]  Theorem
+      
+      ⊢ ∀l s. l with vsh_bd := s = <|vsh_bd := s|>
+   
+   [num2based_11]  Theorem
+      
+      ⊢ ∀r r'. r < 4 ⇒ r' < 4 ⇒ (num2based r = num2based r' ⇔ r = r')
+   
+   [num2based_ONTO]  Theorem
+      
+      ⊢ ∀a. ∃r. a = num2based r ∧ r < 4
+   
+   [num2based_based2num]  Theorem
+      
+      ⊢ ∀a. num2based (based2num a) = a
+   
+   [num2based_thm]  Theorem
+      
+      ⊢ num2based 0 = Based ∧ num2based 1 = NotBased ∧
+        num2based 2 = Trusted ∧ num2based 3 = NotTrusted
+   
+   [num2last_stmt_11]  Theorem
+      
+      ⊢ ∀r r'.
+          r < 8 ⇒ r' < 8 ⇒ (num2last_stmt r = num2last_stmt r' ⇔ r = r')
+   
+   [num2last_stmt_ONTO]  Theorem
+      
+      ⊢ ∀a. ∃r. a = num2last_stmt r ∧ r < 8
+   
+   [num2last_stmt_last_stmt2num]  Theorem
+      
+      ⊢ ∀a. num2last_stmt (last_stmt2num a) = a
+   
+   [num2last_stmt_thm]  Theorem
+      
+      ⊢ num2last_stmt 0 = RetLast ∧ num2last_stmt 1 = RaiseLast ∧
+        num2last_stmt 2 = TailLast ∧ num2last_stmt 3 = BreakLast ∧
+        num2last_stmt 4 = ContLast ∧ num2last_stmt 5 = CondExitLast ∧
+        num2last_stmt 6 = InvisLast ∧ num2last_stmt 7 = OtherLast
+   
+   [num2reachable_11]  Theorem
+      
+      ⊢ ∀r r'.
+          r < 3 ⇒ r' < 3 ⇒ (num2reachable r = num2reachable r' ⇔ r = r')
+   
+   [num2reachable_ONTO]  Theorem
+      
+      ⊢ ∀a. ∃r. a = num2reachable r ∧ r < 3
+   
+   [num2reachable_reachable2num]  Theorem
+      
+      ⊢ ∀a. num2reachable (reachable2num a) = a
+   
+   [num2reachable_thm]  Theorem
+      
+      ⊢ num2reachable 0 = IsReach ∧ num2reachable 1 = NotReach ∧
+        num2reachable 2 = WarnReach
+   
+   [num2scoped_id_11]  Theorem
+      
+      ⊢ ∀r r'.
+          r < 3 ⇒ r' < 3 ⇒ (num2scoped_id r = num2scoped_id r' ⇔ r = r')
+   
+   [num2scoped_id_ONTO]  Theorem
+      
+      ⊢ ∀a. ∃r. a = num2scoped_id r ∧ r < 3
+   
+   [num2scoped_id_scoped_id2num]  Theorem
+      
+      ⊢ ∀a. num2scoped_id (scoped_id2num a) = a
+   
+   [num2scoped_id_thm]  Theorem
+      
+      ⊢ num2scoped_id 0 = Var ∧ num2scoped_id 1 = Fun ∧
+        num2scoped_id 2 = Stc
+   
+   [prog_return_11]  Theorem
+      
+      ⊢ ∀a0 a1 a2 a3 a4 a0' a1' a2' a3' a4'.
+          prog_return a0 a1 a2 a3 a4 = prog_return a0' a1' a2' a3' a4' ⇔
+          (a0 ⇔ a0') ∧ (a1 ⇔ a1') ∧ a2 = a2' ∧ a3 = a3' ∧ a4 = a4'
+   
+   [prog_return_Axiom]  Theorem
+      
+      ⊢ ∀f. ∃fn. ∀a0 a1 a2 a3 a4.
+          fn (prog_return a0 a1 a2 a3 a4) = f a0 a1 a2 a3 a4
+   
+   [prog_return_accessors]  Theorem
+      
+      ⊢ (∀b b0 l m m0. (prog_return b b0 l m m0).exits_fun ⇔ b) ∧
+        (∀b b0 l m m0. (prog_return b b0 l m m0).exits_loop ⇔ b0) ∧
+        (∀b b0 l m m0. (prog_return b b0 l m m0).last = l) ∧
+        (∀b b0 l m m0. (prog_return b b0 l m m0).var_delta = m) ∧
+        ∀b b0 l m m0. (prog_return b b0 l m m0).curr_loc = m0
+   
+   [prog_return_accfupds]  Theorem
+      
+      ⊢ (∀p f. (p with exits_loop updated_by f).exits_fun ⇔ p.exits_fun) ∧
+        (∀p f. (p with last updated_by f).exits_fun ⇔ p.exits_fun) ∧
+        (∀p f. (p with var_delta updated_by f).exits_fun ⇔ p.exits_fun) ∧
+        (∀p f. (p with curr_loc updated_by f).exits_fun ⇔ p.exits_fun) ∧
+        (∀p f. (p with exits_fun updated_by f).exits_loop ⇔ p.exits_loop) ∧
+        (∀p f. (p with last updated_by f).exits_loop ⇔ p.exits_loop) ∧
+        (∀p f. (p with var_delta updated_by f).exits_loop ⇔ p.exits_loop) ∧
+        (∀p f. (p with curr_loc updated_by f).exits_loop ⇔ p.exits_loop) ∧
+        (∀p f. (p with exits_fun updated_by f).last = p.last) ∧
+        (∀p f. (p with exits_loop updated_by f).last = p.last) ∧
+        (∀p f. (p with var_delta updated_by f).last = p.last) ∧
+        (∀p f. (p with curr_loc updated_by f).last = p.last) ∧
+        (∀p f. (p with exits_fun updated_by f).var_delta = p.var_delta) ∧
+        (∀p f. (p with exits_loop updated_by f).var_delta = p.var_delta) ∧
+        (∀p f. (p with last updated_by f).var_delta = p.var_delta) ∧
+        (∀p f. (p with curr_loc updated_by f).var_delta = p.var_delta) ∧
+        (∀p f. (p with exits_fun updated_by f).curr_loc = p.curr_loc) ∧
+        (∀p f. (p with exits_loop updated_by f).curr_loc = p.curr_loc) ∧
+        (∀p f. (p with last updated_by f).curr_loc = p.curr_loc) ∧
+        (∀p f. (p with var_delta updated_by f).curr_loc = p.curr_loc) ∧
+        (∀p f. (p with exits_fun updated_by f).exits_fun ⇔ f p.exits_fun) ∧
+        (∀p f. (p with exits_loop updated_by f).exits_loop ⇔ f p.exits_loop) ∧
+        (∀p f. (p with last updated_by f).last = f p.last) ∧
+        (∀p f. (p with var_delta updated_by f).var_delta = f p.var_delta) ∧
+        ∀p f. (p with curr_loc updated_by f).curr_loc = f p.curr_loc
+   
+   [prog_return_case_cong]  Theorem
+      
+      ⊢ ∀M M' f.
+          M = M' ∧
+          (∀a0 a1 a2 a3 a4.
+             M' = prog_return a0 a1 a2 a3 a4 ⇒
+             f a0 a1 a2 a3 a4 = f' a0 a1 a2 a3 a4) ⇒
+          prog_return_CASE M f = prog_return_CASE M' f'
+   
+   [prog_return_case_eq]  Theorem
+      
+      ⊢ prog_return_CASE x f = v ⇔
+        ∃b b0 l m m0. x = prog_return b b0 l m m0 ∧ f b b0 l m m0 = v
+   
+   [prog_return_component_equality]  Theorem
+      
+      ⊢ ∀p1 p2.
+          p1 = p2 ⇔
+          (p1.exits_fun ⇔ p2.exits_fun) ∧ (p1.exits_loop ⇔ p2.exits_loop) ∧
+          p1.last = p2.last ∧ p1.var_delta = p2.var_delta ∧
+          p1.curr_loc = p2.curr_loc
+   
+   [prog_return_fn_updates]  Theorem
+      
+      ⊢ (∀f b b0 l m m0.
+           prog_return b b0 l m m0 with exits_fun updated_by f =
+           prog_return (f b) b0 l m m0) ∧
+        (∀f b b0 l m m0.
+           prog_return b b0 l m m0 with exits_loop updated_by f =
+           prog_return b (f b0) l m m0) ∧
+        (∀f b b0 l m m0.
+           prog_return b b0 l m m0 with last updated_by f =
+           prog_return b b0 (f l) m m0) ∧
+        (∀f b b0 l m m0.
+           prog_return b b0 l m m0 with var_delta updated_by f =
+           prog_return b b0 l (f m) m0) ∧
+        ∀f b b0 l m m0.
+          prog_return b b0 l m m0 with curr_loc updated_by f =
+          prog_return b b0 l m (f m0)
+   
+   [prog_return_fupdcanon]  Theorem
+      
+      ⊢ (∀p g f.
+           p with <|exits_loop updated_by f; exits_fun updated_by g|> =
+           p with <|exits_fun updated_by g; exits_loop updated_by f|>) ∧
+        (∀p g f.
+           p with <|last updated_by f; exits_fun updated_by g|> =
+           p with <|exits_fun updated_by g; last updated_by f|>) ∧
+        (∀p g f.
+           p with <|last updated_by f; exits_loop updated_by g|> =
+           p with <|exits_loop updated_by g; last updated_by f|>) ∧
+        (∀p g f.
+           p with <|var_delta updated_by f; exits_fun updated_by g|> =
+           p with <|exits_fun updated_by g; var_delta updated_by f|>) ∧
+        (∀p g f.
+           p with <|var_delta updated_by f; exits_loop updated_by g|> =
+           p with <|exits_loop updated_by g; var_delta updated_by f|>) ∧
+        (∀p g f.
+           p with <|var_delta updated_by f; last updated_by g|> =
+           p with <|last updated_by g; var_delta updated_by f|>) ∧
+        (∀p g f.
+           p with <|curr_loc updated_by f; exits_fun updated_by g|> =
+           p with <|exits_fun updated_by g; curr_loc updated_by f|>) ∧
+        (∀p g f.
+           p with <|curr_loc updated_by f; exits_loop updated_by g|> =
+           p with <|exits_loop updated_by g; curr_loc updated_by f|>) ∧
+        (∀p g f.
+           p with <|curr_loc updated_by f; last updated_by g|> =
+           p with <|last updated_by g; curr_loc updated_by f|>) ∧
+        ∀p g f.
+          p with <|curr_loc updated_by f; var_delta updated_by g|> =
+          p with <|var_delta updated_by g; curr_loc updated_by f|>
+   
+   [prog_return_fupdcanon_comp]  Theorem
+      
+      ⊢ ((∀g f.
+            exits_loop_fupd f ∘ exits_fun_fupd g =
+            exits_fun_fupd g ∘ exits_loop_fupd f) ∧
+         ∀h g f.
+           exits_loop_fupd f ∘ exits_fun_fupd g ∘ h =
+           exits_fun_fupd g ∘ exits_loop_fupd f ∘ h) ∧
+        ((∀g f.
+            last_fupd f ∘ exits_fun_fupd g = exits_fun_fupd g ∘ last_fupd f) ∧
+         ∀h g f.
+           last_fupd f ∘ exits_fun_fupd g ∘ h =
+           exits_fun_fupd g ∘ last_fupd f ∘ h) ∧
+        ((∀g f.
+            last_fupd f ∘ exits_loop_fupd g =
+            exits_loop_fupd g ∘ last_fupd f) ∧
+         ∀h g f.
+           last_fupd f ∘ exits_loop_fupd g ∘ h =
+           exits_loop_fupd g ∘ last_fupd f ∘ h) ∧
+        ((∀g f.
+            var_delta_fupd f ∘ exits_fun_fupd g =
+            exits_fun_fupd g ∘ var_delta_fupd f) ∧
+         ∀h g f.
+           var_delta_fupd f ∘ exits_fun_fupd g ∘ h =
+           exits_fun_fupd g ∘ var_delta_fupd f ∘ h) ∧
+        ((∀g f.
+            var_delta_fupd f ∘ exits_loop_fupd g =
+            exits_loop_fupd g ∘ var_delta_fupd f) ∧
+         ∀h g f.
+           var_delta_fupd f ∘ exits_loop_fupd g ∘ h =
+           exits_loop_fupd g ∘ var_delta_fupd f ∘ h) ∧
+        ((∀g f.
+            var_delta_fupd f ∘ last_fupd g = last_fupd g ∘ var_delta_fupd f) ∧
+         ∀h g f.
+           var_delta_fupd f ∘ last_fupd g ∘ h =
+           last_fupd g ∘ var_delta_fupd f ∘ h) ∧
+        ((∀g f.
+            curr_loc_fupd f ∘ exits_fun_fupd g =
+            exits_fun_fupd g ∘ curr_loc_fupd f) ∧
+         ∀h g f.
+           curr_loc_fupd f ∘ exits_fun_fupd g ∘ h =
+           exits_fun_fupd g ∘ curr_loc_fupd f ∘ h) ∧
+        ((∀g f.
+            curr_loc_fupd f ∘ exits_loop_fupd g =
+            exits_loop_fupd g ∘ curr_loc_fupd f) ∧
+         ∀h g f.
+           curr_loc_fupd f ∘ exits_loop_fupd g ∘ h =
+           exits_loop_fupd g ∘ curr_loc_fupd f ∘ h) ∧
+        ((∀g f.
+            curr_loc_fupd f ∘ last_fupd g = last_fupd g ∘ curr_loc_fupd f) ∧
+         ∀h g f.
+           curr_loc_fupd f ∘ last_fupd g ∘ h =
+           last_fupd g ∘ curr_loc_fupd f ∘ h) ∧
+        (∀g f.
+           curr_loc_fupd f ∘ var_delta_fupd g =
+           var_delta_fupd g ∘ curr_loc_fupd f) ∧
+        ∀h g f.
+          curr_loc_fupd f ∘ var_delta_fupd g ∘ h =
+          var_delta_fupd g ∘ curr_loc_fupd f ∘ h
+   
+   [prog_return_fupdfupds]  Theorem
+      
+      ⊢ (∀p g f.
+           p with <|exits_fun updated_by f; exits_fun updated_by g|> =
+           p with exits_fun updated_by f ∘ g) ∧
+        (∀p g f.
+           p with <|exits_loop updated_by f; exits_loop updated_by g|> =
+           p with exits_loop updated_by f ∘ g) ∧
+        (∀p g f.
+           p with <|last updated_by f; last updated_by g|> =
+           p with last updated_by f ∘ g) ∧
+        (∀p g f.
+           p with <|var_delta updated_by f; var_delta updated_by g|> =
+           p with var_delta updated_by f ∘ g) ∧
+        ∀p g f.
+          p with <|curr_loc updated_by f; curr_loc updated_by g|> =
+          p with curr_loc updated_by f ∘ g
+   
+   [prog_return_fupdfupds_comp]  Theorem
+      
+      ⊢ ((∀g f.
+            exits_fun_fupd f ∘ exits_fun_fupd g = exits_fun_fupd (f ∘ g)) ∧
+         ∀h g f.
+           exits_fun_fupd f ∘ exits_fun_fupd g ∘ h =
+           exits_fun_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f.
+            exits_loop_fupd f ∘ exits_loop_fupd g = exits_loop_fupd (f ∘ g)) ∧
+         ∀h g f.
+           exits_loop_fupd f ∘ exits_loop_fupd g ∘ h =
+           exits_loop_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. last_fupd f ∘ last_fupd g = last_fupd (f ∘ g)) ∧
+         ∀h g f. last_fupd f ∘ last_fupd g ∘ h = last_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f.
+            var_delta_fupd f ∘ var_delta_fupd g = var_delta_fupd (f ∘ g)) ∧
+         ∀h g f.
+           var_delta_fupd f ∘ var_delta_fupd g ∘ h =
+           var_delta_fupd (f ∘ g) ∘ h) ∧
+        (∀g f. curr_loc_fupd f ∘ curr_loc_fupd g = curr_loc_fupd (f ∘ g)) ∧
+        ∀h g f.
+          curr_loc_fupd f ∘ curr_loc_fupd g ∘ h = curr_loc_fupd (f ∘ g) ∘ h
+   
+   [prog_return_induction]  Theorem
+      
+      ⊢ ∀P. (∀b b0 l m m0. P (prog_return b b0 l m m0)) ⇒ ∀p. P p
+   
+   [prog_return_literal_11]  Theorem
+      
+      ⊢ ∀b01 b1 l1 m01 m1 b02 b2 l2 m02 m2.
+          <|exits_fun := b01; exits_loop := b1; last := l1;
+            var_delta := m01; curr_loc := m1|> =
+          <|exits_fun := b02; exits_loop := b2; last := l2;
+            var_delta := m02; curr_loc := m2|> ⇔
+          (b01 ⇔ b02) ∧ (b1 ⇔ b2) ∧ l1 = l2 ∧ m01 = m02 ∧ m1 = m2
+   
+   [prog_return_literal_nchotomy]  Theorem
+      
+      ⊢ ∀p. ∃b0 b l m0 m.
+          p =
+          <|exits_fun := b0; exits_loop := b; last := l; var_delta := m0;
+            curr_loc := m|>
+   
+   [prog_return_nchotomy]  Theorem
+      
+      ⊢ ∀pp. ∃b b0 l m m0. pp = prog_return b b0 l m m0
+   
+   [prog_return_updates_eq_literal]  Theorem
+      
+      ⊢ ∀p b0 b l m0 m.
+          p with
+          <|exits_fun := b0; exits_loop := b; last := l; var_delta := m0;
+            curr_loc := m|> =
+          <|exits_fun := b0; exits_loop := b; last := l; var_delta := m0;
+            curr_loc := m|>
+   
+   [reachable2num_11]  Theorem
+      
+      ⊢ ∀a a'. reachable2num a = reachable2num a' ⇔ a = a'
+   
+   [reachable2num_ONTO]  Theorem
+      
+      ⊢ ∀r. r < 3 ⇔ ∃a. r = reachable2num a
+   
+   [reachable2num_num2reachable]  Theorem
+      
+      ⊢ ∀r. r < 3 ⇔ reachable2num (num2reachable r) = r
+   
+   [reachable2num_thm]  Theorem
+      
+      ⊢ reachable2num IsReach = 0 ∧ reachable2num NotReach = 1 ∧
+        reachable2num WarnReach = 2
+   
+   [reachable_Axiom]  Theorem
+      
+      ⊢ ∀x0 x1 x2. ∃f. f IsReach = x0 ∧ f NotReach = x1 ∧ f WarnReach = x2
+   
+   [reachable_EQ_reachable]  Theorem
+      
+      ⊢ ∀a a'. a = a' ⇔ reachable2num a = reachable2num a'
+   
+   [reachable_case_cong]  Theorem
+      
+      ⊢ ∀M M' v0 v1 v2.
+          M = M' ∧ (M' = IsReach ⇒ v0 = v0') ∧ (M' = NotReach ⇒ v1 = v1') ∧
+          (M' = WarnReach ⇒ v2 = v2') ⇒
+          (case M of IsReach => v0 | NotReach => v1 | WarnReach => v2) =
+          case M' of IsReach => v0' | NotReach => v1' | WarnReach => v2'
+   
+   [reachable_case_def]  Theorem
+      
+      ⊢ (∀v0 v1 v2.
+           (case IsReach of
+              IsReach => v0
+            | NotReach => v1
+            | WarnReach => v2) = v0) ∧
+        (∀v0 v1 v2.
+           (case NotReach of
+              IsReach => v0
+            | NotReach => v1
+            | WarnReach => v2) = v1) ∧
+        ∀v0 v1 v2.
+          (case WarnReach of
+             IsReach => v0
+           | NotReach => v1
+           | WarnReach => v2) = v2
+   
+   [reachable_case_eq]  Theorem
+      
+      ⊢ (case x of IsReach => v0 | NotReach => v1 | WarnReach => v2) = v ⇔
+        x = IsReach ∧ v0 = v ∨ x = NotReach ∧ v1 = v ∨
+        x = WarnReach ∧ v2 = v
+   
+   [reachable_distinct]  Theorem
+      
+      ⊢ IsReach ≠ NotReach ∧ IsReach ≠ WarnReach ∧ NotReach ≠ WarnReach
+   
+   [reachable_induction]  Theorem
+      
+      ⊢ ∀P. P IsReach ∧ P NotReach ∧ P WarnReach ⇒ ∀a. P a
+   
+   [reachable_nchotomy]  Theorem
+      
+      ⊢ ∀a. a = IsReach ∨ a = NotReach ∨ a = WarnReach
+   
+   [scope_11]  Theorem
+      
+      ⊢ (∀a0 a1 a0' a1'.
+           FunScope a0 a1 = FunScope a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a a'. DeclScope a = DeclScope a' ⇔ a = a') ∧
+        ∀a0 a1 a0' a1'.
+          StcScope a0 a1 = StcScope a0' a1' ⇔ a0 = a0' ∧ a1 = a1'
+   
+   [scope_Axiom]  Theorem
+      
+      ⊢ ∀f0 f1 f2 f3. ∃fn.
+          (∀a0 a1. fn (FunScope a0 a1) = f0 a0 a1) ∧
+          (∀a. fn (DeclScope a) = f1 a) ∧
+          (∀a0 a1. fn (StcScope a0 a1) = f2 a0 a1) ∧ fn TopLevel = f3
+   
+   [scope_case_cong]  Theorem
+      
+      ⊢ ∀M M' f f1 f2 v.
+          M = M' ∧ (∀a0 a1. M' = FunScope a0 a1 ⇒ f a0 a1 = f' a0 a1) ∧
+          (∀a. M' = DeclScope a ⇒ f1 a = f1' a) ∧
+          (∀a0 a1. M' = StcScope a0 a1 ⇒ f2 a0 a1 = f2' a0 a1) ∧
+          (M' = TopLevel ⇒ v = v') ⇒
+          scope_CASE M f f1 f2 v = scope_CASE M' f' f1' f2' v'
+   
+   [scope_case_eq]  Theorem
+      
+      ⊢ scope_CASE x f f1 f2 v = v' ⇔
+        (∃m m0. x = FunScope m m0 ∧ f m m0 = v') ∨
+        (∃m. x = DeclScope m ∧ f1 m = v') ∨
+        (∃m m0. x = StcScope m m0 ∧ f2 m m0 = v') ∨ x = TopLevel ∧ v = v'
+   
+   [scope_distinct]  Theorem
+      
+      ⊢ (∀a1 a0 a. FunScope a0 a1 ≠ DeclScope a) ∧
+        (∀a1' a1 a0' a0. FunScope a0 a1 ≠ StcScope a0' a1') ∧
+        (∀a1 a0. FunScope a0 a1 ≠ TopLevel) ∧
+        (∀a1 a0 a. DeclScope a ≠ StcScope a0 a1) ∧
+        (∀a. DeclScope a ≠ TopLevel) ∧ ∀a1 a0. StcScope a0 a1 ≠ TopLevel
+   
+   [scope_induction]  Theorem
+      
+      ⊢ ∀P. (∀m m0. P (FunScope m m0)) ∧ (∀m. P (DeclScope m)) ∧
+            (∀m m0. P (StcScope m m0)) ∧ P TopLevel ⇒
+            ∀s. P s
+   
+   [scope_nchotomy]  Theorem
+      
+      ⊢ ∀ss.
+          (∃m m0. ss = FunScope m m0) ∨ (∃m. ss = DeclScope m) ∨
+          (∃m m0. ss = StcScope m m0) ∨ ss = TopLevel
+   
+   [scoped_id2num_11]  Theorem
+      
+      ⊢ ∀a a'. scoped_id2num a = scoped_id2num a' ⇔ a = a'
+   
+   [scoped_id2num_ONTO]  Theorem
+      
+      ⊢ ∀r. r < 3 ⇔ ∃a. r = scoped_id2num a
+   
+   [scoped_id2num_num2scoped_id]  Theorem
+      
+      ⊢ ∀r. r < 3 ⇔ scoped_id2num (num2scoped_id r) = r
+   
+   [scoped_id2num_thm]  Theorem
+      
+      ⊢ scoped_id2num Var = 0 ∧ scoped_id2num Fun = 1 ∧
+        scoped_id2num Stc = 2
+   
+   [scoped_id_Axiom]  Theorem
+      
+      ⊢ ∀x0 x1 x2. ∃f. f Var = x0 ∧ f Fun = x1 ∧ f Stc = x2
+   
+   [scoped_id_EQ_scoped_id]  Theorem
+      
+      ⊢ ∀a a'. a = a' ⇔ scoped_id2num a = scoped_id2num a'
+   
+   [scoped_id_case_cong]  Theorem
+      
+      ⊢ ∀M M' v0 v1 v2.
+          M = M' ∧ (M' = Var ⇒ v0 = v0') ∧ (M' = Fun ⇒ v1 = v1') ∧
+          (M' = Stc ⇒ v2 = v2') ⇒
+          (case M of Var => v0 | Fun => v1 | Stc => v2) =
+          case M' of Var => v0' | Fun => v1' | Stc => v2'
+   
+   [scoped_id_case_def]  Theorem
+      
+      ⊢ (∀v0 v1 v2. (case Var of Var => v0 | Fun => v1 | Stc => v2) = v0) ∧
+        (∀v0 v1 v2. (case Fun of Var => v0 | Fun => v1 | Stc => v2) = v1) ∧
+        ∀v0 v1 v2. (case Stc of Var => v0 | Fun => v1 | Stc => v2) = v2
+   
+   [scoped_id_case_eq]  Theorem
+      
+      ⊢ (case x of Var => v0 | Fun => v1 | Stc => v2) = v ⇔
+        x = Var ∧ v0 = v ∨ x = Fun ∧ v1 = v ∨ x = Stc ∧ v2 = v
+   
+   [scoped_id_distinct]  Theorem
+      
+      ⊢ Var ≠ Fun ∧ Var ≠ Stc ∧ Fun ≠ Stc
+   
+   [scoped_id_induction]  Theorem
+      
+      ⊢ ∀P. P Fun ∧ P Stc ∧ P Var ⇒ ∀a. P a
+   
+   [scoped_id_nchotomy]  Theorem
+      
+      ⊢ ∀a. a = Var ∨ a = Fun ∨ a = Stc
+   
+   [sh_bd_eq_shapes_def]  Theorem
+      
+      ⊢ (∀sh sb.
+           sh_bd_eq_shapes sb sh ⇔
+           case (sb,sh) of
+             (WordB b,WordB b') => T
+           | (WordB b,StructB v17) => F
+           | (WordB b,NamedB v18 v19) => F
+           | (StructB sbs,WordB v24) => F
+           | (StructB sbs,StructB sbs') => sh_bd_eq_shapes_list sbs sbs'
+           | (StructB sbs,NamedB v26 v27) => F
+           | (NamedB nm flds,WordB v32) => F
+           | (NamedB nm flds,StructB v33) => F
+           | (NamedB nm flds,NamedB nm' flds') => nm = nm') ∧
+        (sh_bd_eq_shapes_list [] [] ⇔ T) ∧
+        (∀sbs sb. sh_bd_eq_shapes_list (sb::sbs) [] ⇔ F) ∧
+        (∀sbs sb. sh_bd_eq_shapes_list [] (sb::sbs) ⇔ F) ∧
+        ∀sbs' sbs sb' sb.
+          sh_bd_eq_shapes_list (sb::sbs) (sb'::sbs') ⇔
+          sh_bd_eq_shapes sb sb' ∧ sh_bd_eq_shapes_list sbs sbs'
+   
+   [sh_bd_eq_shapes_ind]  Theorem
+      
+      ⊢ ∀P0 P1.
+          (∀sb sh.
+             (∀v2 v3 sbs sbs'.
+                (sb,sh) = (v2,v3) ∧ v2 = StructB sbs ∧ v3 = StructB sbs' ⇒
+                P1 sbs sbs') ⇒
+             P0 sb sh) ∧ P1 [] [] ∧ (∀sb sbs. P1 (sb::sbs) []) ∧
+          (∀sb sbs. P1 [] (sb::sbs)) ∧
+          (∀sb sbs sb' sbs'.
+             P0 sb sb' ∧ P1 sbs sbs' ⇒ P1 (sb::sbs) (sb'::sbs')) ⇒
+          (∀v0 v1. P0 v0 v1) ∧ ∀v0 v1. P1 v0 v1
+   
+   [sh_bd_from_bd_def]  Theorem
+      
+      ⊢ (∀b' b. sh_bd_from_bd b (WordB b') = WordB b) ∧
+        (∀sbs b.
+           sh_bd_from_bd b (StructB sbs) =
+           StructB (MAP (λa. sh_bd_from_bd b a) sbs)) ∧
+        ∀nm flds b.
+          sh_bd_from_bd b (NamedB nm flds) =
+          NamedB nm (MAP (λ(nm',sb). (nm',sh_bd_from_bd b sb)) flds)
+   
+   [sh_bd_from_bd_ind]  Theorem
+      
+      ⊢ ∀P. (∀b b'. P b (WordB b')) ∧
+            (∀b sbs. (∀a. MEM a sbs ⇒ P b a) ⇒ P b (StructB sbs)) ∧
+            (∀b nm flds.
+               (∀nm' sb. MEM (nm',sb) flds ⇒ P b sb) ⇒ P b (NamedB nm flds)) ⇒
+            ∀v v1. P v v1
+   
+   [sh_bd_from_sh_def]  Theorem
+      
+      ⊢ (∀sctxt b. sh_bd_from_sh sctxt b One = SOME (WordB b)) ∧
+        (∀shs sctxt b.
+           sh_bd_from_sh sctxt b (Comb shs) =
+           case OPT_MMAP (λa. sh_bd_from_sh sctxt b a) shs of
+             NONE => NONE
+           | SOME sbs => SOME (StructB sbs)) ∧
+        ∀sctxt nm b.
+          sh_bd_from_sh sctxt b (Named nm) =
+          case dropWhile (λ(n,i). n ≠ nm) sctxt of
+            [] => NONE
+          | (nm',info)::sctxt' =>
+            (let
+               (field_nms,field_shs) = UNZIP info.fields
+             in
+               case OPT_MMAP (λa. sh_bd_from_sh sctxt' b a) field_shs of
+                 NONE => NONE
+               | SOME field_sbs =>
+                 SOME (NamedB nm' (ZIP (field_nms,field_sbs))))
+   
+   [sh_bd_from_sh_ind]  Theorem
+      
+      ⊢ ∀P. (∀sctxt b. P sctxt b One) ∧
+            (∀sctxt b shs.
+               (∀a. MEM a shs ⇒ P sctxt b a) ⇒ P sctxt b (Comb shs)) ∧
+            (∀sctxt b nm.
+               (∀v2 sctxt' nm' info field_nms field_shs a.
+                  dropWhile (λ(n,i). n ≠ nm) sctxt = v2::sctxt' ∧
+                  v2 = (nm',info) ∧
+                  (field_nms,field_shs) = UNZIP info.fields ∧
+                  MEM a field_shs ⇒
+                  P sctxt' b a) ⇒
+               P sctxt b (Named nm)) ⇒
+            ∀v v1 v2. P v v1 v2
+   
+   [sh_bd_has_shape_def]  Theorem
+      
+      ⊢ (∀sh sb.
+           sh_bd_has_shape sh sb ⇔
+           case (sh,sb) of
+             (One,WordB b) => T
+           | (Comb v14,WordB b) => F
+           | (Named v15,WordB b) => F
+           | (One,StructB sbs) => F
+           | (Comb shs,StructB sbs) => sh_bd_has_shape_list shs sbs
+           | (Named v19,StructB sbs) => F
+           | (One,NamedB nm' flds) => F
+           | (Comb v22,NamedB nm' flds) => F
+           | (Named nm,NamedB nm' flds) => nm = nm') ∧
+        (sh_bd_has_shape_list [] [] ⇔ T) ∧
+        (∀shs sh. sh_bd_has_shape_list (sh::shs) [] ⇔ F) ∧
+        (∀sbs sb. sh_bd_has_shape_list [] (sb::sbs) ⇔ F) ∧
+        ∀shs sh sbs sb.
+          sh_bd_has_shape_list (sh::shs) (sb::sbs) ⇔
+          sh_bd_has_shape sh sb ∧ sh_bd_has_shape_list shs sbs
+   
+   [sh_bd_has_shape_ind]  Theorem
+      
+      ⊢ ∀P0 P1.
+          (∀sh sb.
+             (∀v2 v3 sbs shs.
+                (sh,sb) = (v2,v3) ∧ v3 = StructB sbs ∧ v2 = Comb shs ⇒
+                P1 shs sbs) ⇒
+             P0 sh sb) ∧ P1 [] [] ∧ (∀sh shs. P1 (sh::shs) []) ∧
+          (∀sb sbs. P1 [] (sb::sbs)) ∧
+          (∀sh shs sb sbs. P0 sh sb ∧ P1 shs sbs ⇒ P1 (sh::shs) (sb::sbs)) ⇒
+          (∀v0 v1. P0 v0 v1) ∧ ∀v0 v1. P1 v0 v1
+   
+   [sh_bd_to_str_def]  Theorem
+      
+      ⊢ (∀b. sh_bd_to_str (WordB b) = «1») ∧
+        sh_bd_to_str (StructB []) = «{}» ∧
+        (∀xs x.
+           sh_bd_to_str (StructB (x::xs)) =
+           concat
+             («{»::sh_bd_to_str x::
+                MAP (λx. «,» ^ x) (MAP (λa. sh_bd_to_str a) xs) ++ [«}»])) ∧
+        ∀nm flds. sh_bd_to_str (NamedB nm flds) = nm
+   
+   [sh_bd_to_str_ind]  Theorem
+      
+      ⊢ ∀P. (∀b. P (WordB b)) ∧ P (StructB []) ∧
+            (∀x xs. (∀a. MEM a xs ⇒ P a) ∧ P x ⇒ P (StructB (x::xs))) ∧
+            (∀nm flds. P (NamedB nm flds)) ⇒
+            ∀v. P v
+   
+   [shaped_based_11]  Theorem
+      
+      ⊢ (∀a a'. WordB a = WordB a' ⇔ a = a') ∧
+        (∀a a'. StructB a = StructB a' ⇔ a = a') ∧
+        ∀a0 a1 a0' a1'. NamedB a0 a1 = NamedB a0' a1' ⇔ a0 = a0' ∧ a1 = a1'
+   
+   [shaped_based_Axiom]  Theorem
+      
+      ⊢ ∀f0 f1 f2 f3 f4 f5 f6 f7. ∃fn0 fn1 fn2 fn3.
+          (∀a. fn0 (WordB a) = f0 a) ∧
+          (∀a. fn0 (StructB a) = f1 a (fn3 a)) ∧
+          (∀a0 a1. fn0 (NamedB a0 a1) = f2 a0 a1 (fn1 a1)) ∧ fn1 [] = f3 ∧
+          (∀a0 a1. fn1 (a0::a1) = f4 a0 a1 (fn2 a0) (fn1 a1)) ∧
+          (∀a0 a1. fn2 (a0,a1) = f5 a0 a1 (fn0 a1)) ∧ fn3 [] = f6 ∧
+          ∀a0 a1. fn3 (a0::a1) = f7 a0 a1 (fn0 a0) (fn3 a1)
+   
+   [shaped_based_case_cong]  Theorem
+      
+      ⊢ ∀M M' f f1 f2.
+          M = M' ∧ (∀a. M' = WordB a ⇒ f a = f' a) ∧
+          (∀a. M' = StructB a ⇒ f1 a = f1' a) ∧
+          (∀a0 a1. M' = NamedB a0 a1 ⇒ f2 a0 a1 = f2' a0 a1) ⇒
+          shaped_based_CASE M f f1 f2 = shaped_based_CASE M' f' f1' f2'
+   
+   [shaped_based_case_eq]  Theorem
+      
+      ⊢ shaped_based_CASE x f f1 f2 = v ⇔
+        (∃b. x = WordB b ∧ f b = v) ∨ (∃l. x = StructB l ∧ f1 l = v) ∨
+        ∃m l. x = NamedB m l ∧ f2 m l = v
+   
+   [shaped_based_distinct]  Theorem
+      
+      ⊢ (∀a' a. WordB a ≠ StructB a') ∧
+        (∀a1 a0 a. WordB a ≠ NamedB a0 a1) ∧
+        ∀a1 a0 a. StructB a ≠ NamedB a0 a1
+   
+   [shaped_based_induction]  Theorem
+      
+      ⊢ ∀P0 P1 P2 P3.
+          (∀b. P0 (WordB b)) ∧ (∀l. P3 l ⇒ P0 (StructB l)) ∧
+          (∀l. P1 l ⇒ ∀m. P0 (NamedB m l)) ∧ P1 [] ∧
+          (∀p l. P2 p ∧ P1 l ⇒ P1 (p::l)) ∧ (∀s. P0 s ⇒ ∀m. P2 (m,s)) ∧
+          P3 [] ∧ (∀s l. P0 s ∧ P3 l ⇒ P3 (s::l)) ⇒
+          (∀s. P0 s) ∧ (∀l. P1 l) ∧ (∀p. P2 p) ∧ ∀l. P3 l
+   
+   [shaped_based_nchotomy]  Theorem
+      
+      ⊢ ∀ss.
+          (∃b. ss = WordB b) ∨ (∃l. ss = StructB l) ∨ ∃m l. ss = NamedB m l
+   
+   [staterr_11]  Theorem
+      
+      ⊢ (∀a a'. ScopeErr a = ScopeErr a' ⇔ a = a') ∧
+        (∀a a'. WarningErr a = WarningErr a' ⇔ a = a') ∧
+        (∀a a'. GenErr a = GenErr a' ⇔ a = a') ∧
+        ∀a a'. ShapeErr a = ShapeErr a' ⇔ a = a'
+   
+   [staterr_Axiom]  Theorem
+      
+      ⊢ ∀f0 f1 f2 f3. ∃fn.
+          (∀a. fn (ScopeErr a) = f0 a) ∧ (∀a. fn (WarningErr a) = f1 a) ∧
+          (∀a. fn (GenErr a) = f2 a) ∧ ∀a. fn (ShapeErr a) = f3 a
+   
+   [staterr_case_cong]  Theorem
+      
+      ⊢ ∀M M' f f1 f2 f3.
+          M = M' ∧ (∀a. M' = ScopeErr a ⇒ f a = f' a) ∧
+          (∀a. M' = WarningErr a ⇒ f1 a = f1' a) ∧
+          (∀a. M' = GenErr a ⇒ f2 a = f2' a) ∧
+          (∀a. M' = ShapeErr a ⇒ f3 a = f3' a) ⇒
+          staterr_CASE M f f1 f2 f3 = staterr_CASE M' f' f1' f2' f3'
+   
+   [staterr_case_eq]  Theorem
+      
+      ⊢ staterr_CASE x f f1 f2 f3 = v ⇔
+        (∃m. x = ScopeErr m ∧ f m = v) ∨
+        (∃m. x = WarningErr m ∧ f1 m = v) ∨ (∃m. x = GenErr m ∧ f2 m = v) ∨
+        ∃m. x = ShapeErr m ∧ f3 m = v
+   
+   [staterr_distinct]  Theorem
+      
+      ⊢ (∀a' a. ScopeErr a ≠ WarningErr a') ∧
+        (∀a' a. ScopeErr a ≠ GenErr a') ∧
+        (∀a' a. ScopeErr a ≠ ShapeErr a') ∧
+        (∀a' a. WarningErr a ≠ GenErr a') ∧
+        (∀a' a. WarningErr a ≠ ShapeErr a') ∧ ∀a' a. GenErr a ≠ ShapeErr a'
+   
+   [staterr_induction]  Theorem
+      
+      ⊢ ∀P. (∀m. P (ScopeErr m)) ∧ (∀m. P (WarningErr m)) ∧
+            (∀m. P (GenErr m)) ∧ (∀m. P (ShapeErr m)) ⇒
+            ∀s. P s
+   
+   [staterr_nchotomy]  Theorem
+      
+      ⊢ ∀ss.
+          (∃m. ss = ScopeErr m) ∨ (∃m. ss = WarningErr m) ∨
+          (∃m. ss = GenErr m) ∨ ∃m. ss = ShapeErr m
+   
+   [static_check_decls_def]  Theorem
+      
+      ⊢ (∀sctxt gctxt fctxt.
+           static_check_decls fctxt gctxt sctxt [] = return (fctxt,gctxt)) ∧
+        (∀v1 v0 sctxt gctxt fctxt decls.
+           static_check_decls fctxt gctxt sctxt (Name v0 v1::decls) =
+           static_check_decls fctxt gctxt sctxt decls) ∧
+        (∀vname shape sctxt gctxt fctxt exp decls.
+           static_check_decls fctxt gctxt sctxt
+             (Decl shape vname exp::decls) =
+           (let
+              ctxt =
+                <|locals := empty compare; globals := gctxt;
+                  funcs := empty compare; structs := sctxt;
+                  scope := DeclScope vname; in_loop := F;
+                  is_reachable := IsReach; last := InvisLast; loc := «»|>
+            in
+              do
+                check_redec_var (ctxt with scope := TopLevel) vname;
+                check_shape sctxt «» ctxt.scope shape;
+                eret <- static_check_exp ctxt exp;
+                if ¬sh_bd_has_shape shape eret.sh_bd then
+                  error
+                    (ShapeErr
+                       (get_shape_mismatch_msg
+                          (concat
+                             [«expression to initialise global variable »;
+                              vname]) (sh_bd_to_str eret.sh_bd)
+                          (shape_to_str shape) «» ctxt.scope))
+                else return ();
+                static_check_decls fctxt
+                  (insert gctxt vname <|vshape := shape|>) sctxt decls
+              od)) ∧
+        ∀sctxt gctxt fi fctxt decls.
+          static_check_decls fctxt gctxt sctxt (Function fi::decls) =
+          do
+            if member fi.name fctxt then
+              error (ScopeErr (get_redec_msg Fun «» fi.name TopLevel))
+            else return ();
+            if fi.name = «main» then
+              do
+                if LENGTH fi.params > 0 then
+                  error (GenErr «main function has arguments\n»)
+                else return ();
+                if fi.export then
+                  error (GenErr «main function is exported\n»)
+                else return ();
+                if fi.return ≠ One then
+                  error
+                    (ShapeErr
+                       (get_non_word_msg «main function return»
+                          (shape_to_str fi.return) «» (FunScope fi.name «»)))
+                else return ()
+              od
+            else
+              do
+                case first_repeat (sort mlstring_lt (MAP FST fi.params)) of
+                  NONE => return ()
+                | SOME pname =>
+                  error
+                    (ScopeErr
+                       (concat
+                          [«parameter »; pname;
+                           « is redeclared in function »; fi.name; «\n»]));
+                if fi.export then
+                  do
+                    if LENGTH fi.params > 4 then
+                      error
+                        (GenErr
+                           (concat
+                              [«exported function »; fi.name;
+                               « has more than 4 arguments\n»]))
+                    else return ();
+                    check_export_params «» (FunScope fi.name «») fi.params;
+                    if fi.return ≠ One then
+                      error
+                        (ShapeErr
+                           (get_non_word_msg «exported function return»
+                              (shape_to_str fi.return) «»
+                              (FunScope fi.name «»)))
+                    else return ()
+                  od
+                else
+                  check_id_shapes sctxt «» (FunScope fi.name «») fi.params;
+                check_shape sctxt «» (FunScope fi.name « return») fi.return;
+                if size_of_sh_with_ctxt sctxt fi.return > 32 then
+                  error
+                    (ShapeErr
+                       (concat
+                          [«function »; fi.name;
+                           « returns a shape bigger than 32 words\n»]))
+                else return ()
+              od;
+            static_check_decls
+              (insert fctxt fi.name
+                 <|ret_shape := fi.return; params := fi.params|>) gctxt
+              sctxt decls
+          od
+   
+   [static_check_decls_ind]  Theorem
+      
+      ⊢ ∀P. (∀fctxt gctxt sctxt. P fctxt gctxt sctxt []) ∧
+            (∀fctxt gctxt sctxt v0 v1 decls.
+               P fctxt gctxt sctxt decls ⇒
+               P fctxt gctxt sctxt (Name v0 v1::decls)) ∧
+            (∀fctxt gctxt sctxt shape vname exp decls.
+               (∀ctxt.
+                  ctxt =
+                  <|locals := empty compare; globals := gctxt;
+                    funcs := empty compare; structs := sctxt;
+                    scope := DeclScope vname; in_loop := F;
+                    is_reachable := IsReach; last := InvisLast; loc := «»|> ⇒
+                  P fctxt (insert gctxt vname <|vshape := shape|>) sctxt
+                    decls) ⇒
+               P fctxt gctxt sctxt (Decl shape vname exp::decls)) ∧
+            (∀fctxt gctxt sctxt fi decls.
+               P
+                 (insert fctxt fi.name
+                    <|ret_shape := fi.return; params := fi.params|>) gctxt
+                 sctxt decls ⇒
+               P fctxt gctxt sctxt (Function fi::decls)) ⇒
+            ∀v v1 v2 v3. P v v1 v2 v3
+   
+   [static_check_exp_def]  Theorem
+      
+      ⊢ (∀num ctxt.
+           static_check_exp ctxt (Const num) =
+           return <|sh_bd := WordB NotBased|>) ∧
+        (∀vname ctxt.
+           static_check_exp ctxt (Var Local vname) =
+           do
+             vinf <- check_local_var ctxt vname;
+             return <|sh_bd := vinf.vsh_bd|>
+           od) ∧
+        (∀vname ctxt.
+           static_check_exp ctxt (Var Global vname) =
+           do
+             vinf <- check_global_var ctxt vname;
+             case sh_bd_from_sh ctxt.structs Trusted vinf.vshape of
+               NONE =>
+                 error
+                   (ScopeErr
+                      (get_implementation_err_msg
+                         «static analysis failed to convert in-scope shape»
+                         ctxt.loc ctxt.scope))
+             | SOME sb => return <|sh_bd := sb|>
+           od) ∧
+        (∀exps ctxt.
+           static_check_exp ctxt (RStruct exps) =
+           do
+             esret <- static_check_exps ctxt exps;
+             return <|sh_bd := StructB esret.sh_bds|>
+           od) ∧
+        (∀index exp ctxt.
+           static_check_exp ctxt (RField index exp) =
+           do
+             eret <- static_check_exp ctxt exp;
+             case index_sh_bd index eret.sh_bd of
+               NONE =>
+                 error
+                   (ShapeErr
+                      (concat
+                         [ctxt.loc; «expression shape »;
+                          sh_bd_to_str eret.sh_bd;
+                          « has no field at index »; toString index;
+                          « in »; get_scope_desc ctxt.scope; «\n»]))
+             | SOME sb => return <|sh_bd := sb|>
+           od) ∧
+        (∀name eflds ctxt.
+           static_check_exp ctxt (NStruct name eflds) =
+           do
+             sinfo <-
+               case ALOOKUP ctxt.structs name of
+                 NONE =>
+                   error
+                     (ScopeErr (get_scope_msg Stc ctxt.loc name ctxt.scope))
+               | SOME info => return info;
+             (field_names,field_exps) <<- UNZIP eflds;
+             esret <- static_check_exps ctxt field_exps;
+             field_sbs <<- ZIP (field_names,esret.sh_bds);
+             check_struct_fields ctxt name sinfo.fields field_sbs;
+             return <|sh_bd := NamedB name field_sbs|>
+           od) ∧
+        (∀field exp ctxt.
+           static_check_exp ctxt (NField field exp) =
+           do
+             eret <- static_check_exp ctxt exp;
+             case field_sh_bd field eret.sh_bd of
+               NONE =>
+                 error
+                   (ShapeErr
+                      (concat
+                         [ctxt.loc; «expression shape »;
+                          sh_bd_to_str eret.sh_bd; « has no field »; field;
+                          « in »; get_scope_desc ctxt.scope; «\n»]))
+             | SOME sb => return <|sh_bd := sb|>
+           od) ∧
+        (∀shape ctxt addr.
+           static_check_exp ctxt (Load shape addr) =
+           do
+             check_shape ctxt.structs ctxt.loc ctxt.scope shape;
+             aret <- static_check_exp ctxt addr;
+             case aret.sh_bd of
+               WordB Based => return ()
+             | WordB NotBased =>
+               log (WarningErr (get_memop_msg T T F ctxt.loc ctxt.scope))
+             | WordB Trusted => return ()
+             | WordB NotTrusted =>
+               log (WarningErr (get_memop_msg T T T ctxt.loc ctxt.scope))
+             | StructB v5 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «load address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope))
+             | NamedB v6 v7 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «load address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope));
+             case sh_bd_from_sh ctxt.structs Trusted shape of
+               NONE =>
+                 error
+                   (ScopeErr
+                      (get_implementation_err_msg
+                         «static analysis failed to convert in-scope shape»
+                         ctxt.loc ctxt.scope))
+             | SOME sb => return <|sh_bd := sb|>
+           od) ∧
+        (∀ctxt addr.
+           static_check_exp ctxt (Load32 addr) =
+           do
+             aret <- static_check_exp ctxt addr;
+             case aret.sh_bd of
+               WordB Based => return ()
+             | WordB NotBased =>
+               log (WarningErr (get_memop_msg T T F ctxt.loc ctxt.scope))
+             | WordB Trusted => return ()
+             | WordB NotTrusted =>
+               log (WarningErr (get_memop_msg T T T ctxt.loc ctxt.scope))
+             | StructB v5 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «load address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope))
+             | NamedB v6 v7 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «load address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope));
+             return <|sh_bd := WordB Trusted|>
+           od) ∧
+        (∀ctxt addr.
+           static_check_exp ctxt (LoadByte addr) =
+           do
+             aret <- static_check_exp ctxt addr;
+             case aret.sh_bd of
+               WordB Based => return ()
+             | WordB NotBased =>
+               log (WarningErr (get_memop_msg T T F ctxt.loc ctxt.scope))
+             | WordB Trusted => return ()
+             | WordB NotTrusted =>
+               log (WarningErr (get_memop_msg T T T ctxt.loc ctxt.scope))
+             | StructB v5 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «load address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope))
+             | NamedB v6 v7 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «load address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope));
+             return <|sh_bd := WordB Trusted|>
+           od) ∧
+        (∀exps ctxt bop.
+           static_check_exp ctxt (Op bop exps) =
+           (let
+              op_str = binop_to_str bop;
+              nargs = LENGTH exps
+            in
+              do
+                case bop of
+                  Add =>
+                    if nargs < 2 then
+                      error
+                        (GenErr
+                           (get_oparg_msg F «2» (toString nargs) ctxt.loc
+                              op_str ctxt.scope))
+                    else return ()
+                | Sub =>
+                  if nargs ≠ 2 then
+                    error
+                      (GenErr
+                         (get_oparg_msg T «2» (toString nargs) ctxt.loc
+                            op_str ctxt.scope))
+                  else return ()
+                | And =>
+                  if nargs < 2 then
+                    error
+                      (GenErr
+                         (get_oparg_msg F «2» (toString nargs) ctxt.loc
+                            op_str ctxt.scope))
+                  else return ()
+                | Or =>
+                  if nargs < 2 then
+                    error
+                      (GenErr
+                         (get_oparg_msg F «2» (toString nargs) ctxt.loc
+                            op_str ctxt.scope))
+                  else return ()
+                | Xor =>
+                  if nargs < 2 then
+                    error
+                      (GenErr
+                         (get_oparg_msg F «2» (toString nargs) ctxt.loc
+                            op_str ctxt.scope))
+                  else return ();
+                esret <- static_check_exps ctxt exps;
+                b <- check_operands ctxt op_str esret.sh_bds;
+                return <|sh_bd := WordB b|>
+              od)) ∧
+        (∀pop exps ctxt.
+           static_check_exp ctxt (Panop pop exps) =
+           (let
+              op_str = panop_to_str pop;
+              nargs = LENGTH exps
+            in
+              do
+                if nargs ≠ 2 then
+                  error
+                    (GenErr
+                       (get_oparg_msg T «2» (toString nargs) ctxt.loc
+                          op_str ctxt.scope))
+                else return ();
+                esret <- static_check_exps ctxt exps;
+                b <- check_operands ctxt op_str esret.sh_bds;
+                return <|sh_bd := WordB b|>
+              od)) ∧
+        (∀exp2 exp1 ctxt cop.
+           static_check_exp ctxt (Cmp cop exp1 exp2) =
+           do
+             eret1 <- static_check_exp ctxt exp1;
+             eret2 <- static_check_exp ctxt exp2;
+             if ¬sh_bd_eq_shapes eret1.sh_bd eret2.sh_bd then
+               error
+                 (ShapeErr
+                    (concat
+                       [ctxt.loc;
+                        «comparison given operands of different shapes in »;
+                        get_scope_desc ctxt.scope; «\n»]))
+             else return ();
+             return <|sh_bd := WordB NotBased|>
+           od) ∧
+        (∀sop n exp ctxt.
+           static_check_exp ctxt (Shift sop exp n) =
+           do
+             eret <- static_check_exp ctxt exp;
+             if ¬sh_bd_has_shape One eret.sh_bd then
+               error
+                 (ShapeErr
+                    (get_non_word_msg «shifted expression»
+                       (sh_bd_to_str eret.sh_bd) ctxt.loc ctxt.scope))
+             else return ();
+             return eret
+           od) ∧
+        (∀ctxt.
+           static_check_exp ctxt BaseAddr = return <|sh_bd := WordB Based|>) ∧
+        (∀ctxt.
+           static_check_exp ctxt TopAddr = return <|sh_bd := WordB Based|>) ∧
+        (∀ctxt.
+           static_check_exp ctxt BytesInWord =
+           return <|sh_bd := WordB NotBased|>) ∧
+        (∀ctxt. static_check_exps ctxt [] = return <|sh_bds := []|>) ∧
+        ∀exps exp ctxt.
+          static_check_exps ctxt (exp::exps) =
+          do
+            eret <- static_check_exp ctxt exp;
+            esret <- static_check_exps ctxt exps;
+            return <|sh_bds := eret.sh_bd::esret.sh_bds|>
+          od
+   
+   [static_check_exp_ind]  Theorem
+      
+      ⊢ ∀P0 P1.
+          (∀ctxt num. P0 ctxt (Const num)) ∧
+          (∀ctxt vname. P0 ctxt (Var Local vname)) ∧
+          (∀ctxt vname. P0 ctxt (Var Global vname)) ∧
+          (∀ctxt exps. P1 ctxt exps ⇒ P0 ctxt (RStruct exps)) ∧
+          (∀ctxt index exp. P0 ctxt exp ⇒ P0 ctxt (RField index exp)) ∧
+          (∀ctxt name eflds.
+             (∀field_names field_exps.
+                (field_names,field_exps) = UNZIP eflds ⇒ P1 ctxt field_exps) ⇒
+             P0 ctxt (NStruct name eflds)) ∧
+          (∀ctxt field exp. P0 ctxt exp ⇒ P0 ctxt (NField field exp)) ∧
+          (∀ctxt shape addr. P0 ctxt addr ⇒ P0 ctxt (Load shape addr)) ∧
+          (∀ctxt addr. P0 ctxt addr ⇒ P0 ctxt (Load32 addr)) ∧
+          (∀ctxt addr. P0 ctxt addr ⇒ P0 ctxt (LoadByte addr)) ∧
+          (∀ctxt bop exps.
+             (∀op_str nargs.
+                op_str = binop_to_str bop ∧ nargs = LENGTH exps ⇒
+                P1 ctxt exps) ⇒
+             P0 ctxt (Op bop exps)) ∧
+          (∀ctxt pop exps.
+             (∀op_str nargs.
+                op_str = panop_to_str pop ∧ nargs = LENGTH exps ⇒
+                P1 ctxt exps) ⇒
+             P0 ctxt (Panop pop exps)) ∧
+          (∀ctxt cop exp1 exp2.
+             P0 ctxt exp1 ∧ P0 ctxt exp2 ⇒ P0 ctxt (Cmp cop exp1 exp2)) ∧
+          (∀ctxt sop exp n. P0 ctxt exp ⇒ P0 ctxt (Shift sop exp n)) ∧
+          (∀ctxt. P0 ctxt BaseAddr) ∧ (∀ctxt. P0 ctxt TopAddr) ∧
+          (∀ctxt. P0 ctxt BytesInWord) ∧ (∀ctxt. P1 ctxt []) ∧
+          (∀ctxt exp exps. P0 ctxt exp ∧ P1 ctxt exps ⇒ P1 ctxt (exp::exps)) ⇒
+          (∀v0 v1. P0 v0 v1) ∧ ∀v0 v1. P1 v0 v1
+   
+   [static_check_names_def]  Theorem
+      
+      ⊢ (∀sctxt. static_check_names sctxt [] = return sctxt) ∧
+        (∀sctxt name flds decls.
+           static_check_names sctxt (Name name flds::decls) =
+           do
+             case ALOOKUP sctxt name of
+               NONE => return ()
+             | SOME info =>
+               error (ScopeErr (get_redec_msg Stc «» name TopLevel));
+             case first_repeat (sort mlstring_lt (MAP FST flds)) of
+               NONE => return ()
+             | SOME fld =>
+               error
+                 (ScopeErr
+                    (concat
+                       [«field »; fld; « is redeclared in struct name »;
+                        name; «\n»]));
+             check_id_shapes sctxt «» (StcScope name «») flds;
+             info <<-
+               <|fields := flds;
+                 size := size_of_sh_with_ctxt sctxt (Comb (MAP SND flds))|>;
+             static_check_names ((name,info)::sctxt) decls
+           od) ∧
+        (∀v4 sctxt decls.
+           static_check_names sctxt (Function v4::decls) =
+           static_check_names sctxt decls) ∧
+        ∀v7 v6 v5 sctxt decls.
+          static_check_names sctxt (Decl v5 v6 v7::decls) =
+          static_check_names sctxt decls
+   
+   [static_check_names_ind]  Theorem
+      
+      ⊢ ∀P. (∀sctxt. P sctxt []) ∧
+            (∀sctxt name flds decls.
+               (∀info.
+                  info =
+                  <|fields := flds;
+                    size :=
+                      size_of_sh_with_ctxt sctxt (Comb (MAP SND flds))|> ⇒
+                  P ((name,info)::sctxt) decls) ⇒
+               P sctxt (Name name flds::decls)) ∧
+            (∀sctxt v4 decls. P sctxt decls ⇒ P sctxt (Function v4::decls)) ∧
+            (∀sctxt v5 v6 v7 decls.
+               P sctxt decls ⇒ P sctxt (Decl v5 v6 v7::decls)) ⇒
+            ∀v v1. P v v1
+   
+   [static_check_prog_def]  Theorem
+      
+      ⊢ (∀ctxt.
+           static_check_prog ctxt Skip =
+           return
+             <|exits_fun := F; exits_loop := F; last := OtherLast;
+               var_delta := empty compare; curr_loc := ctxt.loc|>) ∧
+        (∀vname shape prog exp ctxt.
+           static_check_prog ctxt (Dec vname shape exp prog) =
+           do
+             check_redec_var ctxt vname;
+             check_shape ctxt.structs ctxt.loc ctxt.scope shape;
+             eret <- static_check_exp ctxt exp;
+             if ¬sh_bd_has_shape shape eret.sh_bd then
+               error
+                 (ShapeErr
+                    (get_shape_mismatch_msg
+                       (concat
+                          [«expression to initialise local variable »;
+                           vname]) (sh_bd_to_str eret.sh_bd)
+                       (shape_to_str shape) ctxt.loc ctxt.scope))
+             else return ();
+             ctxt' <<-
+               ctxt with
+               <|locals :=
+                   insert ctxt.locals vname <|vsh_bd := eret.sh_bd|>;
+                 last := OtherLast|>;
+             pret <- static_check_prog ctxt' prog;
+             return
+               <|exits_fun := pret.exits_fun;
+                 exits_loop := pret.exits_loop; last := pret.last;
+                 var_delta := delete pret.var_delta vname;
+                 curr_loc := pret.curr_loc|>
+           od) ∧
+        (∀vname shape prog fname ctxt args.
+           static_check_prog ctxt (DecCall vname shape fname args prog) =
+           do
+             check_redec_var ctxt vname;
+             check_shape ctxt.structs ctxt.loc ctxt.scope shape;
+             finf <- check_fun_name ctxt fname;
+             esret <- static_check_exps ctxt args;
+             check_func_args ctxt fname finf.params esret.sh_bds;
+             if shape ≠ finf.ret_shape then
+               error
+                 (ShapeErr
+                    (get_shape_mismatch_msg
+                       (concat
+                          [«result of function call »; fname;
+                           « to initialise local variable »; vname])
+                       (shape_to_str finf.ret_shape) (shape_to_str shape)
+                       ctxt.loc ctxt.scope))
+             else return ();
+             sb <-
+               case sh_bd_from_sh ctxt.structs Trusted shape of
+                 NONE =>
+                   error
+                     (ScopeErr
+                        (get_implementation_err_msg
+                           «static analysis failed to convert in-scope shape»
+                           ctxt.loc ctxt.scope))
+               | SOME sb => return sb;
+             ctxt' <<-
+               ctxt with
+               <|locals := insert ctxt.locals vname <|vsh_bd := sb|>;
+                 last := OtherLast|>;
+             pret <- static_check_prog ctxt' prog;
+             return
+               <|exits_fun := pret.exits_fun;
+                 exits_loop := pret.exits_loop; last := pret.last;
+                 var_delta := delete pret.var_delta vname;
+                 curr_loc := pret.curr_loc|>
+           od) ∧
+        (∀vname exp ctxt.
+           static_check_prog ctxt (Assign Local vname exp) =
+           do
+             vinf <- check_local_var ctxt vname;
+             eret <- static_check_exp ctxt exp;
+             if ¬sh_bd_eq_shapes vinf.vsh_bd eret.sh_bd then
+               error
+                 (ShapeErr
+                    (get_shape_mismatch_msg
+                       (concat
+                          [«expression assigned to local variable »; vname])
+                       (sh_bd_to_str eret.sh_bd) (sh_bd_to_str vinf.vsh_bd)
+                       ctxt.loc ctxt.scope))
+             else return ();
+             return
+               <|exits_fun := F; exits_loop := F; last := OtherLast;
+                 var_delta :=
+                   singleton compare vname (vinf with vsh_bd := eret.sh_bd);
+                 curr_loc := ctxt.loc|>
+           od) ∧
+        (∀vname exp ctxt.
+           static_check_prog ctxt (Assign Global vname exp) =
+           do
+             vinf <- check_global_var ctxt vname;
+             eret <- static_check_exp ctxt exp;
+             if ¬sh_bd_has_shape vinf.vshape eret.sh_bd then
+               error
+                 (ShapeErr
+                    (get_shape_mismatch_msg
+                       (concat
+                          [«expression assigned to global variable »;
+                           vname]) (sh_bd_to_str eret.sh_bd)
+                       (shape_to_str vinf.vshape) ctxt.loc ctxt.scope))
+             else return ();
+             return
+               <|exits_fun := F; exits_loop := F; last := OtherLast;
+                 var_delta := empty compare; curr_loc := ctxt.loc|>
+           od) ∧
+        (∀v pop es ctxt.
+           static_check_prog ctxt (Primitive v pop es) =
+           do
+             vinf <- check_local_var ctxt v;
+             esret <- static_check_exps ctxt es;
+             res_sb <- check_addcarry_args ctxt esret.sh_bds;
+             if ¬sh_bd_eq_shapes vinf.vsh_bd res_sb then
+               error
+                 (ShapeErr
+                    (get_shape_mismatch_msg
+                       (concat
+                          [«result of primitive »; primop_to_str pop;
+                           « assigned to local variable »; v])
+                       (sh_bd_to_str res_sb) (sh_bd_to_str vinf.vsh_bd)
+                       ctxt.loc ctxt.scope))
+             else return ();
+             return
+               <|exits_fun := F; exits_loop := F; last := OtherLast;
+                 var_delta :=
+                   singleton compare v (vinf with vsh_bd := res_sb);
+                 curr_loc := ctxt.loc|>
+           od) ∧
+        (∀vname hdl fname ctxt args.
+           static_check_prog ctxt (AssignCall (Local,vname) hdl fname args) =
+           do
+             vinf <- check_local_var ctxt vname;
+             finf <- check_fun_name ctxt fname;
+             esret <- static_check_exps ctxt args;
+             check_func_args ctxt fname finf.params esret.sh_bds;
+             if ¬sh_bd_has_shape finf.ret_shape vinf.vsh_bd then
+               error
+                 (ShapeErr
+                    (get_shape_mismatch_msg
+                       (concat
+                          [«result of function call »; fname;
+                           « assigned to local variable »; vname])
+                       (shape_to_str finf.ret_shape)
+                       (sh_bd_to_str vinf.vsh_bd) ctxt.loc ctxt.scope))
+             else return ();
+             case hdl of
+               NONE => return ()
+             | SOME (eid,evar,prog) =>
+               do
+                 evinf <- check_local_var ctxt evar;
+                 static_check_prog
+                   (ctxt with
+                    locals :=
+                      insert ctxt.locals evar
+                        (evinf with
+                         vsh_bd := sh_bd_from_bd Trusted evinf.vsh_bd))
+                   prog;
+                 return ()
+               od;
+             return
+               <|exits_fun := F; exits_loop := F; last := OtherLast;
+                 var_delta :=
+                   singleton compare vname
+                     (vinf with vsh_bd := sh_bd_from_bd Trusted vinf.vsh_bd);
+                 curr_loc := ctxt.loc|>
+           od) ∧
+        (∀vname hdl fname ctxt args.
+           static_check_prog ctxt
+             (AssignCall (Global,vname) hdl fname args) =
+           do
+             vinf <- check_global_var ctxt vname;
+             finf <- check_fun_name ctxt fname;
+             esret <- static_check_exps ctxt args;
+             check_func_args ctxt fname finf.params esret.sh_bds;
+             if vinf.vshape ≠ finf.ret_shape then
+               error
+                 (ShapeErr
+                    (get_shape_mismatch_msg
+                       (concat
+                          [«result of function call »; fname;
+                           « assigned to global variable »; vname])
+                       (shape_to_str finf.ret_shape)
+                       (shape_to_str vinf.vshape) ctxt.loc ctxt.scope))
+             else return ();
+             case hdl of
+               NONE => return ()
+             | SOME (eid,evar,prog) =>
+               do
+                 evinf <- check_local_var ctxt evar;
+                 static_check_prog
+                   (ctxt with
+                    locals :=
+                      insert ctxt.locals evar
+                        (evinf with
+                         vsh_bd := sh_bd_from_bd Trusted evinf.vsh_bd))
+                   prog;
+                 return ()
+               od;
+             return
+               <|exits_fun := F; exits_loop := F; last := OtherLast;
+                 var_delta := empty compare; curr_loc := ctxt.loc|>
+           od) ∧
+        (∀exp ctxt.
+           static_check_prog ctxt (Return exp) =
+           do
+             eret <- static_check_exp ctxt exp;
+             finf <-
+               case ctxt.scope of
+                 FunScope fname v6 => check_fun_name ctxt fname
+               | DeclScope v7 =>
+                 error
+                   (GenErr
+                      (get_implementation_err_msg
+                         «return found outside function scope» ctxt.loc
+                         ctxt.scope))
+               | StcScope v8 v9 =>
+                 error
+                   (GenErr
+                      (get_implementation_err_msg
+                         «return found outside function scope» ctxt.loc
+                         ctxt.scope))
+               | TopLevel =>
+                 error
+                   (GenErr
+                      (get_implementation_err_msg
+                         «return found outside function scope» ctxt.loc
+                         ctxt.scope));
+             if ¬sh_bd_has_shape finf.ret_shape eret.sh_bd then
+               error
+                 (ShapeErr
+                    (get_shape_mismatch_msg «expression to return»
+                       (sh_bd_to_str eret.sh_bd)
+                       (shape_to_str finf.ret_shape) ctxt.loc ctxt.scope))
+             else return ();
+             return
+               <|exits_fun := T; exits_loop := F; last := RetLast;
+                 var_delta := empty compare; curr_loc := ctxt.loc|>
+           od) ∧
+        (∀fname ctxt args.
+           static_check_prog ctxt (TailCall fname args) =
+           do
+             caller_inf <-
+               case ctxt.scope of
+                 FunScope caller v6 => check_fun_name ctxt caller
+               | DeclScope v7 =>
+                 error (GenErr «tail call found outside function scope»)
+               | StcScope v8 v9 =>
+                 error (GenErr «tail call found outside function scope»)
+               | TopLevel =>
+                 error (GenErr «tail call found outside function scope»);
+             callee_inf <- check_fun_name ctxt fname;
+             esret <- static_check_exps ctxt args;
+             if caller_inf.ret_shape ≠ callee_inf.ret_shape then
+               error
+                 (ShapeErr
+                    (get_shape_mismatch_msg
+                       (concat
+                          [«result of function call »; fname; « to return»])
+                       (shape_to_str callee_inf.ret_shape)
+                       (shape_to_str caller_inf.ret_shape) ctxt.loc
+                       ctxt.scope))
+             else return ();
+             check_func_args ctxt fname callee_inf.params esret.sh_bds;
+             return
+               <|exits_fun := T; exits_loop := F; last := TailLast;
+                 var_delta := empty compare; curr_loc := ctxt.loc|>
+           od) ∧
+        (∀hdl fname ctxt args.
+           static_check_prog ctxt (StandAloneCall hdl fname args) =
+           do
+             finf <- check_fun_name ctxt fname;
+             esret <- static_check_exps ctxt args;
+             check_func_args ctxt fname finf.params esret.sh_bds;
+             case hdl of
+               NONE => return ()
+             | SOME (eid,evar,prog) =>
+               do
+                 evinf <- check_local_var ctxt evar;
+                 static_check_prog
+                   (ctxt with
+                    locals :=
+                      insert ctxt.locals evar
+                        (evinf with
+                         vsh_bd := sh_bd_from_bd Trusted evinf.vsh_bd))
+                   prog;
+                 return ()
+               od;
+             return
+               <|exits_fun := F; exits_loop := F; last := OtherLast;
+                 var_delta := empty compare; curr_loc := ctxt.loc|>
+           od) ∧
+        (∀ptr2 ptr1 len2 len1 fname ctxt.
+           static_check_prog ctxt (ExtCall fname ptr1 len1 ptr2 len2) =
+           do
+             esret <- static_check_exps ctxt [ptr1; len1; ptr2; len2];
+             case FIND (λsb. ¬sh_bd_has_shape One sb) esret.sh_bds of
+               NONE => return ()
+             | SOME sb =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg
+                       (concat [«value for argument given to FFI »; fname])
+                       (sh_bd_to_str sb) ctxt.loc ctxt.scope));
+             return
+               <|exits_fun := F; exits_loop := F; last := OtherLast;
+                 var_delta := empty compare; curr_loc := ctxt.loc|>
+           od) ∧
+        (∀prog2 prog1 ctxt.
+           static_check_prog ctxt (Seq prog1 prog2) =
+           (let
+              (warn_p1,ctxt1) = reached_warnable prog1 ctxt
+            in
+              do
+                case warn_p1 of
+                  NONE => return ()
+                | SOME ls =>
+                  log
+                    (WarningErr
+                       (get_unreach_msg ctxt1.loc (last_to_str ls)
+                          ctxt1.scope));
+                pret1 <- static_check_prog ctxt1 prog1;
+                next_r <<- next_is_reachable ctxt1.is_reachable pret1.last;
+                ctxt2 <<-
+                  ctxt1 with
+                  <|locals := seq_loc_inf ctxt1.locals pret1.var_delta;
+                    is_reachable := next_r;
+                    last :=
+                      if
+                        next_now_unreachable ctxt1.is_reachable next_r
+                      then
+                        pret1.last
+                      else ctxt1.last; loc := pret1.curr_loc|>;
+                (warn_p2,ctxt3) <<- reached_warnable prog2 ctxt2;
+                case warn_p2 of
+                  NONE => return ()
+                | SOME ls =>
+                  log
+                    (WarningErr
+                       (get_unreach_msg ctxt3.loc (last_to_str ls)
+                          ctxt1.scope));
+                pret2 <- static_check_prog ctxt3 prog2;
+                return
+                  <|exits_fun := (pret1.exits_fun ∨ pret2.exits_fun);
+                    exits_loop := (pret1.exits_loop ∨ pret2.exits_loop);
+                    last := seq_last_stmt pret1.last pret2.last;
+                    var_delta :=
+                      seq_loc_inf pret1.var_delta pret2.var_delta;
+                    curr_loc := pret2.curr_loc|>
+              od)) ∧
+        (∀prog2 prog1 exp ctxt.
+           static_check_prog ctxt (If exp prog1 prog2) =
+           do
+             eret <- static_check_exp ctxt exp;
+             if ¬sh_bd_has_shape One eret.sh_bd then
+               error
+                 (ShapeErr
+                    (get_non_word_msg «if condition»
+                       (sh_bd_to_str eret.sh_bd) ctxt.loc ctxt.scope))
+             else return ();
+             pret1 <- static_check_prog ctxt prog1;
+             pret2 <-
+               static_check_prog (ctxt with loc := pret1.curr_loc) prog2;
+             double_ret <<- pret1.exits_fun ∧ pret2.exits_fun;
+             double_loop_exit <<- pret1.exits_loop ∧ pret2.exits_loop;
+             return
+               <|exits_fun := double_ret; exits_loop := double_loop_exit;
+                 last := branch_last_stmt double_ret double_loop_exit;
+                 var_delta :=
+                   branch_loc_inf ctxt.locals pret1.var_delta
+                     pret2.var_delta; curr_loc := pret2.curr_loc|>
+           od) ∧
+        (∀prog exp ctxt.
+           static_check_prog ctxt (While exp prog) =
+           do
+             eret <- static_check_exp ctxt exp;
+             if ¬sh_bd_has_shape One eret.sh_bd then
+               error
+                 (ShapeErr
+                    (get_non_word_msg «while condition»
+                       (sh_bd_to_str eret.sh_bd) ctxt.loc ctxt.scope))
+             else return ();
+             pret <- static_check_prog (ctxt with in_loop := T) prog;
+             return
+               <|exits_fun := F; exits_loop := F; last := OtherLast;
+                 var_delta :=
+                   branch_loc_inf ctxt.locals pret.var_delta
+                     (empty compare); curr_loc := ctxt.loc|>
+           od) ∧
+        (∀ctxt.
+           static_check_prog ctxt Break =
+           do
+             if ¬ctxt.in_loop then
+               error (GenErr (get_rogue_msg T ctxt.loc ctxt.scope))
+             else return ();
+             return
+               <|exits_fun := F; exits_loop := T; last := BreakLast;
+                 var_delta := empty compare; curr_loc := ctxt.loc|>
+           od) ∧
+        (∀ctxt.
+           static_check_prog ctxt Continue =
+           do
+             if ¬ctxt.in_loop then
+               error (GenErr (get_rogue_msg F ctxt.loc ctxt.scope))
+             else return ();
+             return
+               <|exits_fun := F; exits_loop := T; last := ContLast;
+                 var_delta := empty compare; curr_loc := ctxt.loc|>
+           od) ∧
+        (∀exp eid ctxt.
+           static_check_prog ctxt (Raise eid exp) =
+           do
+             static_check_exp ctxt exp;
+             return
+               <|exits_fun := T; exits_loop := F; last := RaiseLast;
+                 var_delta := empty compare; curr_loc := ctxt.loc|>
+           od) ∧
+        (∀exp ctxt addr.
+           static_check_prog ctxt (Store addr exp) =
+           do
+             aret <- static_check_exp ctxt addr;
+             eret <- static_check_exp ctxt exp;
+             case aret.sh_bd of
+               WordB Based => return ()
+             | WordB NotBased =>
+               log (WarningErr (get_memop_msg T F F ctxt.loc ctxt.scope))
+             | WordB Trusted => return ()
+             | WordB NotTrusted =>
+               log (WarningErr (get_memop_msg T F T ctxt.loc ctxt.scope))
+             | StructB v5 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «store address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope))
+             | NamedB v6 v7 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «store address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope));
+             return
+               <|exits_fun := F; exits_loop := F; last := OtherLast;
+                 var_delta := empty compare; curr_loc := ctxt.loc|>
+           od) ∧
+        (∀exp ctxt addr.
+           static_check_prog ctxt (Store32 addr exp) =
+           do
+             aret <- static_check_exp ctxt addr;
+             eret <- static_check_exp ctxt exp;
+             case aret.sh_bd of
+               WordB Based => return ()
+             | WordB NotBased =>
+               log (WarningErr (get_memop_msg T F F ctxt.loc ctxt.scope))
+             | WordB Trusted => return ()
+             | WordB NotTrusted =>
+               log (WarningErr (get_memop_msg T F T ctxt.loc ctxt.scope))
+             | StructB v5 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «store address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope))
+             | NamedB v6 v7 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «store address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope));
+             if ¬sh_bd_has_shape One eret.sh_bd then
+               error
+                 (ShapeErr
+                    (get_non_word_msg «store value»
+                       (sh_bd_to_str eret.sh_bd) ctxt.loc ctxt.scope))
+             else return ();
+             return
+               <|exits_fun := F; exits_loop := F; last := OtherLast;
+                 var_delta := empty compare; curr_loc := ctxt.loc|>
+           od) ∧
+        (∀exp ctxt addr.
+           static_check_prog ctxt (StoreByte addr exp) =
+           do
+             aret <- static_check_exp ctxt addr;
+             eret <- static_check_exp ctxt exp;
+             case aret.sh_bd of
+               WordB Based => return ()
+             | WordB NotBased =>
+               log (WarningErr (get_memop_msg T F F ctxt.loc ctxt.scope))
+             | WordB Trusted => return ()
+             | WordB NotTrusted =>
+               log (WarningErr (get_memop_msg T F T ctxt.loc ctxt.scope))
+             | StructB v5 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «store address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope))
+             | NamedB v6 v7 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «store address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope));
+             if ¬sh_bd_has_shape One eret.sh_bd then
+               error
+                 (ShapeErr
+                    (get_non_word_msg «store value»
+                       (sh_bd_to_str eret.sh_bd) ctxt.loc ctxt.scope))
+             else return ();
+             return
+               <|exits_fun := F; exits_loop := F; last := OtherLast;
+                 var_delta := empty compare; curr_loc := ctxt.loc|>
+           od) ∧
+        (∀vname mop ctxt addr.
+           static_check_prog ctxt (ShMemLoad mop Local vname addr) =
+           do
+             vinf <- check_local_var ctxt vname;
+             aret <- static_check_exp ctxt addr;
+             case aret.sh_bd of
+               WordB Based =>
+                 log (WarningErr (get_memop_msg F T F ctxt.loc ctxt.scope))
+             | WordB NotBased => return ()
+             | WordB Trusted => return ()
+             | WordB NotTrusted =>
+               log (WarningErr (get_memop_msg F T T ctxt.loc ctxt.scope))
+             | StructB v5 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «load address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope))
+             | NamedB v6 v7 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «load address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope));
+             if ¬sh_bd_has_shape One vinf.vsh_bd then
+               error
+                 (ShapeErr
+                    (get_non_word_msg «load variable»
+                       (sh_bd_to_str vinf.vsh_bd) ctxt.loc ctxt.scope))
+             else return ();
+             return
+               <|exits_fun := F; exits_loop := F; last := OtherLast;
+                 var_delta :=
+                   singleton compare vname
+                     (vinf with vsh_bd := sh_bd_from_bd Trusted vinf.vsh_bd);
+                 curr_loc := ctxt.loc|>
+           od) ∧
+        (∀vname mop ctxt addr.
+           static_check_prog ctxt (ShMemLoad mop Global vname addr) =
+           do
+             vinf <- check_global_var ctxt vname;
+             aret <- static_check_exp ctxt addr;
+             case aret.sh_bd of
+               WordB Based =>
+                 log (WarningErr (get_memop_msg F T F ctxt.loc ctxt.scope))
+             | WordB NotBased => return ()
+             | WordB Trusted => return ()
+             | WordB NotTrusted =>
+               log (WarningErr (get_memop_msg F T T ctxt.loc ctxt.scope))
+             | StructB v5 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «load address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope))
+             | NamedB v6 v7 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «load address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope));
+             if One ≠ vinf.vshape then
+               error
+                 (ShapeErr
+                    (get_non_word_msg «load variable»
+                       (shape_to_str vinf.vshape) ctxt.loc ctxt.scope))
+             else return ();
+             return
+               <|exits_fun := F; exits_loop := F; last := OtherLast;
+                 var_delta := empty compare; curr_loc := ctxt.loc|>
+           od) ∧
+        (∀mop exp ctxt addr.
+           static_check_prog ctxt (ShMemStore mop addr exp) =
+           do
+             aret <- static_check_exp ctxt addr;
+             eret <- static_check_exp ctxt exp;
+             case aret.sh_bd of
+               WordB Based =>
+                 log (WarningErr (get_memop_msg F F F ctxt.loc ctxt.scope))
+             | WordB NotBased => return ()
+             | WordB Trusted => return ()
+             | WordB NotTrusted =>
+               log (WarningErr (get_memop_msg F F T ctxt.loc ctxt.scope))
+             | StructB v5 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «store address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope))
+             | NamedB v6 v7 =>
+               error
+                 (ShapeErr
+                    (get_non_word_msg «store address»
+                       (sh_bd_to_str aret.sh_bd) ctxt.loc ctxt.scope));
+             if ¬sh_bd_has_shape One eret.sh_bd then
+               error
+                 (ShapeErr
+                    (get_non_word_msg «store value»
+                       (sh_bd_to_str eret.sh_bd) ctxt.loc ctxt.scope))
+             else return ();
+             return
+               <|exits_fun := F; exits_loop := F; last := OtherLast;
+                 var_delta := empty compare; curr_loc := ctxt.loc|>
+           od) ∧
+        (∀ctxt.
+           static_check_prog ctxt Tick =
+           return
+             <|exits_fun := F; exits_loop := F; last := InvisLast;
+               var_delta := empty compare; curr_loc := ctxt.loc|>) ∧
+        ∀tag str ctxt.
+          static_check_prog ctxt (Annot tag str) =
+          (let
+             loc =
+               if tag = «location» then concat [«AT »; str; «: »]
+               else ctxt.loc
+           in
+             return
+               <|exits_fun := F; exits_loop := F; last := InvisLast;
+                 var_delta := empty compare; curr_loc := loc|>)
+   
+   [static_check_prog_ind]  Theorem
+      
+      ⊢ ∀P. (∀ctxt. P ctxt Skip) ∧
+            (∀ctxt vname shape exp prog.
+               (∀ctxt' eret.
+                  ctxt' =
+                  ctxt with
+                  <|locals :=
+                      insert ctxt.locals vname <|vsh_bd := eret.sh_bd|>;
+                    last := OtherLast|> ⇒
+                  P ctxt' prog) ⇒
+               P ctxt (Dec vname shape exp prog)) ∧
+            (∀ctxt vname shape fname args prog.
+               (∀ctxt' sb.
+                  ctxt' =
+                  ctxt with
+                  <|locals := insert ctxt.locals vname <|vsh_bd := sb|>;
+                    last := OtherLast|> ⇒
+                  P ctxt' prog) ⇒
+               P ctxt (DecCall vname shape fname args prog)) ∧
+            (∀ctxt vname exp. P ctxt (Assign Local vname exp)) ∧
+            (∀ctxt vname exp. P ctxt (Assign Global vname exp)) ∧
+            (∀ctxt v pop es. P ctxt (Primitive v pop es)) ∧
+            (∀ctxt vname hdl fname args.
+               (∀v eid v2 evar prog evinf.
+                  hdl = SOME v ∧ v = (eid,v2) ∧ v2 = (evar,prog) ⇒
+                  P
+                    (ctxt with
+                     locals :=
+                       insert ctxt.locals evar
+                         (evinf with
+                          vsh_bd := sh_bd_from_bd Trusted evinf.vsh_bd))
+                    prog) ⇒
+               P ctxt (AssignCall (Local,vname) hdl fname args)) ∧
+            (∀ctxt vname hdl fname args.
+               (∀v eid v2 evar prog evinf.
+                  hdl = SOME v ∧ v = (eid,v2) ∧ v2 = (evar,prog) ⇒
+                  P
+                    (ctxt with
+                     locals :=
+                       insert ctxt.locals evar
+                         (evinf with
+                          vsh_bd := sh_bd_from_bd Trusted evinf.vsh_bd))
+                    prog) ⇒
+               P ctxt (AssignCall (Global,vname) hdl fname args)) ∧
+            (∀ctxt exp. P ctxt (Return exp)) ∧
+            (∀ctxt fname args. P ctxt (TailCall fname args)) ∧
+            (∀ctxt hdl fname args.
+               (∀v eid v2 evar prog evinf.
+                  hdl = SOME v ∧ v = (eid,v2) ∧ v2 = (evar,prog) ⇒
+                  P
+                    (ctxt with
+                     locals :=
+                       insert ctxt.locals evar
+                         (evinf with
+                          vsh_bd := sh_bd_from_bd Trusted evinf.vsh_bd))
+                    prog) ⇒
+               P ctxt (StandAloneCall hdl fname args)) ∧
+            (∀ctxt fname ptr1 len1 ptr2 len2.
+               P ctxt (ExtCall fname ptr1 len1 ptr2 len2)) ∧
+            (∀ctxt prog1 prog2.
+               (∀warn_p1 ctxt1 next_r pret1 ctxt2 warn_p2 ctxt3.
+                  (warn_p1,ctxt1) = reached_warnable prog1 ctxt ∧
+                  next_r = next_is_reachable ctxt1.is_reachable pret1.last ∧
+                  ctxt2 =
+                  ctxt1 with
+                  <|locals := seq_loc_inf ctxt1.locals pret1.var_delta;
+                    is_reachable := next_r;
+                    last :=
+                      if
+                        next_now_unreachable ctxt1.is_reachable next_r
+                      then
+                        pret1.last
+                      else ctxt1.last; loc := pret1.curr_loc|> ∧
+                  (warn_p2,ctxt3) = reached_warnable prog2 ctxt2 ⇒
+                  P ctxt3 prog2) ∧
+               (∀warn_p1 ctxt1.
+                  (warn_p1,ctxt1) = reached_warnable prog1 ctxt ⇒
+                  P ctxt1 prog1) ⇒
+               P ctxt (Seq prog1 prog2)) ∧
+            (∀ctxt exp prog1 prog2.
+               (∀pret1. P (ctxt with loc := pret1.curr_loc) prog2) ∧
+               P ctxt prog1 ⇒
+               P ctxt (If exp prog1 prog2)) ∧
+            (∀ctxt exp prog.
+               P (ctxt with in_loop := T) prog ⇒ P ctxt (While exp prog)) ∧
+            (∀ctxt. P ctxt Break) ∧ (∀ctxt. P ctxt Continue) ∧
+            (∀ctxt eid exp. P ctxt (Raise eid exp)) ∧
+            (∀ctxt addr exp. P ctxt (Store addr exp)) ∧
+            (∀ctxt addr exp. P ctxt (Store32 addr exp)) ∧
+            (∀ctxt addr exp. P ctxt (StoreByte addr exp)) ∧
+            (∀ctxt mop vname addr. P ctxt (ShMemLoad mop Local vname addr)) ∧
+            (∀ctxt mop vname addr. P ctxt (ShMemLoad mop Global vname addr)) ∧
+            (∀ctxt mop addr exp. P ctxt (ShMemStore mop addr exp)) ∧
+            (∀ctxt. P ctxt Tick) ∧ (∀ctxt tag str. P ctxt (Annot tag str)) ⇒
+            ∀v v1. P v v1
+   
+   [static_check_progs_def]  Theorem
+      
+      ⊢ (∀sctxt gctxt fctxt.
+           static_check_progs fctxt gctxt sctxt [] = return ()) ∧
+        (∀v1 v0 sctxt gctxt fctxt decls.
+           static_check_progs fctxt gctxt sctxt (Name v0 v1::decls) =
+           static_check_progs fctxt gctxt sctxt decls) ∧
+        (∀v4 v3 v2 sctxt gctxt fctxt decls.
+           static_check_progs fctxt gctxt sctxt (Decl v2 v3 v4::decls) =
+           static_check_progs fctxt gctxt sctxt decls) ∧
+        ∀sctxt gctxt fi fctxt decls.
+          static_check_progs fctxt gctxt sctxt (Function fi::decls) =
+          (let
+             (param_names,param_shapes) = UNZIP fi.params
+           in
+             do
+               param_sbs <-
+                 case
+                   OPT_MMAP (sh_bd_from_sh sctxt Trusted) param_shapes
+                 of
+                   NONE =>
+                     error
+                       (ScopeErr
+                          (get_implementation_err_msg
+                             «static analysis failed to convert in-scope shape»
+                             «» (FunScope fi.name «»)))
+                 | SOME sbs => return (ZIP (param_names,sbs));
+               ctxt <<-
+                 <|locals :=
+                     FOLDL (λm (v,sb). insert m v <|vsh_bd := sb|>)
+                       (empty compare) param_sbs; globals := gctxt;
+                   funcs := fctxt; structs := sctxt;
+                   scope := FunScope fi.name «»; in_loop := F;
+                   is_reachable := IsReach; last := InvisLast; loc := «»|>;
+               prog_ret <- static_check_prog ctxt fi.body;
+               if ¬prog_ret.exits_fun then
+                 error
+                   (GenErr
+                      (concat
+                         [«branches missing return statement in »;
+                          get_scope_desc (FunScope fi.name «»); «\n»]))
+               else return ();
+               static_check_progs fctxt gctxt sctxt decls
+             od)
+   
+   [static_check_progs_ind]  Theorem
+      
+      ⊢ ∀P. (∀fctxt gctxt sctxt. P fctxt gctxt sctxt []) ∧
+            (∀fctxt gctxt sctxt v0 v1 decls.
+               P fctxt gctxt sctxt decls ⇒
+               P fctxt gctxt sctxt (Name v0 v1::decls)) ∧
+            (∀fctxt gctxt sctxt v2 v3 v4 decls.
+               P fctxt gctxt sctxt decls ⇒
+               P fctxt gctxt sctxt (Decl v2 v3 v4::decls)) ∧
+            (∀fctxt gctxt sctxt fi decls.
+               (∀param_names param_shapes ctxt param_sbs.
+                  (param_names,param_shapes) = UNZIP fi.params ∧
+                  ctxt =
+                  <|locals :=
+                      FOLDL (λm (v,sb). insert m v <|vsh_bd := sb|>)
+                        (empty compare) param_sbs; globals := gctxt;
+                    funcs := fctxt; structs := sctxt;
+                    scope := FunScope fi.name «»; in_loop := F;
+                    is_reachable := IsReach; last := InvisLast; loc := «»|> ⇒
+                  P fctxt gctxt sctxt decls) ⇒
+               P fctxt gctxt sctxt (Function fi::decls)) ⇒
+            ∀v v1 v2 v3. P v v1 v2 v3
+   
+   

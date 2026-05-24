@@ -1,0 +1,1043 @@
+[panSem] Parent theory of "panProps"
+   
+   [pan_commonProps] Parent theory of "panProps"
+   
+   [exps_of_def_primitive]  Definition
+      
+      ⊢ exps_of =
+        WFREC
+          (@R. WF R ∧ (∀e v2 v1 p. R p (Dec v1 v2 e p)) ∧
+               (∀p q. R q (Seq p q)) ∧ (∀q p. R p (Seq p q)) ∧
+               (∀p e q. R q (If e p q)) ∧ (∀q e p. R p (If e p q)) ∧
+               (∀e p. R p (While e p)) ∧
+               (∀es v7 v6 v5 v4 ep.
+                  R ep (Call (SOME (v4,SOME (v5,v6,ep))) v7 es)) ∧
+               ∀es v12 v11 v10 p. R p (DecCall v10 v11 v12 es p))
+          (λexps_of a.
+               case a of
+                 Skip => I []
+               | Dec v1 v2 e' p => I (e'::exps_of p)
+               | Assign v14 v15 e'⁵' => I [e'⁵']
+               | Primitive v16 v17 es'' => I es''
+               | Store e1 e2 => I [e1; e2]
+               | Store32 e1' e2' => I [e1'; e2']
+               | StoreByte e1'' e2'' => I [e1''; e2'']
+               | Seq p' q => I (exps_of p' ++ exps_of q)
+               | If e'' p'' q' => I (e''::exps_of p'' ++ exps_of q')
+               | While e'³' p'³' => I (e'³'::exps_of p'³')
+               | Break => I []
+               | Continue => I []
+               | TailCall v3 es => I es
+               | Call (SOME (v4,NONE)) v3 es => I es
+               | Call (SOME (v4,SOME (v5,v6,ep))) v3 es =>
+                 I (es ++ exps_of ep)
+               | DecCall v10 v11 v12 es' p'⁴' => I (es' ++ exps_of p'⁴')
+               | ExtCall v13 e1'³' e2'³' e3 e4 => I [e1'³'; e2'³'; e3; e4]
+               | Raise v0 e => I [e]
+               | Return e'⁴' => I [e'⁴']
+               | ShMemLoad v18 v19 v20 e'⁶' => I [e'⁶']
+               | ShMemStore v21 e1'⁴' e2'⁴' => I [e1'⁴'; e2'⁴']
+               | Tick => I []
+               | Annot v116 v117 => I [])
+   
+   [is_decl_def_primitive]  Definition
+      
+      ⊢ is_decl =
+        WFREC (@R. WF R)
+          (λis_decl a.
+               case a of
+                 Function v7 => I F
+               | Decl sh v e => I T
+               | Name v11 v12 => I F)
+   
+   [localised_exp_real_def]  Definition
+      
+      ⊢ localised_exp =
+        every_exp
+          (λe.
+               case e of
+                 Const v24 => T
+               | Var tp v26 => tp = Local
+               | RStruct v27 => T
+               | RField v28 v29 => T
+               | NStruct v30 v31 => T
+               | NField v32 v33 => T
+               | Load v34 v35 => T
+               | Load32 v36 => T
+               | LoadByte v37 => T
+               | Op v38 v39 => T
+               | Panop v40 v41 => T
+               | Cmp v42 v43 v44 => T
+               | Shift v45 v46 v47 => T
+               | BaseAddr => T
+               | TopAddr => T
+               | BytesInWord => T)
+   
+   [localised_prog_def_primitive]  Definition
+      
+      ⊢ localised_prog =
+        WFREC
+          (@R. WF R ∧ (∀e v2 v1 p. R p (Dec v1 v2 e p)) ∧
+               (∀p q. R q (Seq p q)) ∧ (∀q p. R p (Seq p q)) ∧
+               (∀p e q. R q (If e p q)) ∧ (∀q e p. R p (If e p q)) ∧
+               (∀e p. R p (While e p)) ∧
+               (∀args f hdl v1 v4 v5 v7 v10 v11 v14 p.
+                  hdl = SOME v1 ∧ v1 = (v4,v5) ∧ v5 = SOME v7 ∧
+                  v7 = (v10,v11) ∧ v11 = (v14,p) ⇒
+                  R p (Call hdl f args)) ∧
+               ∀args fn sh vn p. R p (DecCall vn sh fn args p))
+          (λlocalised_prog a.
+               case a of
+                 Skip => I T
+               | Dec v1 v2 e' p => I (localised_exp e' ∧ localised_prog p)
+               | Assign Local v3 e'⁶' => I (localised_exp e'⁶')
+               | Assign Global v3 e'⁶' => I F
+               | Primitive v6 v7 es => I (EVERY localised_exp es)
+               | Store e1 e2 => I (localised_exp e1 ∧ localised_exp e2)
+               | Store32 e1' e2' =>
+                 I (localised_exp e1' ∧ localised_exp e2')
+               | StoreByte e1'' e2'' =>
+                 I (localised_exp e1'' ∧ localised_exp e2'')
+               | Seq p' q => I (localised_prog p' ∧ localised_prog q)
+               | If e'' p'' q' =>
+                 I
+                   (localised_exp e'' ∧ localised_prog p'' ∧
+                    localised_prog q')
+               | While e'³' p'³' =>
+                 I (localised_exp e'³' ∧ localised_prog p'³')
+               | Break => I T
+               | Continue => I T
+               | Call hdl f args =>
+                 I
+                   (EVERY localised_exp args ∧
+                    (case hdl of
+                       NONE => T
+                     | SOME (v4,NONE) => T
+                     | SOME (v4,SOME (v10,v14,p)) => localised_prog p) ∧
+                    case hdl of
+                      NONE => T
+                    | SOME (NONE,v5) => T
+                    | SOME (SOME (Local,v11),v5) => T
+                    | SOME (SOME (Global,v11),v5) => F)
+               | DecCall vn sh fn' args' p'⁴' =>
+                 I (EVERY localised_exp args' ∧ localised_prog p'⁴')
+               | ExtCall fn e1'³' e2'³' e3 e4 =>
+                 I
+                   (localised_exp e1'³' ∧ localised_exp e2'³' ∧
+                    localised_exp e3 ∧ localised_exp e4)
+               | Raise v0 e => I (localised_exp e)
+               | Return e'⁴' => I (localised_exp e'⁴')
+               | ShMemLoad op' vk v e'⁵' =>
+                 I (vk = Local ∧ localised_exp e'⁵')
+               | ShMemStore op e1'⁴' e2'⁴' =>
+                 I (localised_exp e1'⁴' ∧ localised_exp e2'⁴')
+               | Tick => I T
+               | Annot v106 v107 => I T)
+   
+   [nameless_exp_real_def]  Definition
+      
+      ⊢ nameless_exp =
+        every_exp
+          (λe.
+               case e of
+                 Const v24 => T
+               | Var v25 v26 => T
+               | RStruct v27 => T
+               | RField v28 v29 => T
+               | NStruct v30 v31 => F
+               | NField v32 v33 => F
+               | Load v34 v35 => T
+               | Load32 v36 => T
+               | LoadByte v37 => T
+               | Op v38 v39 => T
+               | Panop v40 v41 => T
+               | Cmp v42 v43 v44 => T
+               | Shift v45 v46 v47 => T
+               | BaseAddr => T
+               | TopAddr => T
+               | BytesInWord => T)
+   
+   [semantics_run_res_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0.
+                 ∀ $var$('semantics_run_res').
+                   (∀a0.
+                      a0 = ind_type$CONSTR 0 ARB (λn. ind_type$BOTTOM) ∨
+                      (∃a. a0 =
+                           (λa.
+                                ind_type$CONSTR (SUC 0) a
+                                  (λn. ind_type$BOTTOM)) a) ∨
+                      a0 =
+                      ind_type$CONSTR (SUC (SUC 0)) ARB
+                        (λn. ind_type$BOTTOM) ⇒
+                      $var$('semantics_run_res') a0) ⇒
+                   $var$('semantics_run_res') a0) rep
+   
+   [semantics_run_res_case_def]  Definition
+      
+      ⊢ (∀v f v1. semantics_run_res_CASE RunError v f v1 = v) ∧
+        (∀a v f v1. semantics_run_res_CASE (CompleteResult a) v f v1 = f a) ∧
+        ∀v f v1. semantics_run_res_CASE Incomplete v f v1 = v1
+   
+   [semantics_run_res_size_def]  Definition
+      
+      ⊢ (∀f. semantics_run_res_size f RunError = 0) ∧
+        (∀f a. semantics_run_res_size f (CompleteResult a) = 1 + f a) ∧
+        ∀f. semantics_run_res_size f Incomplete = 0
+   
+   [semantics_wrapper_def]  Definition
+      
+      ⊢ ∀f. semantics_wrapper f =
+            if ∃k v. f k = (RunError,v) then Fail
+            else
+              case
+                some res. ∃k r ev.
+                  f k = (CompleteResult r,ev) ∧ res = Terminate r ev
+              of
+                NONE => Diverge (LUB (IMAGE (fromList ∘ SND ∘ f) 𝕌(:num)))
+              | SOME res => res
+   
+   [v2word_def_primitive]  Definition
+      
+      ⊢ v2word =
+        WFREC (@R. WF R)
+          (λv2word a.
+               case a of
+                 ValWord v => I (Word v)
+               | RStruct v2 => ARB
+               | NStruct v4 v5 => ARB)
+   
+   [FLOOKUP_pan_res_var_thm]  Theorem
+      
+      ⊢ FLOOKUP (res_var l (m,v)) n = if n = m then v else FLOOKUP l n
+   
+   [OPT_MMAP_MEM_IMP]  Theorem
+      
+      ⊢ OPT_MMAP f xs = SOME ys ∧ MEM y ys ⇒ ∃x. MEM x xs ∧ f x = SOME y
+   
+   [OPT_MMAP_update_locals_not_vars_eval_eq]  Theorem
+      
+      ⊢ ∀s es vs n w.
+          ¬MEM n (FLAT (MAP var_exp es)) ∧ OPT_MMAP (eval s) es = SOME vs ⇒
+          OPT_MMAP (eval (s with locals := s.locals⟨n ↦ w⟩)) es = SOME vs
+   
+   [all_distinct_alist_ctxt_max]  Theorem
+      
+      ⊢ ALL_DISTINCT ns ∧ LENGTH ns = size_of_shape (Comb sh) ∧
+        LENGTH vs = LENGTH sh ⇒
+        ctxt_max (MAX_LIST ns)
+          (alist_to_fmap (ZIP (vs,ZIP (sh,with_shape sh ns))))
+   
+   [all_distinct_alist_no_overlap]  Theorem
+      
+      ⊢ ALL_DISTINCT ns ∧ LENGTH ns = size_of_shape (Comb sh) ∧
+        LENGTH vs = LENGTH sh ⇒
+        no_overlap (alist_to_fmap (ZIP (vs,ZIP (sh,with_shape sh ns))))
+   
+   [all_distinct_disjoint_with_shape]  Theorem
+      
+      ⊢ ∀sh ns n n'.
+          ALL_DISTINCT ns ∧ n < LENGTH sh ∧ n' < LENGTH sh ∧ n ≠ n' ∧
+          LENGTH ns = size_of_shape (Comb sh) ⇒
+          DISJOINT (set (with_shape sh ns)❲n❳) (set (with_shape sh ns)❲n'❳)
+   
+   [all_distinct_mem_zip_disjoint_with_shape]  Theorem
+      
+      ⊢ LENGTH l = LENGTH sh ∧ LENGTH sh = LENGTH (with_shape sh ns) ∧
+        ALL_DISTINCT ns ∧ LENGTH ns = size_of_shape (Comb sh) ∧
+        MEM (x,a,xs) (ZIP (l,ZIP (sh,with_shape sh ns))) ∧
+        MEM (y,b,ys) (ZIP (l,ZIP (sh,with_shape sh ns))) ∧ x ≠ y ⇒
+        DISJOINT (set xs) (set ys)
+   
+   [all_distinct_with_shape]  Theorem
+      
+      ⊢ ∀sh ns n.
+          ALL_DISTINCT ns ∧ n < LENGTH sh ∧
+          LENGTH ns = size_of_shape (Comb sh) ⇒
+          ALL_DISTINCT (with_shape sh ns)❲n❳
+   
+   [all_distinct_with_shape_distinct]  Theorem
+      
+      ⊢ ∀sh ns x y.
+          ALL_DISTINCT ns ∧ LENGTH ns = size_of_shape (Comb sh) ∧
+          MEM x (with_shape sh ns) ∧ MEM y (with_shape sh ns) ∧ x ≠ y ∧
+          x ≠ [] ∧ y ≠ [] ⇒
+          DISJOINT (set x) (set y)
+   
+   [datatype_semantics_run_res]  Theorem
+      
+      ⊢ DATATYPE (semantics_run_res RunError CompleteResult Incomplete)
+   
+   [decs_stcnames_only_functions]  Theorem
+      
+      ⊢ ∀ctxt code.
+          EVERY (λd. is_function d ∨ is_decl d) code ⇒
+          decs_stcnames ctxt code = SOME ctxt
+   
+   [decs_stcnames_only_functions2]  Theorem
+      
+      ⊢ ∀ctxt code.
+          EVERY is_function code ⇒ decs_stcnames ctxt code = SOME ctxt
+   
+   [el_el_with_shape]  Theorem
+      
+      ⊢ LENGTH xs = size_of_shape (Comb shs) ∧ n < LENGTH shs ∧
+        n' < size_of_shape shs❲n❳ ∧ EVERY is_wf_shape_nil shs ⇒
+        (with_shape shs xs)❲n❳❲n'❳ =
+        xs❲n' + size_of_shape (Comb (TAKE n shs))❳
+   
+   [el_mem_with_shape]  Theorem
+      
+      ⊢ ∀sh ns n x.
+          n < LENGTH (with_shape sh ns) ∧
+          LENGTH ns = size_of_shape (Comb sh) ∧ MEM x (with_shape sh ns)❲n❳ ⇒
+          MEM x ns
+   
+   [eval_empty_locals_IMP]  Theorem
+      
+      ⊢ ∀s e v.
+          eval (s with locals := FEMPTY) e = SOME v ⇒ eval s e = SOME v
+   
+   [eval_fresh_var]  Theorem
+      
+      ⊢ ∀s e n w.
+          ¬MEM n (var_exp e) ⇒
+          eval (s with locals := s.locals⟨n ↦ w⟩) e = eval s e
+   
+   [eval_is_wf_shape_v]  Theorem
+      
+      ⊢ ∀s exp v.
+          eval s exp = SOME v ∧
+          FEVERY (λ(nm,v). is_wf_shape_v s.structs v) s.locals ∧
+          FEVERY (λ(nm,v). is_wf_shape_v s.structs v) s.globals ⇒
+          is_wf_shape_v s.structs v
+   
+   [eval_swap_memaddrs]  Theorem
+      
+      ⊢ ∀s exp v memaddrs.
+          eval s exp = SOME v ∧ s.memaddrs ⊆ memaddrs ⇒
+          eval (s with memaddrs := memaddrs) exp = SOME v
+   
+   [eval_swap_memory]  Theorem
+      
+      ⊢ ∀s exp v mry.
+          eval s exp = SOME v ∧
+          (∀addr. addr ∈ s.memaddrs ⇒ s.memory addr = mry addr) ⇒
+          eval (s with memory := mry) exp = SOME v
+   
+   [eval_upd_clock_eq]  Theorem
+      
+      ⊢ ∀t e ck. eval (t with clock := ck) e = eval t e
+   
+   [eval_upd_code_eq]  Theorem
+      
+      ⊢ ∀t e code. eval (t with code := code) e = eval t e
+   
+   [evaluate_add_clock_eq]  Theorem
+      
+      ⊢ ∀p t res st ck.
+          evaluate (p,t) = (res,st) ∧ res ≠ SOME TimeOut ⇒
+          evaluate (p,t with clock := t.clock + ck) =
+          (res,st with clock := st.clock + ck)
+   
+   [evaluate_add_clock_io_events_mono]  Theorem
+      
+      ⊢ ∀exps s extra.
+          (SND (evaluate (exps,s))).ffi.io_events ≼
+          (SND (evaluate (exps,s with clock := s.clock + extra))).ffi.
+          io_events
+   
+   [evaluate_add_clock_or_timeout]  Theorem
+      
+      ⊢ evaluate (p,s) = (q,t with clock := 0) ∧ q ≠ SOME TimeOut ⇒
+        evaluate (p,s with clock := k) = (q',t') ⇒
+        q' = SOME TimeOut ∧ k < s.clock ∨
+        q' = q ∧ s.clock ≤ k ∧ t' = t with clock := k − s.clock
+   
+   [evaluate_clock_sub]  Theorem
+      
+      ⊢ ∀p t res st ck.
+          evaluate (p,t) = (res,st with clock := st.clock + ck) ∧
+          res ≠ SOME TimeOut ⇒
+          evaluate (p,t with clock := t.clock − ck) = (res,st)
+   
+   [evaluate_clock_sub1]  Theorem
+      
+      ⊢ ∀p t res st t' ck.
+          evaluate (p,t) = (res,st) ∧ res ≠ SOME TimeOut ∧
+          evaluate (p,t with clock := ck + t.clock) = evaluate (p,t') ⇒
+          evaluate (p,t) = evaluate (p,t' with clock := t'.clock − ck)
+   
+   [evaluate_decl_commute]  Theorem
+      
+      ⊢ evaluate_decls s (Function fi::Decl sh v' e::ds) =
+        evaluate_decls s (Decl sh v' e::Function fi::ds)
+   
+   [evaluate_decls_append]  Theorem
+      
+      ⊢ ∀s ds1 ds2.
+          evaluate_decls s (ds1 ++ ds2) =
+          case evaluate_decls s ds1 of
+            NONE => NONE
+          | SOME s' => evaluate_decls s' ds2
+   
+   [evaluate_decls_functions]  Theorem
+      
+      ⊢ ∀s pan_code s'.
+          evaluate_decls s pan_code = SOME s' ⇒
+          s'.code = s.code |++ functions pan_code
+   
+   [evaluate_decls_memaddrs_mono]  Theorem
+      
+      ⊢ ∀s prog s' memaddrs.
+          evaluate_decls s prog = SOME s' ∧ s.memaddrs ⊆ memaddrs ⇒
+          evaluate_decls (s with memaddrs := memaddrs) prog =
+          SOME (s' with memaddrs := memaddrs)
+   
+   [evaluate_decls_only_functions]  Theorem
+      
+      ⊢ ∀s pan_code s'.
+          EVERY is_function pan_code ∧ evaluate_decls s pan_code = SOME s' ⇒
+          s' = s with code := s.code |++ functions pan_code
+   
+   [evaluate_decls_swap_locals]  Theorem
+      
+      ⊢ ∀s prog s' locals.
+          evaluate_decls s prog = SOME s' ⇒
+          evaluate_decls (s with locals := locals) prog =
+          SOME (s' with locals := locals)
+   
+   [evaluate_decls_swap_memaddrs]  Theorem
+      
+      ⊢ ∀s prog s' memaddrs.
+          evaluate_decls s prog = SOME s' ∧ s.memaddrs ⊆ memaddrs ⇒
+          evaluate_decls (s with memaddrs := memaddrs) prog =
+          SOME (s' with memaddrs := memaddrs)
+   
+   [evaluate_decls_swap_memory]  Theorem
+      
+      ⊢ ∀s prog s' mry.
+          evaluate_decls s prog = SOME s' ∧
+          (∀addr. addr ∈ s.memaddrs ⇒ s.memory addr = mry addr) ⇒
+          evaluate_decls (s with memory := mry) prog =
+          SOME (s' with memory := mry)
+   
+   [evaluate_global_shape_invariant]  Theorem
+      
+      ⊢ ∀p s res st n v.
+          evaluate (p,s) = (res,st) ∧ FLOOKUP s.globals n = SOME v ⇒
+          ∃v'. FLOOKUP st.globals n = SOME v' ∧ shape_of v' = shape_of v
+   
+   [evaluate_invariants]  Theorem
+      
+      ⊢ ∀p t res st.
+          evaluate (p,t) = (res,st) ⇒
+          st.memaddrs = t.memaddrs ∧ st.sh_memaddrs = t.sh_memaddrs ∧
+          (st.be ⇔ t.be) ∧ st.eshapes = t.eshapes ∧
+          st.base_addr = t.base_addr ∧ st.structs = t.structs ∧
+          st.code = t.code ∧ st.ffi.oracle = t.ffi.oracle
+   
+   [evaluate_io_events_lprefix_chain]  Theorem
+      
+      ⊢ lprefix_chain
+          (IMAGE
+             (λk.
+                  fromList
+                    (SND (evaluate (p,s with clock := k))).ffi.io_events)
+             𝕌(:num))
+   
+   [evaluate_io_events_mono]  Theorem
+      
+      ⊢ ∀exps s1 res s2.
+          evaluate (exps,s1) = (res,s2) ⇒
+          s1.ffi.io_events ≼ s2.ffi.io_events
+   
+   [evaluate_is_wf_shape_invariant]  Theorem
+      
+      ⊢ ∀p s res s'.
+          evaluate (p,s) = (res,s') ∧
+          FEVERY (λ(nm,v). is_wf_shape_v s.structs v) s.locals ∧
+          FEVERY (λ(nm,v). is_wf_shape_v s.structs v) s.globals ⇒
+          FEVERY (λ(nm,v). is_wf_shape_v s'.structs v) s'.locals ∧
+          FEVERY (λ(nm,v). is_wf_shape_v s'.structs v) s'.globals ∧
+          case res of
+            NONE => T
+          | SOME Error => T
+          | SOME TimeOut => T
+          | SOME Break => T
+          | SOME Continue => T
+          | SOME (Return retv) => is_wf_shape_v s.structs retv
+          | SOME (Exception eid exn) => is_wf_shape_v s.structs exn
+          | SOME (FinalFFI v9) => T
+   
+   [evaluate_min_clock]  Theorem
+      
+      ⊢ evaluate (prog,s) = (q,r) ∧ q ≠ SOME TimeOut ⇒
+        ∃k. evaluate (prog,s with clock := k) = (q,r with clock := 0)
+   
+   [every_exp_def]  Theorem
+      
+      ⊢ (∀w P. every_exp P (Const w) ⇔ P (Const w)) ∧
+        (∀vk v P. every_exp P (Var vk v) ⇔ P (Var vk v)) ∧
+        (∀es P.
+           every_exp P (RStruct es) ⇔
+           P (RStruct es) ∧ EVERY (λa. every_exp P a) es) ∧
+        (∀i e P. every_exp P (RField i e) ⇔ P (RField i e) ∧ every_exp P e) ∧
+        (∀nm_es nm P.
+           every_exp P (NStruct nm nm_es) ⇔
+           P (NStruct nm nm_es) ∧ EVERY (λa. every_exp P a) (MAP SND nm_es)) ∧
+        (∀i e P. every_exp P (NField i e) ⇔ P (NField i e) ∧ every_exp P e) ∧
+        (∀sh e P. every_exp P (Load sh e) ⇔ P (Load sh e) ∧ every_exp P e) ∧
+        (∀e P. every_exp P (Load32 e) ⇔ P (Load32 e) ∧ every_exp P e) ∧
+        (∀e P. every_exp P (LoadByte e) ⇔ P (LoadByte e) ∧ every_exp P e) ∧
+        (∀es bop P.
+           every_exp P (Op bop es) ⇔
+           P (Op bop es) ∧ EVERY (λa. every_exp P a) es) ∧
+        (∀op es P.
+           every_exp P (Panop op es) ⇔
+           P (Panop op es) ∧ EVERY (λa. every_exp P a) es) ∧
+        (∀e2 e1 c P.
+           every_exp P (Cmp c e1 e2) ⇔
+           P (Cmp c e1 e2) ∧ every_exp P e1 ∧ every_exp P e2) ∧
+        (∀sh num e P.
+           every_exp P (Shift sh e num) ⇔
+           P (Shift sh e num) ∧ every_exp P e) ∧
+        (∀P. every_exp P BaseAddr ⇔ P BaseAddr) ∧
+        (∀P. every_exp P TopAddr ⇔ P TopAddr) ∧
+        ∀P. every_exp P BytesInWord ⇔ P BytesInWord
+   
+   [every_exp_ind]  Theorem
+      
+      ⊢ ∀P'.
+          (∀P w. P' P (Const w)) ∧ (∀P vk v. P' P (Var vk v)) ∧
+          (∀P es. (∀a. MEM a es ⇒ P' P a) ⇒ P' P (RStruct es)) ∧
+          (∀P i e. P' P e ⇒ P' P (RField i e)) ∧
+          (∀P nm nm_es.
+             (∀a. MEM a (MAP SND nm_es) ⇒ P' P a) ⇒ P' P (NStruct nm nm_es)) ∧
+          (∀P i e. P' P e ⇒ P' P (NField i e)) ∧
+          (∀P sh e. P' P e ⇒ P' P (Load sh e)) ∧
+          (∀P e. P' P e ⇒ P' P (Load32 e)) ∧
+          (∀P e. P' P e ⇒ P' P (LoadByte e)) ∧
+          (∀P bop es. (∀a. MEM a es ⇒ P' P a) ⇒ P' P (Op bop es)) ∧
+          (∀P op es. (∀a. MEM a es ⇒ P' P a) ⇒ P' P (Panop op es)) ∧
+          (∀P c e1 e2. P' P e1 ∧ P' P e2 ⇒ P' P (Cmp c e1 e2)) ∧
+          (∀P sh e num. P' P e ⇒ P' P (Shift sh e num)) ∧
+          (∀P. P' P BaseAddr) ∧ (∀P. P' P TopAddr) ∧ (∀P. P' P BytesInWord) ⇒
+          ∀v v1. P' v v1
+   
+   [exps_of_def]  Theorem
+      
+      ⊢ (∀v0 e. exps_of (Raise v0 e) = [e]) ∧
+        (∀v2 v1 p e. exps_of (Dec v1 v2 e p) = e::exps_of p) ∧
+        (∀q p. exps_of (Seq p q) = exps_of p ++ exps_of q) ∧
+        (∀q p e. exps_of (If e p q) = e::exps_of p ++ exps_of q) ∧
+        (∀p e. exps_of (While e p) = e::exps_of p) ∧
+        (∀v3 es. exps_of (TailCall v3 es) = es) ∧
+        (∀v7 v6 v5 v4 es ep.
+           exps_of (Call (SOME (v4,SOME (v5,v6,ep))) v7 es) =
+           es ++ exps_of ep) ∧
+        (∀v9 v8 es. exps_of (Call (SOME (v8,NONE)) v9 es) = es) ∧
+        (∀v12 v11 v10 p es.
+           exps_of (DecCall v10 v11 v12 es p) = es ++ exps_of p) ∧
+        (∀e2 e1. exps_of (Store e1 e2) = [e1; e2]) ∧
+        (∀e2 e1. exps_of (Store32 e1 e2) = [e1; e2]) ∧
+        (∀e2 e1. exps_of (StoreByte e1 e2) = [e1; e2]) ∧
+        (∀e. exps_of (Return e) = [e]) ∧
+        (∀v13 e4 e3 e2 e1.
+           exps_of (ExtCall v13 e1 e2 e3 e4) = [e1; e2; e3; e4]) ∧
+        (∀v15 v14 e. exps_of (Assign v14 v15 e) = [e]) ∧
+        (∀v17 v16 es. exps_of (Primitive v16 v17 es) = es) ∧
+        (∀v20 v19 v18 e. exps_of (ShMemLoad v18 v19 v20 e) = [e]) ∧
+        (∀v21 e2 e1. exps_of (ShMemStore v21 e1 e2) = [e1; e2]) ∧
+        exps_of Skip = [] ∧ exps_of Break = [] ∧ exps_of Continue = [] ∧
+        exps_of Tick = [] ∧ ∀v69 v68. exps_of (Annot v68 v69) = []
+   
+   [exps_of_ind]  Theorem
+      
+      ⊢ ∀P. (∀v0 e. P (Raise v0 e)) ∧
+            (∀v1 v2 e p. P p ⇒ P (Dec v1 v2 e p)) ∧
+            (∀p q. P p ∧ P q ⇒ P (Seq p q)) ∧
+            (∀e p q. P p ∧ P q ⇒ P (If e p q)) ∧
+            (∀e p. P p ⇒ P (While e p)) ∧ (∀v3 es. P (TailCall v3 es)) ∧
+            (∀v4 v5 v6 ep v7 es.
+               P ep ⇒ P (Call (SOME (v4,SOME (v5,v6,ep))) v7 es)) ∧
+            (∀v8 v9 es. P (Call (SOME (v8,NONE)) v9 es)) ∧
+            (∀v10 v11 v12 es p. P p ⇒ P (DecCall v10 v11 v12 es p)) ∧
+            (∀e1 e2. P (Store e1 e2)) ∧ (∀e1 e2. P (Store32 e1 e2)) ∧
+            (∀e1 e2. P (StoreByte e1 e2)) ∧ (∀e. P (Return e)) ∧
+            (∀v13 e1 e2 e3 e4. P (ExtCall v13 e1 e2 e3 e4)) ∧
+            (∀v14 v15 e. P (Assign v14 v15 e)) ∧
+            (∀v16 v17 es. P (Primitive v16 v17 es)) ∧
+            (∀v18 v19 v20 e. P (ShMemLoad v18 v19 v20 e)) ∧
+            (∀v21 e1 e2. P (ShMemStore v21 e1 e2)) ∧ P Skip ∧ P Break ∧
+            P Continue ∧ P Tick ∧ (∀v68 v69. P (Annot v68 v69)) ⇒
+            ∀v. P v
+   
+   [fdoms_eq_flookup_some_none]  Theorem
+      
+      ⊢ ∀fm fm' n v v'.
+          FDOM fm = FDOM fm' ∧ FLOOKUP fm n = SOME v ⇒
+          ∃v. FLOOKUP fm' n = SOME v
+   
+   [flookup_res_var_diff_eq_org]  Theorem
+      
+      ⊢ n ≠ m ⇒ FLOOKUP (res_var lc (n,v)) m = FLOOKUP lc m
+   
+   [flookup_res_var_some_eq_lookup]  Theorem
+      
+      ⊢ FLOOKUP (res_var lc (v,FLOOKUP lc' v)) v = SOME value ⇒
+        FLOOKUP lc' v = SOME value
+   
+   [functions_FILTER]  Theorem
+      
+      ⊢ ∀prog. functions (FILTER is_function prog) = functions prog
+   
+   [functions_append]  Theorem
+      
+      ⊢ functions (prog1 ++ prog2) = functions prog1 ++ functions prog2
+   
+   [functions_eq_FILTER]  Theorem
+      
+      ⊢ functions prog =
+        MAP
+          (λx.
+               case x of
+                 Function fi => (fi.name,fi.params,fi.body)
+               | Decl v7 v8 v9 => ARB
+               | Name v10 v11 => ARB) (FILTER is_function prog)
+   
+   [io_events_eq_imp_ffi_eq]  Theorem
+      
+      ⊢ evaluate (p,s) = (res,t) ∧ s.ffi.io_events = t.ffi.io_events ⇒
+        t.ffi = s.ffi
+   
+   [is_decl_def]  Theorem
+      
+      ⊢ (is_decl (Decl sh v e) ⇔ T) ∧ (is_decl (Function v1) ⇔ F) ∧
+        (is_decl (Name v5 v6) ⇔ F)
+   
+   [is_decl_ind]  Theorem
+      
+      ⊢ ∀P. (∀sh v e. P (Decl sh v e)) ∧ (∀v1. P (Function v1)) ∧
+            (∀v5 v6. P (Name v5 v6)) ⇒
+            ∀v. P v
+   
+   [is_wf_shape_of_v]  Theorem
+      
+      ⊢ ∀sctxt v. is_wf_shape_v sctxt v ⇒ is_wf_shape sctxt (shape_of v)
+   
+   [is_wf_shape_v_def]  Theorem
+      
+      ⊢ (∀v sctxt. is_wf_shape_v sctxt (Val v) ⇔ T) ∧
+        (∀vs sctxt.
+           is_wf_shape_v sctxt (RStruct vs) ⇔
+           EVERY (λa. is_wf_shape_v sctxt a) vs) ∧
+        ∀sctxt nm_vs nm.
+          is_wf_shape_v sctxt (NStruct nm nm_vs) ⇔
+          ALOOKUP sctxt nm ≠ NONE ∧
+          EVERY (λa. is_wf_shape_v sctxt a) (MAP SND nm_vs)
+   
+   [is_wf_shape_v_drop]  Theorem
+      
+      ⊢ ∀sctxt v. is_wf_shape_v (DROP k sctxt) v ⇒ is_wf_shape_v sctxt v
+   
+   [is_wf_shape_v_ind]  Theorem
+      
+      ⊢ ∀P. (∀sctxt v. P sctxt (Val v)) ∧
+            (∀sctxt vs. (∀a. MEM a vs ⇒ P sctxt a) ⇒ P sctxt (RStruct vs)) ∧
+            (∀sctxt nm nm_vs.
+               (∀a. MEM a (MAP SND nm_vs) ⇒ P sctxt a) ⇒
+               P sctxt (NStruct nm nm_vs)) ⇒
+            ∀v v1. P v v1
+   
+   [is_wf_shape_v_nil]  Theorem
+      
+      ⊢ ∀xs. xs = [] ⇒ (is_wf_shape xs (shape_of v) ⇔ is_wf_shape_v xs v)
+   
+   [length_flatten_eq_size_of_shape]  Theorem
+      
+      ⊢ ∀v. is_wf_shape_nil (shape_of v) ⇒
+            LENGTH (flatten v) = size_of_shape (shape_of v)
+   
+   [length_with_shape_eq_shape]  Theorem
+      
+      ⊢ ∀sh ns.
+          LENGTH ns = size_of_shape (Comb sh) ⇒
+          LENGTH sh = LENGTH (with_shape sh ns)
+   
+   [list_rel_flatten_with_shape_flookup]  Theorem
+      
+      ⊢ ∀sh ns args v n n'.
+          ALL_DISTINCT ns ∧ LENGTH ns = LENGTH (FLAT (MAP flatten args)) ∧
+          size_of_shape (Comb sh) = LENGTH (FLAT (MAP flatten args)) ∧
+          args❲n❳ = v ∧ n < LENGTH args ∧ LENGTH args = LENGTH sh ∧
+          LIST_REL (λsh arg. sh = shape_of arg) sh args ∧
+          EVERY is_wf_shape_v_nil args ∧
+          LENGTH (with_shape sh ns)❲n❳ = LENGTH (flatten v) ∧
+          n' < LENGTH (with_shape sh ns)❲n❳ ⇒
+          FLOOKUP (FEMPTY |++ ZIP (ns,FLAT (MAP flatten args)))
+            (with_shape sh ns)❲n❳❲n'❳ = SOME (flatten v)❲n'❳
+   
+   [list_rel_flatten_with_shape_length]  Theorem
+      
+      ⊢ ∀sh ns args v n.
+          LENGTH ns = LENGTH (FLAT (MAP flatten args)) ∧
+          size_of_shape (Comb sh) = LENGTH (FLAT (MAP flatten args)) ∧
+          args❲n❳ = v ∧ n < LENGTH args ∧ LENGTH args = LENGTH sh ∧
+          LIST_REL (λsh arg. sh = shape_of arg) sh args ∧
+          EVERY is_wf_shape_v_nil args ⇒
+          LENGTH (with_shape sh ns)❲n❳ = LENGTH (flatten v)
+   
+   [list_rel_length_shape_of_flatten]  Theorem
+      
+      ⊢ ∀vshs args.
+          LIST_REL (λvsh arg. SND vsh = shape_of arg) vshs args ∧
+          EVERY is_wf_shape_v_nil args ⇒
+          size_of_shape (Comb (MAP SND vshs)) =
+          LENGTH (FLAT (MAP flatten args))
+   
+   [localised_exp_simps]  Theorem
+      
+      ⊢ localised_exp (Const c) ∧ (localised_exp (Var v m) ⇔ v = Local) ∧
+        (localised_exp (RStruct l) ⇔ EVERY localised_exp l) ∧
+        (localised_exp (RField n e) ⇔ localised_exp e) ∧
+        (localised_exp (NStruct m l) ⇔ EVERY localised_exp (MAP SND l)) ∧
+        (localised_exp (NField m e) ⇔ localised_exp e) ∧
+        (localised_exp (Load s e) ⇔ localised_exp e) ∧
+        (localised_exp (Load32 e) ⇔ localised_exp e) ∧
+        (localised_exp (LoadByte e) ⇔ localised_exp e) ∧
+        (localised_exp (Op b l) ⇔ EVERY localised_exp l) ∧
+        (localised_exp (Panop p l) ⇔ EVERY localised_exp l) ∧
+        (localised_exp (Cmp c e e0) ⇔ localised_exp e ∧ localised_exp e0) ∧
+        (localised_exp (Shift s e n) ⇔ localised_exp e) ∧
+        localised_exp BaseAddr ∧ localised_exp TopAddr ∧
+        localised_exp BytesInWord
+   
+   [localised_prog_def]  Theorem
+      
+      ⊢ (∀v0 e. localised_prog (Raise v0 e) ⇔ localised_exp e) ∧
+        (∀v2 v1 p e.
+           localised_prog (Dec v1 v2 e p) ⇔
+           localised_exp e ∧ localised_prog p) ∧
+        (∀q p.
+           localised_prog (Seq p q) ⇔ localised_prog p ∧ localised_prog q) ∧
+        (∀q p e.
+           localised_prog (If e p q) ⇔
+           localised_exp e ∧ localised_prog p ∧ localised_prog q) ∧
+        (∀p e.
+           localised_prog (While e p) ⇔ localised_exp e ∧ localised_prog p) ∧
+        (∀e2 e1.
+           localised_prog (Store e1 e2) ⇔
+           localised_exp e1 ∧ localised_exp e2) ∧
+        (∀e2 e1.
+           localised_prog (Store32 e1 e2) ⇔
+           localised_exp e1 ∧ localised_exp e2) ∧
+        (∀e2 e1.
+           localised_prog (StoreByte e1 e2) ⇔
+           localised_exp e1 ∧ localised_exp e2) ∧
+        (∀fn e4 e3 e2 e1.
+           localised_prog (ExtCall fn e1 e2 e3 e4) ⇔
+           localised_exp e1 ∧ localised_exp e2 ∧ localised_exp e3 ∧
+           localised_exp e4) ∧
+        (∀e. localised_prog (Return e) ⇔ localised_exp e) ∧
+        (∀op e2 e1.
+           localised_prog (ShMemStore op e1 e2) ⇔
+           localised_exp e1 ∧ localised_exp e2) ∧
+        (∀vk v op e.
+           localised_prog (ShMemLoad op vk v e) ⇔
+           vk = Local ∧ localised_exp e) ∧
+        (∀hdl f args.
+           localised_prog (Call hdl f args) ⇔
+           EVERY localised_exp args ∧
+           (case hdl of
+              NONE => T
+            | SOME (v4,NONE) => T
+            | SOME (v4,SOME (v10,v14,p)) => localised_prog p) ∧
+           case hdl of
+             NONE => T
+           | SOME (NONE,v5) => T
+           | SOME (SOME (Local,v11),v5) => T
+           | SOME (SOME (Global,v11),v5) => F) ∧
+        (∀vn sh p fn args.
+           localised_prog (DecCall vn sh fn args p) ⇔
+           EVERY localised_exp args ∧ localised_prog p) ∧
+        (∀v3 e. localised_prog (Assign Local v3 e) ⇔ localised_exp e) ∧
+        (∀v5 v4. localised_prog (Assign Global v4 v5) ⇔ F) ∧
+        (∀v7 v6 es.
+           localised_prog (Primitive v6 v7 es) ⇔ EVERY localised_exp es) ∧
+        (localised_prog Skip ⇔ T) ∧ (localised_prog Break ⇔ T) ∧
+        (localised_prog Continue ⇔ T) ∧ (localised_prog Tick ⇔ T) ∧
+        ∀v59 v58. localised_prog (Annot v58 v59) ⇔ T
+   
+   [localised_prog_ind]  Theorem
+      
+      ⊢ ∀P. (∀v0 e. P (Raise v0 e)) ∧
+            (∀v1 v2 e p. P p ⇒ P (Dec v1 v2 e p)) ∧
+            (∀p q. P p ∧ P q ⇒ P (Seq p q)) ∧
+            (∀e p q. P p ∧ P q ⇒ P (If e p q)) ∧
+            (∀e p. P p ⇒ P (While e p)) ∧ (∀e1 e2. P (Store e1 e2)) ∧
+            (∀e1 e2. P (Store32 e1 e2)) ∧ (∀e1 e2. P (StoreByte e1 e2)) ∧
+            (∀fn e1 e2 e3 e4. P (ExtCall fn e1 e2 e3 e4)) ∧
+            (∀e. P (Return e)) ∧ (∀op e1 e2. P (ShMemStore op e1 e2)) ∧
+            (∀op vk v e. P (ShMemLoad op vk v e)) ∧
+            (∀hdl f args.
+               (∀v1 v4 v5 v7 v10 v11 v14 p.
+                  hdl = SOME v1 ∧ v1 = (v4,v5) ∧ v5 = SOME v7 ∧
+                  v7 = (v10,v11) ∧ v11 = (v14,p) ⇒
+                  P p) ⇒
+               P (Call hdl f args)) ∧
+            (∀vn sh fn args p. P p ⇒ P (DecCall vn sh fn args p)) ∧
+            (∀v3 e. P (Assign Local v3 e)) ∧
+            (∀v4 v5. P (Assign Global v4 v5)) ∧
+            (∀v6 v7 es. P (Primitive v6 v7 es)) ∧ P Skip ∧ P Break ∧
+            P Continue ∧ P Tick ∧ (∀v58 v59. P (Annot v58 v59)) ⇒
+            ∀v. P v
+   
+   [lookup_code_wf_shape_invariant_step]  Theorem
+      
+      ⊢ OPT_MMAP (eval s) argexps = SOME args ∧
+        lookup_code s.code fname args = SOME (prog,newlocals) ∧
+        FEVERY (λ(nm,v). is_wf_shape_v s.structs v) s.locals ∧
+        FEVERY (λ(nm,v). is_wf_shape_v s.structs v) s.globals ⇒
+        FEVERY (λ(nm,v). is_wf_shape_v s.structs v) newlocals
+   
+   [mem_load_is_wf_shape_v]  Theorem
+      
+      ⊢ (∀shape w sa sm sctxt v.
+           mem_load shape w sa sm sctxt = SOME v ⇒ is_wf_shape_v sctxt v) ∧
+        (∀shapes w sa sm sctxt vs.
+           mem_loads shapes w sa sm sctxt = SOME vs ⇒
+           EVERY (is_wf_shape_v sctxt) vs) ∧
+        ∀flds w sa sm sctxt nm_vs.
+          mem_load_flds flds w sa sm sctxt = SOME nm_vs ⇒
+          EVERY (is_wf_shape_v sctxt) (MAP SND nm_vs)
+   
+   [mem_load_some_shape_eq]  Theorem
+      
+      ⊢ ∀sh adr dm m stcs v.
+          mem_load sh adr dm m stcs = SOME v ⇒ shape_of v = sh
+   
+   [mem_load_swap_memaddrs]  Theorem
+      
+      ⊢ (∀sh addr addrs memory stcs v addrs2.
+           mem_load sh addr addrs memory stcs = SOME v ∧ addrs ⊆ addrs2 ⇒
+           mem_load sh addr addrs2 memory stcs = SOME v) ∧
+        (∀shs addr addrs memory stcs v addrs2.
+           mem_loads shs addr addrs memory stcs = SOME v ∧ addrs ⊆ addrs2 ⇒
+           mem_loads shs addr addrs2 memory stcs = SOME v) ∧
+        ∀flds addr addrs memory stcs vs addrs2.
+          mem_load_flds flds addr addrs memory stcs = SOME vs ∧
+          addrs ⊆ addrs2 ⇒
+          mem_load_flds flds addr addrs2 memory stcs = SOME vs
+   
+   [mem_load_swap_memory]  Theorem
+      
+      ⊢ (∀sh addr addrs memory1 stcs v memory2.
+           mem_load sh addr addrs memory1 stcs = SOME v ∧
+           (∀addr. addr ∈ addrs ⇒ memory1 addr = memory2 addr) ⇒
+           mem_load sh addr addrs memory2 stcs = SOME v) ∧
+        (∀shs addr addrs memory1 stcs v memory2.
+           mem_loads shs addr addrs memory1 stcs = SOME v ∧
+           (∀addr. addr ∈ addrs ⇒ memory1 addr = memory2 addr) ⇒
+           mem_loads shs addr addrs memory2 stcs = SOME v) ∧
+        ∀flds addr addrs memory1 stcs vs memory2.
+          mem_load_flds flds addr addrs memory1 stcs = SOME vs ∧
+          (∀addr. addr ∈ addrs ⇒ memory1 addr = memory2 addr) ⇒
+          mem_load_flds flds addr addrs memory2 stcs = SOME vs
+   
+   [mem_loads_some_shape_eq]  Theorem
+      
+      ⊢ (∀sh adr dm m stcs v.
+           mem_load sh adr dm m stcs = SOME v ⇒ shape_of v = sh) ∧
+        (∀shs adr dm m stcs vs.
+           mem_loads shs adr dm m stcs = SOME vs ⇒ MAP shape_of vs = shs) ∧
+        ∀flds adr dm m stcs vs.
+          mem_load_flds flds adr dm m stcs = SOME vs ⇒
+          MAP (shape_of ∘ SND) vs = MAP SND flds
+   
+   [mem_with_shape_length]  Theorem
+      
+      ⊢ ∀sh ns n.
+          LENGTH ns = size_of_shape (Comb sh) ∧ n < LENGTH sh ⇒
+          MEM (with_shape sh ns)❲n❳ (with_shape sh ns)
+   
+   [nameless_exp_simps]  Theorem
+      
+      ⊢ nameless_exp (Const c) ∧ nameless_exp (Var v m) ∧
+        (nameless_exp (RStruct l) ⇔ EVERY nameless_exp l) ∧
+        (nameless_exp (RField n e) ⇔ nameless_exp e) ∧
+        ¬nameless_exp (NStruct m l) ∧ ¬nameless_exp (NField m e) ∧
+        (nameless_exp (Load s e) ⇔ nameless_exp e) ∧
+        (nameless_exp (Load32 e) ⇔ nameless_exp e) ∧
+        (nameless_exp (LoadByte e) ⇔ nameless_exp e) ∧
+        (nameless_exp (Op b l) ⇔ EVERY nameless_exp l) ∧
+        (nameless_exp (Panop p l) ⇔ EVERY nameless_exp l) ∧
+        (nameless_exp (Cmp c e e0) ⇔ nameless_exp e ∧ nameless_exp e0) ∧
+        (nameless_exp (Shift s e n) ⇔ nameless_exp e) ∧
+        nameless_exp BaseAddr ∧ nameless_exp TopAddr ∧
+        nameless_exp BytesInWord
+   
+   [opt_mmap_eval_upd_clock_eq]  Theorem
+      
+      ⊢ ∀es s ck.
+          OPT_MMAP (eval (s with clock := ck + s.clock)) es =
+          OPT_MMAP (eval s) es
+   
+   [opt_mmap_eval_upd_clock_eq1]  Theorem
+      
+      ⊢ ∀es s ck.
+          OPT_MMAP (eval (s with clock := ck)) es = OPT_MMAP (eval s) es
+   
+   [pan_primop_is_wf_shape_v]  Theorem
+      
+      ⊢ ∀sctxt pop args value.
+          pan_primop pop args = SOME value ⇒ is_wf_shape_v sctxt value
+   
+   [pan_sem_is_wrapper]  Theorem
+      
+      ⊢ semantics s start =
+        (let
+           prog = TailCall start []
+         in
+           semantics_wrapper
+             (((λres.
+                    case res of
+                      NONE => RunError
+                    | SOME Error => RunError
+                    | SOME TimeOut => Incomplete
+                    | SOME Break => RunError
+                    | SOME Continue => RunError
+                    | SOME (Return v6) => CompleteResult Success
+                    | SOME (Exception v7 v8) => RunError
+                    | SOME (FinalFFI e) => CompleteResult (FFI_outcome e)) ##
+               (λs. s.ffi.io_events)) ∘
+              (λk. evaluate (prog,s with clock := k))))
+   
+   [read_write_bytearray_lemma]  Theorem
+      
+      ⊢ ∀n addr bytes.
+          good_dimindex (:α) ∧
+          read_bytearray addr n (mem_load_byte m addrs be) = SOME bytes ⇒
+          write_bytearray addr bytes m addrs be = m
+   
+   [semantics_decls_has_main]  Theorem
+      
+      ⊢ semantics_decls s start code ≠ Fail ⇒
+        ∃body. FLOOKUP (s.code |++ functions code) start = SOME ([],body)
+   
+   [semantics_decls_has_main']  Theorem
+      
+      ⊢ semantics_decls s start code ≠ Fail ⇒
+        ∃body. FLOOKUP (s.code |++ functions code) start = SOME ([],body)
+   
+   [semantics_run_res_11]  Theorem
+      
+      ⊢ ∀a a'. CompleteResult a = CompleteResult a' ⇔ a = a'
+   
+   [semantics_run_res_Axiom]  Theorem
+      
+      ⊢ ∀f0 f1 f2. ∃fn.
+          fn RunError = f0 ∧ (∀a. fn (CompleteResult a) = f1 a) ∧
+          fn Incomplete = f2
+   
+   [semantics_run_res_case_cong]  Theorem
+      
+      ⊢ ∀M M' v f v1.
+          M = M' ∧ (M' = RunError ⇒ v = v') ∧
+          (∀a. M' = CompleteResult a ⇒ f a = f' a) ∧
+          (M' = Incomplete ⇒ v1 = v1') ⇒
+          semantics_run_res_CASE M v f v1 =
+          semantics_run_res_CASE M' v' f' v1'
+   
+   [semantics_run_res_case_eq]  Theorem
+      
+      ⊢ semantics_run_res_CASE x v f v1 = v' ⇔
+        x = RunError ∧ v = v' ∨ (∃a. x = CompleteResult a ∧ f a = v') ∨
+        x = Incomplete ∧ v1 = v'
+   
+   [semantics_run_res_distinct]  Theorem
+      
+      ⊢ (∀a. RunError ≠ CompleteResult a) ∧ RunError ≠ Incomplete ∧
+        ∀a. CompleteResult a ≠ Incomplete
+   
+   [semantics_run_res_induction]  Theorem
+      
+      ⊢ ∀P. P RunError ∧ (∀a. P (CompleteResult a)) ∧ P Incomplete ⇒
+            ∀s. P s
+   
+   [semantics_run_res_nchotomy]  Theorem
+      
+      ⊢ ∀ss. ss = RunError ∨ (∃a. ss = CompleteResult a) ∨ ss = Incomplete
+   
+   [semantics_wrapper_eq]  Theorem
+      
+      ⊢ semantics_wrapper absf ≠ Fail ⇒
+        (∀k r ev.
+           absf k = (r,ev) ∧ r ≠ RunError ⇒ ∃k'. concf (k + k') = (r,ev)) ⇒
+        (∀k k' r ev.
+           concf k = (r,ev) ⇒ r ≠ Incomplete ⇒ concf (k + k') = (r,ev)) ⇒
+        (∀k k' r ev.
+           absf k = (r,ev) ⇒ r ≠ Incomplete ⇒ absf (k + k') = (r,ev)) ⇒
+        (∀k k' ev.
+           absf (k + k') = (Incomplete,ev) ⇒
+           ∃r' ev'. absf k = (r',ev') ∧ ev' ≼ ev) ⇒
+        (∀k k' ev.
+           concf (k + k') = (Incomplete,ev) ⇒
+           ∃r' ev'. concf k = (r',ev') ∧ ev' ≼ ev) ⇒
+        semantics_wrapper concf = semantics_wrapper absf
+   
+   [shape_of_val]  Theorem
+      
+      ⊢ shape_of (Val x) = One
+   
+   [size_of_sh_with_ctxt_eq]  Theorem
+      
+      ⊢ ∀sh sctxt.
+          is_wf_shape_nil sh ⇒
+          size_of_sh_with_ctxt sctxt sh = size_of_shape sh
+   
+   [update_locals_not_vars_eval_eq]  Theorem
+      
+      ⊢ ∀s e v n w.
+          ¬MEM n (var_exp e) ∧ eval s e = SOME v ⇒
+          eval (s with locals := s.locals⟨n ↦ w⟩) e = SOME v
+   
+   [update_locals_not_vars_eval_eq_NONE]  Theorem
+      
+      ⊢ ∀s e v n w.
+          ¬MEM n (var_exp e) ∧ eval s e = NONE ⇒
+          eval (s with locals := s.locals⟨n ↦ w⟩) e = NONE
+   
+   [update_locals_not_vars_eval_eq_eq]  Theorem
+      
+      ⊢ ∀s e v n w.
+          ¬MEM n (var_exp e) ⇒
+          eval (s with locals := s.locals⟨n ↦ w⟩) e = eval s e
+   
+   [v2word_def]  Theorem
+      
+      ⊢ v2word (ValWord v) = Word v
+   
+   [v2word_ind]  Theorem
+      
+      ⊢ ∀P. (∀v. P (ValWord v)) ∧ (∀v3. P (RStruct v3)) ∧
+            (∀v6 v7. P (NStruct v6 v7)) ⇒
+            ∀v. P v
+   
+   [with_shape_el_take_drop_eq]  Theorem
+      
+      ⊢ ∀sh ns n.
+          LENGTH ns = size_of_shape (Comb sh) ∧ n < LENGTH sh ⇒
+          (with_shape sh ns)❲n❳ =
+          TAKE (size_of_shape sh❲n❳)
+            (DROP (size_of_shape (Comb (TAKE n sh))) ns)
+   
+   [write_bytearray_update_byte]  Theorem
+      
+      ⊢ ∀bytes ad ad' m adrs be.
+          byte_aligned ad ∧ (∃w. m ad = Word w) ⇒
+          ∃w. write_bytearray ad' bytes m adrs be ad = Word w
+   
+   

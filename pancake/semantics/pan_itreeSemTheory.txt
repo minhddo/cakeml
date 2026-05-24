@@ -1,0 +1,3398 @@
+[itreeTau] Parent theory of "pan_itreeSem"
+   
+   [panProps] Parent theory of "pan_itreeSem"
+   
+   [bst_def]  Definition
+      
+      ⊢ ∀s. bst s =
+            <|locals := s.locals; globals := s.globals;
+              structs := s.structs; code := s.code; eshapes := s.eshapes;
+              memory := s.memory; memaddrs := s.memaddrs;
+              sh_memaddrs := s.sh_memaddrs; be := s.be;
+              base_addr := s.base_addr; top_addr := s.top_addr|>
+   
+   [bstate_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0'.
+                 ∀ $var$('bstate').
+                   (∀a0'.
+                      (∃a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10.
+                         a0' =
+                         (λa0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10.
+                              ind_type$CONSTR 0
+                                (a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10)
+                                (λn. ind_type$BOTTOM)) a0 a1 a2 a3 a4 a5 a6
+                           a7 a8 a9 a10) ⇒
+                      $var$('bstate') a0') ⇒
+                   $var$('bstate') a0') rep
+   
+   [bstate_case_def]  Definition
+      
+      ⊢ ∀a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 f.
+          bstate_CASE (bstate a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10) f =
+          f a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10
+   
+   [bstate_size_def]  Definition
+      
+      ⊢ ∀f a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10.
+          bstate_size f (bstate a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10) =
+          1 +
+          (fmap_size (λk. 0) (λv. 1 + v_size f v) a0 +
+           (fmap_size (λk. 0) (λv. 1 + v_size f v) a1 +
+            (list_size (pair_size mlstring_size struct_info_size) a2 +
+             (fmap_size (λk. 0)
+                (λv.
+                     1 +
+                     pair_size
+                       (list_size (pair_size mlstring_size shape_size))
+                       (prog_size f) v) a3 +
+              (fmap_size (λk. 0) (λv. 1 + shape_size v) a4 +
+               (bool_size a8 + (w2n a9 + w2n a10)))))))
+   
+   [comp_ffi_def]  Definition
+      
+      ⊢ ∀fs t.
+          comp_ffi fs t =
+          WHILE
+            (λ(t,st). case t of Ret v4 => F | Tau v5 => T | Vis v6 v7 => T)
+            (λ(t,st).
+                 case t of
+                   Ret v => (t,st)
+                 | Tau v1 => (v1,st)
+                 | Vis (s,c,ws) g =>
+                   case FST fs s st c ws of
+                     Oracle_return fs' ws' =>
+                       if LENGTH ws = LENGTH ws' then
+                         (g (INL (INR ws')),fs')
+                       else (g (INL (INL FFI_failed)),st)
+                   | Oracle_final outcome => (g (INL (INL outcome)),st))
+            (t,SND fs)
+   
+   [div_def]  Definition
+      
+      ⊢ ∀fs t. div fs t ⇔ ∀n r. ltree fs t ≠ FUNPOW Tau n (Ret r)
+   
+   [empty_locals_def]  Definition
+      
+      ⊢ ∀s. empty_locals s = s with locals := FEMPTY
+   
+   [ext_def]  Definition
+      
+      ⊢ ∀s k ffi.
+          ext s k ffi =
+          <|locals := s.locals; globals := s.globals; structs := s.structs;
+            code := s.code; eshapes := s.eshapes; memory := s.memory;
+            memaddrs := s.memaddrs; sh_memaddrs := s.sh_memaddrs;
+            be := s.be; ffi := ffi; base_addr := s.base_addr;
+            top_addr := s.top_addr; clock := k|>
+   
+   [h_prog_assign_def]  Definition
+      
+      ⊢ ∀vk vname e s.
+          h_prog_assign vk vname e s =
+          Ret
+            (INR
+               (case eval s e of
+                  NONE => (SOME Error,s)
+                | SOME value =>
+                  if is_valid_value s vk vname value then
+                    (NONE,set_kvar vk vname value s)
+                  else (SOME Error,s)))
+   
+   [h_prog_call_def]  Definition
+      
+      ⊢ ∀calltyp fname argexps s.
+          h_prog_call calltyp fname argexps s =
+          case OPT_MMAP (eval s) argexps of
+            NONE => Ret (INR (SOME Error,s))
+          | SOME args =>
+            case lookup_code s.code fname args of
+              NONE => Ret (INR (SOME Error,s))
+            | SOME (callee_prog,newlocals) =>
+              Vis (INL (callee_prog,s with locals := newlocals))
+                (h_handle_call_ret calltyp s)
+   
+   [h_prog_cond_def]  Definition
+      
+      ⊢ ∀gexp p1 p2 s.
+          h_prog_cond gexp p1 p2 s =
+          case eval s gexp of
+            NONE => Ret (INR (SOME Error,s))
+          | SOME (ValWord g) =>
+            Vis (INL (if g ≠ 0w then p1 else p2,s))
+              (λa.
+                   Ret
+                     (INR
+                        (case a of
+                           INL v => (SOME Error,s)
+                         | INR (res,s') => (res,s'))))
+          | SOME (RStruct v9) => Ret (INR (SOME Error,s))
+          | SOME (NStruct v10 v11) => Ret (INR (SOME Error,s))
+   
+   [h_prog_dec_def]  Definition
+      
+      ⊢ ∀vname sh e p s.
+          h_prog_dec vname sh e p s =
+          case eval s e of
+            NONE => Ret (INR (SOME Error,s))
+          | SOME value =>
+            if sh = shape_of value then
+              Vis (INL (p,s with locals := s.locals⟨vname ↦ value⟩))
+                (λa.
+                     Ret
+                       (INR
+                          (case a of
+                             INL v => (SOME Error,s)
+                           | INR (res,s') =>
+                             (res,
+                              s' with
+                              locals :=
+                                res_var s'.locals
+                                  (vname,FLOOKUP s.locals vname)))))
+            else Ret (INR (SOME Error,s))
+   
+   [h_prog_deccall_def]  Definition
+      
+      ⊢ ∀rt shape fname argexps prog1 s.
+          h_prog_deccall rt shape fname argexps prog1 s =
+          case OPT_MMAP (eval s) argexps of
+            NONE => Ret (INR (SOME Error,s))
+          | SOME args =>
+            case lookup_code s.code fname args of
+              NONE => Ret (INR (SOME Error,s))
+            | SOME (callee_prog,newlocals) =>
+              Vis (INL (callee_prog,s with locals := newlocals))
+                (h_handle_deccall_ret rt shape prog1 s)
+   
+   [h_prog_def_primitive]  Definition
+      
+      ⊢ h_prog =
+        WFREC (@R. WF R)
+          (λh_prog a.
+               case a of
+                 (Skip,s) => I (Ret (INR (NONE,s)))
+               | (Dec vname sh e p,s) => I (h_prog_dec vname sh e p s)
+               | (Assign vk vname' e',s) =>
+                 I (h_prog_assign vk vname' e' s)
+               | (Primitive vname'' pop es,s) =>
+                 I (h_prog_primitive vname'' pop es s)
+               | (Store dst src,s) => I (h_prog_store dst src s)
+               | (Store32 dst' src',s) => I (h_prog_store_32 dst' src' s)
+               | (StoreByte dst'' src'',s) =>
+                 I (h_prog_store_byte dst'' src'' s)
+               | (Seq p1 p2,s) => I (h_prog_seq p1 p2 s)
+               | (If gexp p1' p2',s) => I (h_prog_cond gexp p1' p2' s)
+               | (While gexp' p',s) => I (h_prog_while gexp' p' s)
+               | (Break,s) => I (Ret (INR (SOME Break,s)))
+               | (Continue,s) => I (Ret (INR (SOME Continue,s)))
+               | (Call calltyp tgtexp argexps,s) =>
+                 I (h_prog_call calltyp tgtexp argexps s)
+               | (DecCall rt shape tgtexp' argexps' prog1,s) =>
+                 I (h_prog_deccall rt shape tgtexp' argexps' prog1 s)
+               | (ExtCall ffi_name conf_ptr conf_len array_ptr array_len,s) =>
+                 I
+                   (h_prog_ext_call ffi_name conf_ptr conf_len array_ptr
+                      array_len s)
+               | (Raise eid e'³',s) => I (h_prog_raise eid e'³' s)
+               | (Return e'⁴',s) => I (h_prog_return e'⁴' s)
+               | (ShMemLoad op vk' v ad,s) =>
+                 I (h_prog_sh_mem_load op vk' v ad s)
+               | (ShMemStore op' ad' e'',s) =>
+                 I (h_prog_sh_mem_store op' ad' e'' s)
+               | (Tick,s) => I (Ret (INR (NONE,s)))
+               | (Annot v0 v1,s) => I (Ret (INR (NONE,s))))
+   
+   [h_prog_ext_call_def]  Definition
+      
+      ⊢ ∀ffi_name conf_ptr conf_len array_ptr array_len s.
+          h_prog_ext_call ffi_name conf_ptr conf_len array_ptr array_len s =
+          case
+            (eval s conf_ptr,eval s conf_len,eval s array_ptr,
+             eval s array_len)
+          of
+            (NONE,v7) => Ret (INR (SOME Error,s))
+          | (SOME (Val v14),NONE,v21) => Ret (INR (SOME Error,s))
+          | (SOME (Val v14),SOME (Val v28),NONE,v35) =>
+            Ret (INR (SOME Error,s))
+          | (SOME (Val v14),SOME (Val v28),SOME (Val v42),NONE) =>
+            Ret (INR (SOME Error,s))
+          | (SOME (ValWord conf_ptr_adr),SOME (ValWord conf_sz),
+           SOME (ValWord array_ptr_adr),SOME (ValWord array_sz)) =>
+            (case
+               (read_bytearray conf_ptr_adr (w2n conf_sz)
+                  (mem_load_byte s.memory s.memaddrs s.be),
+                read_bytearray array_ptr_adr (w2n array_sz)
+                  (mem_load_byte s.memory s.memaddrs s.be))
+             of
+               (NONE,v5) => Ret (INR (SOME Error,s))
+             | (SOME conf_bytes,NONE) => Ret (INR (SOME Error,s))
+             | (SOME conf_bytes,SOME array_bytes) =>
+               if explode ffi_name ≠ "" then
+                 Vis (INR (ExtCall ffi_name,conf_bytes,array_bytes))
+                   (λres.
+                        Ret
+                          (INR
+                             (case res of
+                                INL (INL outcome) =>
+                                  (SOME
+                                     (FinalFFI
+                                        (Final_event (ExtCall ffi_name)
+                                           conf_bytes array_bytes outcome)),
+                                   empty_locals s)
+                              | INL (INR new_bytes) =>
+                                if
+                                  LENGTH new_bytes = LENGTH array_bytes
+                                then
+                                  (let
+                                     nmem =
+                                       write_bytearray array_ptr_adr
+                                         new_bytes s.memory s.memaddrs s.be
+                                   in
+                                     (NONE,s with memory := nmem))
+                                else
+                                  (SOME
+                                     (FinalFFI
+                                        (Final_event (ExtCall ffi_name)
+                                           conf_bytes array_bytes
+                                           FFI_failed)),empty_locals s)
+                              | INR v1 => (SOME Error,s))))
+               else
+                 Ret
+                   (INR
+                      (NONE,
+                       s with
+                       memory :=
+                         write_bytearray array_ptr_adr array_bytes s.memory
+                           s.memaddrs s.be)))
+          | (SOME (Val v14),SOME (Val v28),SOME (Val v42),
+           SOME (RStruct v53)) =>
+            Ret (INR (SOME Error,s))
+          | (SOME (Val v14),SOME (Val v28),SOME (Val v42),
+           SOME (NStruct v54 v55)) =>
+            Ret (INR (SOME Error,s))
+          | (SOME (Val v14),SOME (Val v28),SOME (RStruct v43),v35) =>
+            Ret (INR (SOME Error,s))
+          | (SOME (Val v14),SOME (Val v28),SOME (NStruct v44 v45),v35) =>
+            Ret (INR (SOME Error,s))
+          | (SOME (Val v14),SOME (RStruct v29),v21) =>
+            Ret (INR (SOME Error,s))
+          | (SOME (Val v14),SOME (NStruct v30 v31),v21) =>
+            Ret (INR (SOME Error,s))
+          | (SOME (RStruct v15),v7) => Ret (INR (SOME Error,s))
+          | (SOME (NStruct v16 v17),v7) => Ret (INR (SOME Error,s))
+   
+   [h_prog_primitive_def]  Definition
+      
+      ⊢ ∀vname pop es s.
+          h_prog_primitive vname pop es s =
+          Ret
+            (INR
+               (case OPT_MMAP (eval s) es of
+                  NONE => (SOME Error,s)
+                | SOME vs =>
+                  case pan_primop pop vs of
+                    NONE => (SOME Error,s)
+                  | SOME value =>
+                    if is_valid_value s Local vname value then
+                      (NONE,set_var vname value s)
+                    else (SOME Error,s)))
+   
+   [h_prog_raise_def]  Definition
+      
+      ⊢ ∀eid e s.
+          h_prog_raise eid e s =
+          Ret
+            (INR
+               (case (FLOOKUP s.eshapes eid,eval s e) of
+                  (NONE,v3) => (SOME Error,s)
+                | (SOME sh,NONE) => (SOME Error,s)
+                | (SOME sh,SOME value) =>
+                  if
+                    shape_of value = sh ∧
+                    size_of_sh_with_ctxt s.structs (shape_of value) ≤ 32
+                  then
+                    (SOME (Exception eid value),empty_locals s)
+                  else (SOME Error,s)))
+   
+   [h_prog_return_def]  Definition
+      
+      ⊢ ∀e s.
+          h_prog_return e s =
+          Ret
+            (INR
+               (case eval s e of
+                  NONE => (SOME Error,s)
+                | SOME value =>
+                  if
+                    size_of_sh_with_ctxt s.structs (shape_of value) ≤ 32
+                  then
+                    (SOME (Return value),empty_locals s)
+                  else (SOME Error,s)))
+   
+   [h_prog_seq_def]  Definition
+      
+      ⊢ ∀p1 p2 s.
+          h_prog_seq p1 p2 s =
+          Vis (INL (p1,s))
+            (λa.
+                 case a of
+                   INL v2 => Ret (INR (SOME Error,s))
+                 | INR (NONE,s') =>
+                   Vis (INL (p2,s'))
+                     (λa.
+                          Ret
+                            (INR
+                               (case a of
+                                  INL v => (SOME Error,s)
+                                | INR (res,s') => (res,s'))))
+                 | INR (res,s') => Ret (INR (res,s')))
+   
+   [h_prog_sh_mem_load_def]  Definition
+      
+      ⊢ ∀op vk v ad s.
+          h_prog_sh_mem_load op vk v ad s =
+          case eval s ad of
+            NONE => Ret (INR (SOME Error,s))
+          | SOME (ValWord addr) =>
+            (case lookup_kvar vk v s of
+               NONE => Ret (INR (SOME Error,s))
+             | SOME (Val v9) =>
+               (let
+                  nb = nb_op op;
+                  bytes = word_to_bytes addr F
+                in
+                  if nb = 0 then
+                    if addr ∈ s.sh_memaddrs then
+                      Vis (INR (SharedMem MappedRead,[n2w nb],bytes))
+                        (λres.
+                             Ret
+                               (INR
+                                  (case res of
+                                     INL (INL outcome) =>
+                                       (SOME
+                                          (FinalFFI
+                                             (Final_event
+                                                (SharedMem MappedRead)
+                                                [n2w nb] bytes outcome)),
+                                        empty_locals s)
+                                   | INL (INR new_bytes) =>
+                                     if
+                                       LENGTH new_bytes = LENGTH bytes
+                                     then
+                                       (NONE,
+                                        set_kvar vk v
+                                          (ValWord
+                                             (word_of_bytes F 0w new_bytes))
+                                          s)
+                                     else
+                                       (SOME
+                                          (FinalFFI
+                                             (Final_event
+                                                (SharedMem MappedRead)
+                                                [n2w nb] bytes FFI_failed)),
+                                        empty_locals s)
+                                   | INR v2 => (SOME Error,s))))
+                    else Ret (INR (SOME Error,s))
+                  else if byte_align addr ∈ s.sh_memaddrs then
+                    Vis (INR (SharedMem MappedRead,[n2w nb],bytes))
+                      (λres.
+                           Ret
+                             (INR
+                                (case res of
+                                   INL (INL outcome) =>
+                                     (SOME
+                                        (FinalFFI
+                                           (Final_event
+                                              (SharedMem MappedRead)
+                                              [n2w nb] bytes outcome)),
+                                      empty_locals s)
+                                 | INL (INR new_bytes) =>
+                                   if LENGTH new_bytes = LENGTH bytes then
+                                     (NONE,
+                                      set_kvar vk v
+                                        (ValWord
+                                           (word_of_bytes F 0w new_bytes))
+                                        s)
+                                   else
+                                     (SOME
+                                        (FinalFFI
+                                           (Final_event
+                                              (SharedMem MappedRead)
+                                              [n2w nb] bytes FFI_failed)),
+                                      empty_locals s)
+                                 | INR v2 => (SOME Error,s))))
+                  else Ret (INR (SOME Error,s)))
+             | SOME (RStruct v10) => Ret (INR (SOME Error,s))
+             | SOME (NStruct v11 v12) => Ret (INR (SOME Error,s)))
+          | SOME (RStruct v15) => Ret (INR (SOME Error,s))
+          | SOME (NStruct v16 v17) => Ret (INR (SOME Error,s))
+   
+   [h_prog_sh_mem_store_def]  Definition
+      
+      ⊢ ∀op ad e s.
+          h_prog_sh_mem_store op ad e s =
+          case (eval s ad,eval s e) of
+            (NONE,v5) => Ret (INR (SOME Error,s))
+          | (SOME (Val v12),NONE) => Ret (INR (SOME Error,s))
+          | (SOME (ValWord addr),SOME (ValWord w)) =>
+            (let
+               nb = nb_op op
+             in
+               if nb = 0 then
+                 if addr ∈ s.sh_memaddrs then
+                   (let
+                      bytes = word_to_bytes w F ++ word_to_bytes addr F
+                    in
+                      Vis (INR (SharedMem MappedWrite,[n2w nb],bytes))
+                        (λres.
+                             Ret
+                               (INR
+                                  (case res of
+                                     INL (INL outcome) =>
+                                       (SOME
+                                          (FinalFFI
+                                             (Final_event
+                                                (SharedMem MappedWrite)
+                                                [n2w nb] bytes outcome)),s)
+                                   | INL (INR new_bytes) =>
+                                     if
+                                       LENGTH new_bytes = LENGTH bytes
+                                     then
+                                       (NONE,s)
+                                     else
+                                       (SOME
+                                          (FinalFFI
+                                             (Final_event
+                                                (SharedMem MappedWrite)
+                                                [n2w nb] bytes FFI_failed)),
+                                        s)
+                                   | INR v1 => (SOME Error,s)))))
+                 else Ret (INR (SOME Error,s))
+               else if byte_align addr ∈ s.sh_memaddrs then
+                 (let
+                    bytes =
+                      TAKE nb (word_to_bytes w F) ++ word_to_bytes addr F
+                  in
+                    Vis (INR (SharedMem MappedWrite,[n2w nb],bytes))
+                      (λres.
+                           Ret
+                             (INR
+                                (case res of
+                                   INL (INL outcome) =>
+                                     (SOME
+                                        (FinalFFI
+                                           (Final_event
+                                              (SharedMem MappedWrite)
+                                              [n2w nb] bytes outcome)),s)
+                                 | INL (INR new_bytes) =>
+                                   if LENGTH new_bytes = LENGTH bytes then
+                                     (NONE,s)
+                                   else
+                                     (SOME
+                                        (FinalFFI
+                                           (Final_event
+                                              (SharedMem MappedWrite)
+                                              [n2w nb] bytes FFI_failed)),s)
+                                 | INR v1 => (SOME Error,s)))))
+               else Ret (INR (SOME Error,s)))
+          | (SOME (Val v12),SOME (RStruct v23)) => Ret (INR (SOME Error,s))
+          | (SOME (Val v12),SOME (NStruct v24 v25)) =>
+            Ret (INR (SOME Error,s))
+          | (SOME (RStruct v13),v5) => Ret (INR (SOME Error,s))
+          | (SOME (NStruct v14 v15),v5) => Ret (INR (SOME Error,s))
+   
+   [h_prog_store_32_def]  Definition
+      
+      ⊢ ∀dst src s.
+          h_prog_store_32 dst src s =
+          Ret
+            (INR
+               (case (eval s dst,eval s src) of
+                  (NONE,v3) => (SOME Error,s)
+                | (SOME (Val v10),NONE) => (SOME Error,s)
+                | (SOME (ValWord addr),SOME (ValWord w)) =>
+                  (case
+                     mem_store_32 s.memory s.memaddrs s.be addr (w2w w)
+                   of
+                     NONE => (SOME Error,s)
+                   | SOME m => (NONE,s with memory := m))
+                | (SOME (Val v10),SOME (RStruct v21)) => (SOME Error,s)
+                | (SOME (Val v10),SOME (NStruct v22 v23)) => (SOME Error,s)
+                | (SOME (RStruct v11),v3) => (SOME Error,s)
+                | (SOME (NStruct v12 v13),v3) => (SOME Error,s)))
+   
+   [h_prog_store_byte_def]  Definition
+      
+      ⊢ ∀dst src s.
+          h_prog_store_byte dst src s =
+          Ret
+            (INR
+               (case (eval s dst,eval s src) of
+                  (NONE,v3) => (SOME Error,s)
+                | (SOME (Val v10),NONE) => (SOME Error,s)
+                | (SOME (ValWord addr),SOME (ValWord w)) =>
+                  (case
+                     mem_store_byte s.memory s.memaddrs s.be addr (w2w w)
+                   of
+                     NONE => (SOME Error,s)
+                   | SOME m => (NONE,s with memory := m))
+                | (SOME (Val v10),SOME (RStruct v21)) => (SOME Error,s)
+                | (SOME (Val v10),SOME (NStruct v22 v23)) => (SOME Error,s)
+                | (SOME (RStruct v11),v3) => (SOME Error,s)
+                | (SOME (NStruct v12 v13),v3) => (SOME Error,s)))
+   
+   [h_prog_store_def]  Definition
+      
+      ⊢ ∀dst src s.
+          h_prog_store dst src s =
+          Ret
+            (INR
+               (case (eval s dst,eval s src) of
+                  (NONE,v3) => (SOME Error,s)
+                | (SOME (Val v10),NONE) => (SOME Error,s)
+                | (SOME (ValWord addr),SOME value) =>
+                  (case
+                     mem_stores addr (flatten value) s.memaddrs s.memory
+                   of
+                     NONE => (SOME Error,s)
+                   | SOME m => (NONE,s with memory := m))
+                | (SOME (RStruct v11),v3) => (SOME Error,s)
+                | (SOME (NStruct v12 v13),v3) => (SOME Error,s)))
+   
+   [h_prog_while_def]  Definition
+      
+      ⊢ ∀g p s.
+          h_prog_while g p s =
+          itree_iter
+            (λ(p,s).
+                 case eval s g of
+                   NONE => Ret (INR (INR (SOME Error,s)))
+                 | SOME (ValWord w) =>
+                   if w ≠ 0w then
+                     Vis (INL (p,s))
+                       (λa.
+                            Ret
+                              (case a of
+                                 INL v => INR (INR (SOME Error,s))
+                               | INR (res,s') =>
+                                 case res of
+                                   NONE => INL (p,s')
+                                 | SOME Error => INR (INR (res,s'))
+                                 | SOME TimeOut => INR (INR (res,s'))
+                                 | SOME Break => INR (INR (NONE,s'))
+                                 | SOME Continue => INL (p,s')
+                                 | SOME (Return v6) => INR (INR (res,s'))
+                                 | SOME (Exception v7 v8) =>
+                                   INR (INR (res,s'))
+                                 | SOME (FinalFFI v9) => INR (INR (res,s'))))
+                   else Ret (INR (INR (NONE,s)))
+                 | SOME (RStruct v14) => Ret (INR (INR (SOME Error,s)))
+                 | SOME (NStruct v15 v16) => Ret (INR (INR (SOME Error,s))))
+            (p,s)
+   
+   [is_valid_value_def]  Definition
+      
+      ⊢ ∀s vk v value.
+          is_valid_value s vk v value ⇔
+          case lookup_kvar vk v s of
+            NONE => F
+          | SOME w => shape_of value = shape_of w
+   
+   [itree_evaluate_def]  Definition
+      
+      ⊢ ∀p s.
+          itree_evaluate (p,s) =
+          (let
+             g x = case x of INL l => (SOME Error,s) | INR r => r
+           in
+             itree_unfold
+               (λx.
+                    case x of
+                      Ret r => Ret' (g r)
+                    | Tau t => Tau' t
+                    | Vis e f => Vis' e (λx. f (INL x))) (mrec_sem p s))
+   
+   [lookup_kvar_def]  Definition
+      
+      ⊢ ∀vk v s.
+          lookup_kvar vk v s =
+          case vk of
+            Local => FLOOKUP s.locals v
+          | Global => FLOOKUP s.globals v
+   
+   [ltree_def]  Definition
+      
+      ⊢ ∀fs t.
+          ltree fs t =
+          itree_iter
+            (λ(t,st).
+                 case t of
+                   Ret r => Ret (INR r)
+                 | Tau u => Ret (INL (u,st))
+                 | Vis (s,c,ws) g =>
+                   case FST fs s st c ws of
+                     Oracle_return fs' ws' =>
+                       if LENGTH ws = LENGTH ws' then
+                         Ret (INL (g (INL (INR ws')),fs'))
+                       else Ret (INL (g (INL (INL FFI_failed)),st))
+                   | Oracle_final outcome =>
+                     Ret (INL (g (INL (INL outcome)),st))) (t,SND fs)
+   
+   [mrec_def]  Definition
+      
+      ⊢ ∀rh.
+          mrec rh =
+          itree_iter
+            (λt.
+                 case t of
+                   Ret r => Ret (INR r)
+                 | Tau t => Ret (INL t)
+                 | Vis (INL d) k => Ret (INL (itree_bind (rh d) k))
+                 | Vis (INR e) k => Vis e (Ret ∘ INL ∘ k))
+   
+   [recordtype_bstate_seldef_base_addr_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 b c c0.
+          (bstate f f0 l f1 f2 f3 f4 f5 b c c0).base_addr = c
+   
+   [recordtype_bstate_seldef_base_addr_fupd_def]  Definition
+      
+      ⊢ ∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+          bstate f f0 l f1 f2 f3 f4 f5 b c c0 with base_addr updated_by f6 =
+          bstate f f0 l f1 f2 f3 f4 f5 b (f6 c) c0
+   
+   [recordtype_bstate_seldef_be_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 b c c0.
+          (bstate f f0 l f1 f2 f3 f4 f5 b c c0).be ⇔ b
+   
+   [recordtype_bstate_seldef_be_fupd_def]  Definition
+      
+      ⊢ ∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+          bstate f f0 l f1 f2 f3 f4 f5 b c c0 with be updated_by f6 =
+          bstate f f0 l f1 f2 f3 f4 f5 (f6 b) c c0
+   
+   [recordtype_bstate_seldef_code_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 b c c0.
+          (bstate f f0 l f1 f2 f3 f4 f5 b c c0).code = f1
+   
+   [recordtype_bstate_seldef_code_fupd_def]  Definition
+      
+      ⊢ ∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+          bstate f f0 l f1 f2 f3 f4 f5 b c c0 with code updated_by f6 =
+          bstate f f0 l (f6 f1) f2 f3 f4 f5 b c c0
+   
+   [recordtype_bstate_seldef_eshapes_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 b c c0.
+          (bstate f f0 l f1 f2 f3 f4 f5 b c c0).eshapes = f2
+   
+   [recordtype_bstate_seldef_eshapes_fupd_def]  Definition
+      
+      ⊢ ∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+          bstate f f0 l f1 f2 f3 f4 f5 b c c0 with eshapes updated_by f6 =
+          bstate f f0 l f1 (f6 f2) f3 f4 f5 b c c0
+   
+   [recordtype_bstate_seldef_globals_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 b c c0.
+          (bstate f f0 l f1 f2 f3 f4 f5 b c c0).globals = f0
+   
+   [recordtype_bstate_seldef_globals_fupd_def]  Definition
+      
+      ⊢ ∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+          bstate f f0 l f1 f2 f3 f4 f5 b c c0 with globals updated_by f6 =
+          bstate f (f6 f0) l f1 f2 f3 f4 f5 b c c0
+   
+   [recordtype_bstate_seldef_locals_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 b c c0.
+          (bstate f f0 l f1 f2 f3 f4 f5 b c c0).locals = f
+   
+   [recordtype_bstate_seldef_locals_fupd_def]  Definition
+      
+      ⊢ ∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+          bstate f f0 l f1 f2 f3 f4 f5 b c c0 with locals updated_by f6 =
+          bstate (f6 f) f0 l f1 f2 f3 f4 f5 b c c0
+   
+   [recordtype_bstate_seldef_memaddrs_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 b c c0.
+          (bstate f f0 l f1 f2 f3 f4 f5 b c c0).memaddrs = f4
+   
+   [recordtype_bstate_seldef_memaddrs_fupd_def]  Definition
+      
+      ⊢ ∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+          bstate f f0 l f1 f2 f3 f4 f5 b c c0 with memaddrs updated_by f6 =
+          bstate f f0 l f1 f2 f3 (f6 f4) f5 b c c0
+   
+   [recordtype_bstate_seldef_memory_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 b c c0.
+          (bstate f f0 l f1 f2 f3 f4 f5 b c c0).memory = f3
+   
+   [recordtype_bstate_seldef_memory_fupd_def]  Definition
+      
+      ⊢ ∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+          bstate f f0 l f1 f2 f3 f4 f5 b c c0 with memory updated_by f6 =
+          bstate f f0 l f1 f2 (f6 f3) f4 f5 b c c0
+   
+   [recordtype_bstate_seldef_sh_memaddrs_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 b c c0.
+          (bstate f f0 l f1 f2 f3 f4 f5 b c c0).sh_memaddrs = f5
+   
+   [recordtype_bstate_seldef_sh_memaddrs_fupd_def]  Definition
+      
+      ⊢ ∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+          bstate f f0 l f1 f2 f3 f4 f5 b c c0 with
+          sh_memaddrs updated_by f6 =
+          bstate f f0 l f1 f2 f3 f4 (f6 f5) b c c0
+   
+   [recordtype_bstate_seldef_structs_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 b c c0.
+          (bstate f f0 l f1 f2 f3 f4 f5 b c c0).structs = l
+   
+   [recordtype_bstate_seldef_structs_fupd_def]  Definition
+      
+      ⊢ ∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+          bstate f f0 l f1 f2 f3 f4 f5 b c c0 with structs updated_by f6 =
+          bstate f f0 (f6 l) f1 f2 f3 f4 f5 b c c0
+   
+   [recordtype_bstate_seldef_top_addr_def]  Definition
+      
+      ⊢ ∀f f0 l f1 f2 f3 f4 f5 b c c0.
+          (bstate f f0 l f1 f2 f3 f4 f5 b c c0).top_addr = c0
+   
+   [recordtype_bstate_seldef_top_addr_fupd_def]  Definition
+      
+      ⊢ ∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+          bstate f f0 l f1 f2 f3 f4 f5 b c c0 with top_addr updated_by f6 =
+          bstate f f0 l f1 f2 f3 f4 f5 b c (f6 c0)
+   
+   [set_global_def]  Definition
+      
+      ⊢ ∀v value s.
+          set_global v value s = s with globals := s.globals⟨v ↦ value⟩
+   
+   [set_kvar_def]  Definition
+      
+      ⊢ ∀vk v value s.
+          set_kvar vk v value s =
+          case vk of
+            Local => set_var v value s
+          | Global => set_global v value s
+   
+   [set_var_def]  Definition
+      
+      ⊢ ∀v value s.
+          set_var v value s = s with locals := s.locals⟨v ↦ value⟩
+   
+   [trace_prefix0_def]  Definition
+      
+      ⊢ ∀fs th.
+          trace_prefix0 fs th =
+          LFLATTEN
+            (LUNFOLD
+               (λ(fst,t).
+                    case t of
+                      Ret r => NONE
+                    | Tau u => SOME ((fst,u),[||])
+                    | Vis (s,conf,ws) k =>
+                      case FST fs s fst conf ws of
+                        Oracle_return fs' ws' =>
+                          if LENGTH ws ≠ LENGTH ws' then
+                            SOME ((fst,k (INL FFI_failed)),[||])
+                          else
+                            SOME
+                              ((fs',k (INR ws')),
+                               [|IO_event s conf (ZIP (ws,ws'))|])
+                      | Oracle_final outcome =>
+                        SOME ((fst,k (INL outcome)),[||])) (SND fs,th))
+   
+   [trace_prefix_def]  Definition
+      
+      ⊢ ∀fs th.
+          trace_prefix fs th =
+          LFLATTEN
+            (LUNFOLD
+               (λ(fst,t).
+                    case t of
+                      Ret r => NONE
+                    | Tau u => SOME ((fst,u),[||])
+                    | Vis (s,conf,ws) k =>
+                      case FST fs s fst conf ws of
+                        Oracle_return fs' ws' =>
+                          if LENGTH ws ≠ LENGTH ws' then
+                            SOME ((fst,k (INL (INL FFI_failed))),[||])
+                          else
+                            SOME
+                              ((fs',k (INL (INR ws'))),
+                               [|IO_event s conf (ZIP (ws,ws'))|])
+                      | Oracle_final outcome =>
+                        SOME ((fst,k (INL (INL outcome))),[||]))
+               (SND fs,th))
+   
+   [EXISTS_bstate]  Theorem
+      
+      ⊢ ∀P. (∃b. P b) ⇔
+            ∃f5 f4 l f3 f2 f1 f0 f b0 c0 c.
+              P
+                <|locals := f5; globals := f4; structs := l; code := f3;
+                  eshapes := f2; memory := f1; memaddrs := f0;
+                  sh_memaddrs := f; be := b0; base_addr := c0;
+                  top_addr := c|>
+   
+   [FORALL_bstate]  Theorem
+      
+      ⊢ ∀P. (∀b. P b) ⇔
+            ∀f5 f4 l f3 f2 f1 f0 f b0 c0 c.
+              P
+                <|locals := f5; globals := f4; structs := l; code := f3;
+                  eshapes := f2; memory := f1; memaddrs := f0;
+                  sh_memaddrs := f; be := b0; base_addr := c0;
+                  top_addr := c|>
+   
+   [FUNPOW_Ret_simp]  Theorem
+      
+      ⊢ FUNPOW Tau n t = FUNPOW Tau m (Ret x) ⇔
+        n ≤ m ∧ t = FUNPOW Tau (m − n) (Ret x)
+   
+   [FUNPOW_Ret_simp2]  Theorem
+      
+      ⊢ (FUNPOW Tau n (Ret x) = Ret r ⇔ n = 0 ∧ x = r) ∧
+        (Ret r = FUNPOW Tau n (Ret x) ⇔ n = 0 ∧ r = x)
+   
+   [FUNPOW_Ret_strip]  Theorem
+      
+      ⊢ FUNPOW Tau n t = FUNPOW Tau m (Ret x) ⇒
+        n ≤ m ∧ t = FUNPOW Tau (m − n) (Ret x)
+   
+   [FUNPOW_Tau_Ret_eq_simp]  Theorem
+      
+      ⊢ FUNPOW Tau n (Ret x) = FUNPOW Tau m (Ret y) ⇔ n = m ∧ x = y
+   
+   [FUNPOW_Tau_Vis_eq_simp]  Theorem
+      
+      ⊢ FUNPOW Tau n (Vis e k) = FUNPOW Tau m (Vis e' k') ⇔
+        n = m ∧ e = e' ∧ k = k'
+   
+   [FUNPOW_Vis_simp]  Theorem
+      
+      ⊢ FUNPOW Tau n t = FUNPOW Tau m (Vis e k) ⇔
+        n ≤ m ∧ t = FUNPOW Tau (m − n) (Vis e k)
+   
+   [FUNPOW_Vis_strip]  Theorem
+      
+      ⊢ FUNPOW Tau n t = FUNPOW Tau m (Vis e k) ⇒
+        n ≤ m ∧ t = FUNPOW Tau (m − n) (Vis e k)
+   
+   [Skip_loop_spin]  Theorem
+      
+      ⊢ itree_evaluate (While (Const 1w) Skip,s) = spin
+   
+   [bind_FUNPOW_Ret]  Theorem
+      
+      ⊢ itree_bind ht k = FUNPOW Tau n (Ret x) ⇒
+        ∃r n' m.
+          ht = FUNPOW Tau n' (Ret r) ∧ k r = FUNPOW Tau m (Ret x) ∧
+          n = n' + m
+   
+   [bind_FUNPOW_Vis]  Theorem
+      
+      ⊢ itree_bind ht t = FUNPOW Tau n (Vis e k) ⇒
+        (∃g. ht = FUNPOW Tau n (Vis e g) ∧ k = (λx. itree_bind (g x) t)) ∨
+        ∃x m.
+          ht = FUNPOW Tau m (Ret x) ∧ t x = FUNPOW Tau (n − m) (Vis e k) ∧
+          m ≤ n
+   
+   [bst_access]  Theorem
+      
+      ⊢ (bst t).locals = t.locals ∧ (bst t).globals = t.globals ∧
+        (bst t).structs = t.structs ∧ (bst t).code = t.code ∧
+        (bst t).eshapes = t.eshapes ∧ (bst t).memory = t.memory ∧
+        (bst t).memaddrs = t.memaddrs ∧
+        (bst t).sh_memaddrs = t.sh_memaddrs ∧ ((bst t).be ⇔ t.be) ∧
+        (bst t).base_addr = t.base_addr ∧ (bst t).top_addr = t.top_addr
+   
+   [bst_ext_id]  Theorem
+      
+      ⊢ bst (ext s t f) = s ∧
+        bst (ext s t f with locals := x) = s with locals := x ∧
+        bst (ext s t f with globals := x) = s with globals := x ∧
+        bst (ext s t f with memory := m) = s with memory := m ∧
+        bst (empty_locals (ext s k ffi)) = empty_locals s ∧
+        bst (dec_clock (ext s k ffi)) = s
+   
+   [bst_normalise]  Theorem
+      
+      ⊢ bst s with locals := x = bst (s with locals := x) ∧
+        bst s with globals := x = bst (s with globals := x) ∧
+        bst s with memory := m = bst (s with memory := m) ∧
+        bst (s with <|locals := x; clock := k|>) = bst (s with locals := x) ∧
+        bst (s with <|globals := x; clock := k|>) =
+        bst (s with globals := x) ∧
+        bst (s with <|memory := m; clock := k|>) = bst (s with memory := m) ∧
+        bst (s with clock := k) = bst s
+   
+   [bstate_11]  Theorem
+      
+      ⊢ ∀a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a0' a1' a2' a3' a4' a5' a6' a7'
+            a8' a9' a10'.
+          bstate a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 =
+          bstate a0' a1' a2' a3' a4' a5' a6' a7' a8' a9' a10' ⇔
+          a0 = a0' ∧ a1 = a1' ∧ a2 = a2' ∧ a3 = a3' ∧ a4 = a4' ∧ a5 = a5' ∧
+          a6 = a6' ∧ a7 = a7' ∧ (a8 ⇔ a8') ∧ a9 = a9' ∧ a10 = a10'
+   
+   [bstate_Axiom]  Theorem
+      
+      ⊢ ∀f. ∃fn. ∀a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10.
+          fn (bstate a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10) =
+          f a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10
+   
+   [bstate_accessors]  Theorem
+      
+      ⊢ (∀f f0 l f1 f2 f3 f4 f5 b c c0.
+           (bstate f f0 l f1 f2 f3 f4 f5 b c c0).locals = f) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 b c c0.
+           (bstate f f0 l f1 f2 f3 f4 f5 b c c0).globals = f0) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 b c c0.
+           (bstate f f0 l f1 f2 f3 f4 f5 b c c0).structs = l) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 b c c0.
+           (bstate f f0 l f1 f2 f3 f4 f5 b c c0).code = f1) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 b c c0.
+           (bstate f f0 l f1 f2 f3 f4 f5 b c c0).eshapes = f2) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 b c c0.
+           (bstate f f0 l f1 f2 f3 f4 f5 b c c0).memory = f3) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 b c c0.
+           (bstate f f0 l f1 f2 f3 f4 f5 b c c0).memaddrs = f4) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 b c c0.
+           (bstate f f0 l f1 f2 f3 f4 f5 b c c0).sh_memaddrs = f5) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 b c c0.
+           (bstate f f0 l f1 f2 f3 f4 f5 b c c0).be ⇔ b) ∧
+        (∀f f0 l f1 f2 f3 f4 f5 b c c0.
+           (bstate f f0 l f1 f2 f3 f4 f5 b c c0).base_addr = c) ∧
+        ∀f f0 l f1 f2 f3 f4 f5 b c c0.
+          (bstate f f0 l f1 f2 f3 f4 f5 b c c0).top_addr = c0
+   
+   [bstate_accfupds]  Theorem
+      
+      ⊢ (∀f b. (b with globals updated_by f).locals = b.locals) ∧
+        (∀f b. (b with structs updated_by f).locals = b.locals) ∧
+        (∀f b. (b with code updated_by f).locals = b.locals) ∧
+        (∀f b. (b with eshapes updated_by f).locals = b.locals) ∧
+        (∀f b. (b with memory updated_by f).locals = b.locals) ∧
+        (∀f b. (b with memaddrs updated_by f).locals = b.locals) ∧
+        (∀f b. (b with sh_memaddrs updated_by f).locals = b.locals) ∧
+        (∀f b. (b with be updated_by f).locals = b.locals) ∧
+        (∀f b. (b with base_addr updated_by f).locals = b.locals) ∧
+        (∀f b. (b with top_addr updated_by f).locals = b.locals) ∧
+        (∀f b. (b with locals updated_by f).globals = b.globals) ∧
+        (∀f b. (b with structs updated_by f).globals = b.globals) ∧
+        (∀f b. (b with code updated_by f).globals = b.globals) ∧
+        (∀f b. (b with eshapes updated_by f).globals = b.globals) ∧
+        (∀f b. (b with memory updated_by f).globals = b.globals) ∧
+        (∀f b. (b with memaddrs updated_by f).globals = b.globals) ∧
+        (∀f b. (b with sh_memaddrs updated_by f).globals = b.globals) ∧
+        (∀f b. (b with be updated_by f).globals = b.globals) ∧
+        (∀f b. (b with base_addr updated_by f).globals = b.globals) ∧
+        (∀f b. (b with top_addr updated_by f).globals = b.globals) ∧
+        (∀f b. (b with locals updated_by f).structs = b.structs) ∧
+        (∀f b. (b with globals updated_by f).structs = b.structs) ∧
+        (∀f b. (b with code updated_by f).structs = b.structs) ∧
+        (∀f b. (b with eshapes updated_by f).structs = b.structs) ∧
+        (∀f b. (b with memory updated_by f).structs = b.structs) ∧
+        (∀f b. (b with memaddrs updated_by f).structs = b.structs) ∧
+        (∀f b. (b with sh_memaddrs updated_by f).structs = b.structs) ∧
+        (∀f b. (b with be updated_by f).structs = b.structs) ∧
+        (∀f b. (b with base_addr updated_by f).structs = b.structs) ∧
+        (∀f b. (b with top_addr updated_by f).structs = b.structs) ∧
+        (∀f b. (b with locals updated_by f).code = b.code) ∧
+        (∀f b. (b with globals updated_by f).code = b.code) ∧
+        (∀f b. (b with structs updated_by f).code = b.code) ∧
+        (∀f b. (b with eshapes updated_by f).code = b.code) ∧
+        (∀f b. (b with memory updated_by f).code = b.code) ∧
+        (∀f b. (b with memaddrs updated_by f).code = b.code) ∧
+        (∀f b. (b with sh_memaddrs updated_by f).code = b.code) ∧
+        (∀f b. (b with be updated_by f).code = b.code) ∧
+        (∀f b. (b with base_addr updated_by f).code = b.code) ∧
+        (∀f b. (b with top_addr updated_by f).code = b.code) ∧
+        (∀f b. (b with locals updated_by f).eshapes = b.eshapes) ∧
+        (∀f b. (b with globals updated_by f).eshapes = b.eshapes) ∧
+        (∀f b. (b with structs updated_by f).eshapes = b.eshapes) ∧
+        (∀f b. (b with code updated_by f).eshapes = b.eshapes) ∧
+        (∀f b. (b with memory updated_by f).eshapes = b.eshapes) ∧
+        (∀f b. (b with memaddrs updated_by f).eshapes = b.eshapes) ∧
+        (∀f b. (b with sh_memaddrs updated_by f).eshapes = b.eshapes) ∧
+        (∀f b. (b with be updated_by f).eshapes = b.eshapes) ∧
+        (∀f b. (b with base_addr updated_by f).eshapes = b.eshapes) ∧
+        (∀f b. (b with top_addr updated_by f).eshapes = b.eshapes) ∧
+        (∀f b. (b with locals updated_by f).memory = b.memory) ∧
+        (∀f b. (b with globals updated_by f).memory = b.memory) ∧
+        (∀f b. (b with structs updated_by f).memory = b.memory) ∧
+        (∀f b. (b with code updated_by f).memory = b.memory) ∧
+        (∀f b. (b with eshapes updated_by f).memory = b.memory) ∧
+        (∀f b. (b with memaddrs updated_by f).memory = b.memory) ∧
+        (∀f b. (b with sh_memaddrs updated_by f).memory = b.memory) ∧
+        (∀f b. (b with be updated_by f).memory = b.memory) ∧
+        (∀f b. (b with base_addr updated_by f).memory = b.memory) ∧
+        (∀f b. (b with top_addr updated_by f).memory = b.memory) ∧
+        (∀f b. (b with locals updated_by f).memaddrs = b.memaddrs) ∧
+        (∀f b. (b with globals updated_by f).memaddrs = b.memaddrs) ∧
+        (∀f b. (b with structs updated_by f).memaddrs = b.memaddrs) ∧
+        (∀f b. (b with code updated_by f).memaddrs = b.memaddrs) ∧
+        (∀f b. (b with eshapes updated_by f).memaddrs = b.memaddrs) ∧
+        (∀f b. (b with memory updated_by f).memaddrs = b.memaddrs) ∧
+        (∀f b. (b with sh_memaddrs updated_by f).memaddrs = b.memaddrs) ∧
+        (∀f b. (b with be updated_by f).memaddrs = b.memaddrs) ∧
+        (∀f b. (b with base_addr updated_by f).memaddrs = b.memaddrs) ∧
+        (∀f b. (b with top_addr updated_by f).memaddrs = b.memaddrs) ∧
+        (∀f b. (b with locals updated_by f).sh_memaddrs = b.sh_memaddrs) ∧
+        (∀f b. (b with globals updated_by f).sh_memaddrs = b.sh_memaddrs) ∧
+        (∀f b. (b with structs updated_by f).sh_memaddrs = b.sh_memaddrs) ∧
+        (∀f b. (b with code updated_by f).sh_memaddrs = b.sh_memaddrs) ∧
+        (∀f b. (b with eshapes updated_by f).sh_memaddrs = b.sh_memaddrs) ∧
+        (∀f b. (b with memory updated_by f).sh_memaddrs = b.sh_memaddrs) ∧
+        (∀f b. (b with memaddrs updated_by f).sh_memaddrs = b.sh_memaddrs) ∧
+        (∀f b. (b with be updated_by f).sh_memaddrs = b.sh_memaddrs) ∧
+        (∀f b. (b with base_addr updated_by f).sh_memaddrs = b.sh_memaddrs) ∧
+        (∀f b. (b with top_addr updated_by f).sh_memaddrs = b.sh_memaddrs) ∧
+        (∀f b. (b with locals updated_by f).be ⇔ b.be) ∧
+        (∀f b. (b with globals updated_by f).be ⇔ b.be) ∧
+        (∀f b. (b with structs updated_by f).be ⇔ b.be) ∧
+        (∀f b. (b with code updated_by f).be ⇔ b.be) ∧
+        (∀f b. (b with eshapes updated_by f).be ⇔ b.be) ∧
+        (∀f b. (b with memory updated_by f).be ⇔ b.be) ∧
+        (∀f b. (b with memaddrs updated_by f).be ⇔ b.be) ∧
+        (∀f b. (b with sh_memaddrs updated_by f).be ⇔ b.be) ∧
+        (∀f b. (b with base_addr updated_by f).be ⇔ b.be) ∧
+        (∀f b. (b with top_addr updated_by f).be ⇔ b.be) ∧
+        (∀f b. (b with locals updated_by f).base_addr = b.base_addr) ∧
+        (∀f b. (b with globals updated_by f).base_addr = b.base_addr) ∧
+        (∀f b. (b with structs updated_by f).base_addr = b.base_addr) ∧
+        (∀f b. (b with code updated_by f).base_addr = b.base_addr) ∧
+        (∀f b. (b with eshapes updated_by f).base_addr = b.base_addr) ∧
+        (∀f b. (b with memory updated_by f).base_addr = b.base_addr) ∧
+        (∀f b. (b with memaddrs updated_by f).base_addr = b.base_addr) ∧
+        (∀f b. (b with sh_memaddrs updated_by f).base_addr = b.base_addr) ∧
+        (∀f b. (b with be updated_by f).base_addr = b.base_addr) ∧
+        (∀f b. (b with top_addr updated_by f).base_addr = b.base_addr) ∧
+        (∀f b. (b with locals updated_by f).top_addr = b.top_addr) ∧
+        (∀f b. (b with globals updated_by f).top_addr = b.top_addr) ∧
+        (∀f b. (b with structs updated_by f).top_addr = b.top_addr) ∧
+        (∀f b. (b with code updated_by f).top_addr = b.top_addr) ∧
+        (∀f b. (b with eshapes updated_by f).top_addr = b.top_addr) ∧
+        (∀f b. (b with memory updated_by f).top_addr = b.top_addr) ∧
+        (∀f b. (b with memaddrs updated_by f).top_addr = b.top_addr) ∧
+        (∀f b. (b with sh_memaddrs updated_by f).top_addr = b.top_addr) ∧
+        (∀f b. (b with be updated_by f).top_addr = b.top_addr) ∧
+        (∀f b. (b with base_addr updated_by f).top_addr = b.top_addr) ∧
+        (∀f b. (b with locals updated_by f).locals = f b.locals) ∧
+        (∀f b. (b with globals updated_by f).globals = f b.globals) ∧
+        (∀f b. (b with structs updated_by f).structs = f b.structs) ∧
+        (∀f b. (b with code updated_by f).code = f b.code) ∧
+        (∀f b. (b with eshapes updated_by f).eshapes = f b.eshapes) ∧
+        (∀f b. (b with memory updated_by f).memory = f b.memory) ∧
+        (∀f b. (b with memaddrs updated_by f).memaddrs = f b.memaddrs) ∧
+        (∀f b.
+           (b with sh_memaddrs updated_by f).sh_memaddrs = f b.sh_memaddrs) ∧
+        (∀f b. (b with be updated_by f).be ⇔ f b.be) ∧
+        (∀f b. (b with base_addr updated_by f).base_addr = f b.base_addr) ∧
+        ∀f b. (b with top_addr updated_by f).top_addr = f b.top_addr
+   
+   [bstate_case_cong]  Theorem
+      
+      ⊢ ∀M M' f.
+          M = M' ∧
+          (∀a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10.
+             M' = bstate a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 ⇒
+             f a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 =
+             f' a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10) ⇒
+          bstate_CASE M f = bstate_CASE M' f'
+   
+   [bstate_case_eq]  Theorem
+      
+      ⊢ bstate_CASE x f = v ⇔
+        ∃f' f0 l f1 f2 f3 f4 f5 b c c0.
+          x = bstate f' f0 l f1 f2 f3 f4 f5 b c c0 ∧
+          f f' f0 l f1 f2 f3 f4 f5 b c c0 = v
+   
+   [bstate_component_equality]  Theorem
+      
+      ⊢ ∀b1 b2.
+          b1 = b2 ⇔
+          b1.locals = b2.locals ∧ b1.globals = b2.globals ∧
+          b1.structs = b2.structs ∧ b1.code = b2.code ∧
+          b1.eshapes = b2.eshapes ∧ b1.memory = b2.memory ∧
+          b1.memaddrs = b2.memaddrs ∧ b1.sh_memaddrs = b2.sh_memaddrs ∧
+          (b1.be ⇔ b2.be) ∧ b1.base_addr = b2.base_addr ∧
+          b1.top_addr = b2.top_addr
+   
+   [bstate_fn_updates]  Theorem
+      
+      ⊢ (∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+           bstate f f0 l f1 f2 f3 f4 f5 b c c0 with locals updated_by f6 =
+           bstate (f6 f) f0 l f1 f2 f3 f4 f5 b c c0) ∧
+        (∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+           bstate f f0 l f1 f2 f3 f4 f5 b c c0 with globals updated_by f6 =
+           bstate f (f6 f0) l f1 f2 f3 f4 f5 b c c0) ∧
+        (∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+           bstate f f0 l f1 f2 f3 f4 f5 b c c0 with structs updated_by f6 =
+           bstate f f0 (f6 l) f1 f2 f3 f4 f5 b c c0) ∧
+        (∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+           bstate f f0 l f1 f2 f3 f4 f5 b c c0 with code updated_by f6 =
+           bstate f f0 l (f6 f1) f2 f3 f4 f5 b c c0) ∧
+        (∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+           bstate f f0 l f1 f2 f3 f4 f5 b c c0 with eshapes updated_by f6 =
+           bstate f f0 l f1 (f6 f2) f3 f4 f5 b c c0) ∧
+        (∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+           bstate f f0 l f1 f2 f3 f4 f5 b c c0 with memory updated_by f6 =
+           bstate f f0 l f1 f2 (f6 f3) f4 f5 b c c0) ∧
+        (∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+           bstate f f0 l f1 f2 f3 f4 f5 b c c0 with memaddrs updated_by f6 =
+           bstate f f0 l f1 f2 f3 (f6 f4) f5 b c c0) ∧
+        (∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+           bstate f f0 l f1 f2 f3 f4 f5 b c c0 with
+           sh_memaddrs updated_by f6 =
+           bstate f f0 l f1 f2 f3 f4 (f6 f5) b c c0) ∧
+        (∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+           bstate f f0 l f1 f2 f3 f4 f5 b c c0 with be updated_by f6 =
+           bstate f f0 l f1 f2 f3 f4 f5 (f6 b) c c0) ∧
+        (∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+           bstate f f0 l f1 f2 f3 f4 f5 b c c0 with base_addr updated_by f6 =
+           bstate f f0 l f1 f2 f3 f4 f5 b (f6 c) c0) ∧
+        ∀f6 f f0 l f1 f2 f3 f4 f5 b c c0.
+          bstate f f0 l f1 f2 f3 f4 f5 b c c0 with top_addr updated_by f6 =
+          bstate f f0 l f1 f2 f3 f4 f5 b c (f6 c0)
+   
+   [bstate_fupdcanon]  Theorem
+      
+      ⊢ (∀g f b.
+           b with <|globals updated_by f; locals updated_by g|> =
+           b with <|locals updated_by g; globals updated_by f|>) ∧
+        (∀g f b.
+           b with <|structs updated_by f; locals updated_by g|> =
+           b with <|locals updated_by g; structs updated_by f|>) ∧
+        (∀g f b.
+           b with <|structs updated_by f; globals updated_by g|> =
+           b with <|globals updated_by g; structs updated_by f|>) ∧
+        (∀g f b.
+           b with <|code updated_by f; locals updated_by g|> =
+           b with <|locals updated_by g; code updated_by f|>) ∧
+        (∀g f b.
+           b with <|code updated_by f; globals updated_by g|> =
+           b with <|globals updated_by g; code updated_by f|>) ∧
+        (∀g f b.
+           b with <|code updated_by f; structs updated_by g|> =
+           b with <|structs updated_by g; code updated_by f|>) ∧
+        (∀g f b.
+           b with <|eshapes updated_by f; locals updated_by g|> =
+           b with <|locals updated_by g; eshapes updated_by f|>) ∧
+        (∀g f b.
+           b with <|eshapes updated_by f; globals updated_by g|> =
+           b with <|globals updated_by g; eshapes updated_by f|>) ∧
+        (∀g f b.
+           b with <|eshapes updated_by f; structs updated_by g|> =
+           b with <|structs updated_by g; eshapes updated_by f|>) ∧
+        (∀g f b.
+           b with <|eshapes updated_by f; code updated_by g|> =
+           b with <|code updated_by g; eshapes updated_by f|>) ∧
+        (∀g f b.
+           b with <|memory updated_by f; locals updated_by g|> =
+           b with <|locals updated_by g; memory updated_by f|>) ∧
+        (∀g f b.
+           b with <|memory updated_by f; globals updated_by g|> =
+           b with <|globals updated_by g; memory updated_by f|>) ∧
+        (∀g f b.
+           b with <|memory updated_by f; structs updated_by g|> =
+           b with <|structs updated_by g; memory updated_by f|>) ∧
+        (∀g f b.
+           b with <|memory updated_by f; code updated_by g|> =
+           b with <|code updated_by g; memory updated_by f|>) ∧
+        (∀g f b.
+           b with <|memory updated_by f; eshapes updated_by g|> =
+           b with <|eshapes updated_by g; memory updated_by f|>) ∧
+        (∀g f b.
+           b with <|memaddrs updated_by f; locals updated_by g|> =
+           b with <|locals updated_by g; memaddrs updated_by f|>) ∧
+        (∀g f b.
+           b with <|memaddrs updated_by f; globals updated_by g|> =
+           b with <|globals updated_by g; memaddrs updated_by f|>) ∧
+        (∀g f b.
+           b with <|memaddrs updated_by f; structs updated_by g|> =
+           b with <|structs updated_by g; memaddrs updated_by f|>) ∧
+        (∀g f b.
+           b with <|memaddrs updated_by f; code updated_by g|> =
+           b with <|code updated_by g; memaddrs updated_by f|>) ∧
+        (∀g f b.
+           b with <|memaddrs updated_by f; eshapes updated_by g|> =
+           b with <|eshapes updated_by g; memaddrs updated_by f|>) ∧
+        (∀g f b.
+           b with <|memaddrs updated_by f; memory updated_by g|> =
+           b with <|memory updated_by g; memaddrs updated_by f|>) ∧
+        (∀g f b.
+           b with <|sh_memaddrs updated_by f; locals updated_by g|> =
+           b with <|locals updated_by g; sh_memaddrs updated_by f|>) ∧
+        (∀g f b.
+           b with <|sh_memaddrs updated_by f; globals updated_by g|> =
+           b with <|globals updated_by g; sh_memaddrs updated_by f|>) ∧
+        (∀g f b.
+           b with <|sh_memaddrs updated_by f; structs updated_by g|> =
+           b with <|structs updated_by g; sh_memaddrs updated_by f|>) ∧
+        (∀g f b.
+           b with <|sh_memaddrs updated_by f; code updated_by g|> =
+           b with <|code updated_by g; sh_memaddrs updated_by f|>) ∧
+        (∀g f b.
+           b with <|sh_memaddrs updated_by f; eshapes updated_by g|> =
+           b with <|eshapes updated_by g; sh_memaddrs updated_by f|>) ∧
+        (∀g f b.
+           b with <|sh_memaddrs updated_by f; memory updated_by g|> =
+           b with <|memory updated_by g; sh_memaddrs updated_by f|>) ∧
+        (∀g f b.
+           b with <|sh_memaddrs updated_by f; memaddrs updated_by g|> =
+           b with <|memaddrs updated_by g; sh_memaddrs updated_by f|>) ∧
+        (∀g f b.
+           b with <|be updated_by f; locals updated_by g|> =
+           b with <|locals updated_by g; be updated_by f|>) ∧
+        (∀g f b.
+           b with <|be updated_by f; globals updated_by g|> =
+           b with <|globals updated_by g; be updated_by f|>) ∧
+        (∀g f b.
+           b with <|be updated_by f; structs updated_by g|> =
+           b with <|structs updated_by g; be updated_by f|>) ∧
+        (∀g f b.
+           b with <|be updated_by f; code updated_by g|> =
+           b with <|code updated_by g; be updated_by f|>) ∧
+        (∀g f b.
+           b with <|be updated_by f; eshapes updated_by g|> =
+           b with <|eshapes updated_by g; be updated_by f|>) ∧
+        (∀g f b.
+           b with <|be updated_by f; memory updated_by g|> =
+           b with <|memory updated_by g; be updated_by f|>) ∧
+        (∀g f b.
+           b with <|be updated_by f; memaddrs updated_by g|> =
+           b with <|memaddrs updated_by g; be updated_by f|>) ∧
+        (∀g f b.
+           b with <|be updated_by f; sh_memaddrs updated_by g|> =
+           b with <|sh_memaddrs updated_by g; be updated_by f|>) ∧
+        (∀g f b.
+           b with <|base_addr updated_by f; locals updated_by g|> =
+           b with <|locals updated_by g; base_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|base_addr updated_by f; globals updated_by g|> =
+           b with <|globals updated_by g; base_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|base_addr updated_by f; structs updated_by g|> =
+           b with <|structs updated_by g; base_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|base_addr updated_by f; code updated_by g|> =
+           b with <|code updated_by g; base_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|base_addr updated_by f; eshapes updated_by g|> =
+           b with <|eshapes updated_by g; base_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|base_addr updated_by f; memory updated_by g|> =
+           b with <|memory updated_by g; base_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|base_addr updated_by f; memaddrs updated_by g|> =
+           b with <|memaddrs updated_by g; base_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|base_addr updated_by f; sh_memaddrs updated_by g|> =
+           b with <|sh_memaddrs updated_by g; base_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|base_addr updated_by f; be updated_by g|> =
+           b with <|be updated_by g; base_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|top_addr updated_by f; locals updated_by g|> =
+           b with <|locals updated_by g; top_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|top_addr updated_by f; globals updated_by g|> =
+           b with <|globals updated_by g; top_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|top_addr updated_by f; structs updated_by g|> =
+           b with <|structs updated_by g; top_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|top_addr updated_by f; code updated_by g|> =
+           b with <|code updated_by g; top_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|top_addr updated_by f; eshapes updated_by g|> =
+           b with <|eshapes updated_by g; top_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|top_addr updated_by f; memory updated_by g|> =
+           b with <|memory updated_by g; top_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|top_addr updated_by f; memaddrs updated_by g|> =
+           b with <|memaddrs updated_by g; top_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|top_addr updated_by f; sh_memaddrs updated_by g|> =
+           b with <|sh_memaddrs updated_by g; top_addr updated_by f|>) ∧
+        (∀g f b.
+           b with <|top_addr updated_by f; be updated_by g|> =
+           b with <|be updated_by g; top_addr updated_by f|>) ∧
+        ∀g f b.
+          b with <|top_addr updated_by f; base_addr updated_by g|> =
+          b with <|base_addr updated_by g; top_addr updated_by f|>
+   
+   [bstate_fupdcanon_comp]  Theorem
+      
+      ⊢ ((∀g f.
+            globals_fupd f ∘ locals_fupd g = locals_fupd g ∘ globals_fupd f) ∧
+         ∀h g f.
+           globals_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ globals_fupd f ∘ h) ∧
+        ((∀g f.
+            structs_fupd f ∘ locals_fupd g = locals_fupd g ∘ structs_fupd f) ∧
+         ∀h g f.
+           structs_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ structs_fupd f ∘ h) ∧
+        ((∀g f.
+            structs_fupd f ∘ globals_fupd g =
+            globals_fupd g ∘ structs_fupd f) ∧
+         ∀h g f.
+           structs_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ structs_fupd f ∘ h) ∧
+        ((∀g f. code_fupd f ∘ locals_fupd g = locals_fupd g ∘ code_fupd f) ∧
+         ∀h g f.
+           code_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ code_fupd f ∘ h) ∧
+        ((∀g f. code_fupd f ∘ globals_fupd g = globals_fupd g ∘ code_fupd f) ∧
+         ∀h g f.
+           code_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ code_fupd f ∘ h) ∧
+        ((∀g f. code_fupd f ∘ structs_fupd g = structs_fupd g ∘ code_fupd f) ∧
+         ∀h g f.
+           code_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ code_fupd f ∘ h) ∧
+        ((∀g f.
+            eshapes_fupd f ∘ locals_fupd g = locals_fupd g ∘ eshapes_fupd f) ∧
+         ∀h g f.
+           eshapes_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ eshapes_fupd f ∘ h) ∧
+        ((∀g f.
+            eshapes_fupd f ∘ globals_fupd g =
+            globals_fupd g ∘ eshapes_fupd f) ∧
+         ∀h g f.
+           eshapes_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ eshapes_fupd f ∘ h) ∧
+        ((∀g f.
+            eshapes_fupd f ∘ structs_fupd g =
+            structs_fupd g ∘ eshapes_fupd f) ∧
+         ∀h g f.
+           eshapes_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ eshapes_fupd f ∘ h) ∧
+        ((∀g f. eshapes_fupd f ∘ code_fupd g = code_fupd g ∘ eshapes_fupd f) ∧
+         ∀h g f.
+           eshapes_fupd f ∘ code_fupd g ∘ h =
+           code_fupd g ∘ eshapes_fupd f ∘ h) ∧
+        ((∀g f.
+            memory_fupd f ∘ locals_fupd g = locals_fupd g ∘ memory_fupd f) ∧
+         ∀h g f.
+           memory_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ memory_fupd f ∘ h) ∧
+        ((∀g f.
+            memory_fupd f ∘ globals_fupd g = globals_fupd g ∘ memory_fupd f) ∧
+         ∀h g f.
+           memory_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ memory_fupd f ∘ h) ∧
+        ((∀g f.
+            memory_fupd f ∘ structs_fupd g = structs_fupd g ∘ memory_fupd f) ∧
+         ∀h g f.
+           memory_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ memory_fupd f ∘ h) ∧
+        ((∀g f. memory_fupd f ∘ code_fupd g = code_fupd g ∘ memory_fupd f) ∧
+         ∀h g f.
+           memory_fupd f ∘ code_fupd g ∘ h =
+           code_fupd g ∘ memory_fupd f ∘ h) ∧
+        ((∀g f.
+            memory_fupd f ∘ eshapes_fupd g = eshapes_fupd g ∘ memory_fupd f) ∧
+         ∀h g f.
+           memory_fupd f ∘ eshapes_fupd g ∘ h =
+           eshapes_fupd g ∘ memory_fupd f ∘ h) ∧
+        ((∀g f.
+            memaddrs_fupd f ∘ locals_fupd g =
+            locals_fupd g ∘ memaddrs_fupd f) ∧
+         ∀h g f.
+           memaddrs_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            memaddrs_fupd f ∘ globals_fupd g =
+            globals_fupd g ∘ memaddrs_fupd f) ∧
+         ∀h g f.
+           memaddrs_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            memaddrs_fupd f ∘ structs_fupd g =
+            structs_fupd g ∘ memaddrs_fupd f) ∧
+         ∀h g f.
+           memaddrs_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            memaddrs_fupd f ∘ code_fupd g = code_fupd g ∘ memaddrs_fupd f) ∧
+         ∀h g f.
+           memaddrs_fupd f ∘ code_fupd g ∘ h =
+           code_fupd g ∘ memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            memaddrs_fupd f ∘ eshapes_fupd g =
+            eshapes_fupd g ∘ memaddrs_fupd f) ∧
+         ∀h g f.
+           memaddrs_fupd f ∘ eshapes_fupd g ∘ h =
+           eshapes_fupd g ∘ memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            memaddrs_fupd f ∘ memory_fupd g =
+            memory_fupd g ∘ memaddrs_fupd f) ∧
+         ∀h g f.
+           memaddrs_fupd f ∘ memory_fupd g ∘ h =
+           memory_fupd g ∘ memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            sh_memaddrs_fupd f ∘ locals_fupd g =
+            locals_fupd g ∘ sh_memaddrs_fupd f) ∧
+         ∀h g f.
+           sh_memaddrs_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ sh_memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            sh_memaddrs_fupd f ∘ globals_fupd g =
+            globals_fupd g ∘ sh_memaddrs_fupd f) ∧
+         ∀h g f.
+           sh_memaddrs_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ sh_memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            sh_memaddrs_fupd f ∘ structs_fupd g =
+            structs_fupd g ∘ sh_memaddrs_fupd f) ∧
+         ∀h g f.
+           sh_memaddrs_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ sh_memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            sh_memaddrs_fupd f ∘ code_fupd g =
+            code_fupd g ∘ sh_memaddrs_fupd f) ∧
+         ∀h g f.
+           sh_memaddrs_fupd f ∘ code_fupd g ∘ h =
+           code_fupd g ∘ sh_memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            sh_memaddrs_fupd f ∘ eshapes_fupd g =
+            eshapes_fupd g ∘ sh_memaddrs_fupd f) ∧
+         ∀h g f.
+           sh_memaddrs_fupd f ∘ eshapes_fupd g ∘ h =
+           eshapes_fupd g ∘ sh_memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            sh_memaddrs_fupd f ∘ memory_fupd g =
+            memory_fupd g ∘ sh_memaddrs_fupd f) ∧
+         ∀h g f.
+           sh_memaddrs_fupd f ∘ memory_fupd g ∘ h =
+           memory_fupd g ∘ sh_memaddrs_fupd f ∘ h) ∧
+        ((∀g f.
+            sh_memaddrs_fupd f ∘ memaddrs_fupd g =
+            memaddrs_fupd g ∘ sh_memaddrs_fupd f) ∧
+         ∀h g f.
+           sh_memaddrs_fupd f ∘ memaddrs_fupd g ∘ h =
+           memaddrs_fupd g ∘ sh_memaddrs_fupd f ∘ h) ∧
+        ((∀g f. be_fupd f ∘ locals_fupd g = locals_fupd g ∘ be_fupd f) ∧
+         ∀h g f.
+           be_fupd f ∘ locals_fupd g ∘ h = locals_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f. be_fupd f ∘ globals_fupd g = globals_fupd g ∘ be_fupd f) ∧
+         ∀h g f.
+           be_fupd f ∘ globals_fupd g ∘ h = globals_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f. be_fupd f ∘ structs_fupd g = structs_fupd g ∘ be_fupd f) ∧
+         ∀h g f.
+           be_fupd f ∘ structs_fupd g ∘ h = structs_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f. be_fupd f ∘ code_fupd g = code_fupd g ∘ be_fupd f) ∧
+         ∀h g f. be_fupd f ∘ code_fupd g ∘ h = code_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f. be_fupd f ∘ eshapes_fupd g = eshapes_fupd g ∘ be_fupd f) ∧
+         ∀h g f.
+           be_fupd f ∘ eshapes_fupd g ∘ h = eshapes_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f. be_fupd f ∘ memory_fupd g = memory_fupd g ∘ be_fupd f) ∧
+         ∀h g f.
+           be_fupd f ∘ memory_fupd g ∘ h = memory_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f. be_fupd f ∘ memaddrs_fupd g = memaddrs_fupd g ∘ be_fupd f) ∧
+         ∀h g f.
+           be_fupd f ∘ memaddrs_fupd g ∘ h =
+           memaddrs_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f.
+            be_fupd f ∘ sh_memaddrs_fupd g = sh_memaddrs_fupd g ∘ be_fupd f) ∧
+         ∀h g f.
+           be_fupd f ∘ sh_memaddrs_fupd g ∘ h =
+           sh_memaddrs_fupd g ∘ be_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ locals_fupd g =
+            locals_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ globals_fupd g =
+            globals_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ structs_fupd g =
+            structs_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ code_fupd g = code_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ code_fupd g ∘ h =
+           code_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ eshapes_fupd g =
+            eshapes_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ eshapes_fupd g ∘ h =
+           eshapes_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ memory_fupd g =
+            memory_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ memory_fupd g ∘ h =
+           memory_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ memaddrs_fupd g =
+            memaddrs_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ memaddrs_fupd g ∘ h =
+           memaddrs_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ sh_memaddrs_fupd g =
+            sh_memaddrs_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ sh_memaddrs_fupd g ∘ h =
+           sh_memaddrs_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f. base_addr_fupd f ∘ be_fupd g = be_fupd g ∘ base_addr_fupd f) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ be_fupd g ∘ h =
+           be_fupd g ∘ base_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ locals_fupd g =
+            locals_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ locals_fupd g ∘ h =
+           locals_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ globals_fupd g =
+            globals_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ globals_fupd g ∘ h =
+           globals_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ structs_fupd g =
+            structs_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ code_fupd g = code_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ code_fupd g ∘ h =
+           code_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ eshapes_fupd g =
+            eshapes_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ eshapes_fupd g ∘ h =
+           eshapes_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ memory_fupd g =
+            memory_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ memory_fupd g ∘ h =
+           memory_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ memaddrs_fupd g =
+            memaddrs_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ memaddrs_fupd g ∘ h =
+           memaddrs_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f.
+            top_addr_fupd f ∘ sh_memaddrs_fupd g =
+            sh_memaddrs_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ sh_memaddrs_fupd g ∘ h =
+           sh_memaddrs_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        ((∀g f. top_addr_fupd f ∘ be_fupd g = be_fupd g ∘ top_addr_fupd f) ∧
+         ∀h g f.
+           top_addr_fupd f ∘ be_fupd g ∘ h =
+           be_fupd g ∘ top_addr_fupd f ∘ h) ∧
+        (∀g f.
+           top_addr_fupd f ∘ base_addr_fupd g =
+           base_addr_fupd g ∘ top_addr_fupd f) ∧
+        ∀h g f.
+          top_addr_fupd f ∘ base_addr_fupd g ∘ h =
+          base_addr_fupd g ∘ top_addr_fupd f ∘ h
+   
+   [bstate_fupdfupds]  Theorem
+      
+      ⊢ (∀g f b.
+           b with <|locals updated_by f; locals updated_by g|> =
+           b with locals updated_by f ∘ g) ∧
+        (∀g f b.
+           b with <|globals updated_by f; globals updated_by g|> =
+           b with globals updated_by f ∘ g) ∧
+        (∀g f b.
+           b with <|structs updated_by f; structs updated_by g|> =
+           b with structs updated_by f ∘ g) ∧
+        (∀g f b.
+           b with <|code updated_by f; code updated_by g|> =
+           b with code updated_by f ∘ g) ∧
+        (∀g f b.
+           b with <|eshapes updated_by f; eshapes updated_by g|> =
+           b with eshapes updated_by f ∘ g) ∧
+        (∀g f b.
+           b with <|memory updated_by f; memory updated_by g|> =
+           b with memory updated_by f ∘ g) ∧
+        (∀g f b.
+           b with <|memaddrs updated_by f; memaddrs updated_by g|> =
+           b with memaddrs updated_by f ∘ g) ∧
+        (∀g f b.
+           b with <|sh_memaddrs updated_by f; sh_memaddrs updated_by g|> =
+           b with sh_memaddrs updated_by f ∘ g) ∧
+        (∀g f b.
+           b with <|be updated_by f; be updated_by g|> =
+           b with be updated_by f ∘ g) ∧
+        (∀g f b.
+           b with <|base_addr updated_by f; base_addr updated_by g|> =
+           b with base_addr updated_by f ∘ g) ∧
+        ∀g f b.
+          b with <|top_addr updated_by f; top_addr updated_by g|> =
+          b with top_addr updated_by f ∘ g
+   
+   [bstate_fupdfupds_comp]  Theorem
+      
+      ⊢ ((∀g f. locals_fupd f ∘ locals_fupd g = locals_fupd (f ∘ g)) ∧
+         ∀h g f.
+           locals_fupd f ∘ locals_fupd g ∘ h = locals_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. globals_fupd f ∘ globals_fupd g = globals_fupd (f ∘ g)) ∧
+         ∀h g f.
+           globals_fupd f ∘ globals_fupd g ∘ h = globals_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. structs_fupd f ∘ structs_fupd g = structs_fupd (f ∘ g)) ∧
+         ∀h g f.
+           structs_fupd f ∘ structs_fupd g ∘ h = structs_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. code_fupd f ∘ code_fupd g = code_fupd (f ∘ g)) ∧
+         ∀h g f. code_fupd f ∘ code_fupd g ∘ h = code_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. eshapes_fupd f ∘ eshapes_fupd g = eshapes_fupd (f ∘ g)) ∧
+         ∀h g f.
+           eshapes_fupd f ∘ eshapes_fupd g ∘ h = eshapes_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. memory_fupd f ∘ memory_fupd g = memory_fupd (f ∘ g)) ∧
+         ∀h g f.
+           memory_fupd f ∘ memory_fupd g ∘ h = memory_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. memaddrs_fupd f ∘ memaddrs_fupd g = memaddrs_fupd (f ∘ g)) ∧
+         ∀h g f.
+           memaddrs_fupd f ∘ memaddrs_fupd g ∘ h =
+           memaddrs_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f.
+            sh_memaddrs_fupd f ∘ sh_memaddrs_fupd g =
+            sh_memaddrs_fupd (f ∘ g)) ∧
+         ∀h g f.
+           sh_memaddrs_fupd f ∘ sh_memaddrs_fupd g ∘ h =
+           sh_memaddrs_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. be_fupd f ∘ be_fupd g = be_fupd (f ∘ g)) ∧
+         ∀h g f. be_fupd f ∘ be_fupd g ∘ h = be_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f.
+            base_addr_fupd f ∘ base_addr_fupd g = base_addr_fupd (f ∘ g)) ∧
+         ∀h g f.
+           base_addr_fupd f ∘ base_addr_fupd g ∘ h =
+           base_addr_fupd (f ∘ g) ∘ h) ∧
+        (∀g f. top_addr_fupd f ∘ top_addr_fupd g = top_addr_fupd (f ∘ g)) ∧
+        ∀h g f.
+          top_addr_fupd f ∘ top_addr_fupd g ∘ h = top_addr_fupd (f ∘ g) ∘ h
+   
+   [bstate_induction]  Theorem
+      
+      ⊢ ∀P. (∀f f0 l f1 f2 f3 f4 f5 b c c0.
+               P (bstate f f0 l f1 f2 f3 f4 f5 b c c0)) ⇒
+            ∀b. P b
+   
+   [bstate_literal_11]  Theorem
+      
+      ⊢ ∀f51 f41 l1 f31 f21 f11 f01 f1 b01 c01 c1 f52 f42 l2 f32 f22 f12
+            f02 f2 b02 c02 c2.
+          <|locals := f51; globals := f41; structs := l1; code := f31;
+            eshapes := f21; memory := f11; memaddrs := f01;
+            sh_memaddrs := f1; be := b01; base_addr := c01;
+            top_addr := c1|> =
+          <|locals := f52; globals := f42; structs := l2; code := f32;
+            eshapes := f22; memory := f12; memaddrs := f02;
+            sh_memaddrs := f2; be := b02; base_addr := c02;
+            top_addr := c2|> ⇔
+          f51 = f52 ∧ f41 = f42 ∧ l1 = l2 ∧ f31 = f32 ∧ f21 = f22 ∧
+          f11 = f12 ∧ f01 = f02 ∧ f1 = f2 ∧ (b01 ⇔ b02) ∧ c01 = c02 ∧
+          c1 = c2
+   
+   [bstate_literal_nchotomy]  Theorem
+      
+      ⊢ ∀b. ∃f5 f4 l f3 f2 f1 f0 f b0 c0 c.
+          b =
+          <|locals := f5; globals := f4; structs := l; code := f3;
+            eshapes := f2; memory := f1; memaddrs := f0; sh_memaddrs := f;
+            be := b0; base_addr := c0; top_addr := c|>
+   
+   [bstate_nchotomy]  Theorem
+      
+      ⊢ ∀bb. ∃f f0 l f1 f2 f3 f4 f5 b c c0.
+          bb = bstate f f0 l f1 f2 f3 f4 f5 b c c0
+   
+   [bstate_updates_eq_literal]  Theorem
+      
+      ⊢ ∀b f5 f4 l f3 f2 f1 f0 f b0 c0 c.
+          b with
+          <|locals := f5; globals := f4; structs := l; code := f3;
+            eshapes := f2; memory := f1; memaddrs := f0; sh_memaddrs := f;
+            be := b0; base_addr := c0; top_addr := c|> =
+          <|locals := f5; globals := f4; structs := l; code := f3;
+            eshapes := f2; memory := f1; memaddrs := f0; sh_memaddrs := f;
+            be := b0; base_addr := c0; top_addr := c|>
+   
+   [comp_ffi_simps]  Theorem
+      
+      ⊢ comp_ffi fs (Ret r) = (Ret r,SND fs) ∧
+        comp_ffi fs (Tau t) = comp_ffi fs t ∧
+        comp_ffi fs (Vis (s,c,ws) g) =
+        case FST fs s (SND fs) c ws of
+          Oracle_return fs' ws' =>
+            if LENGTH ws = LENGTH ws' then
+              comp_ffi (FST fs,fs') (g (INL (INR ws')))
+            else comp_ffi fs (g (INL (INL FFI_failed)))
+        | Oracle_final outcome => comp_ffi fs (g (INL (INL outcome)))
+   
+   [datatype_bstate]  Theorem
+      
+      ⊢ DATATYPE
+          (record bstate locals globals structs code eshapes memory
+             memaddrs sh_memaddrs be base_addr top_addr)
+   
+   [div_Ret]  Theorem
+      
+      ⊢ div fs (Ret r) ⇔ F
+   
+   [div_Tau]  Theorem
+      
+      ⊢ div fs (Tau u) ⇔ div fs u
+   
+   [empty_locals_defs]  Theorem
+      
+      ⊢ (∀s. empty_locals s = s with locals := FEMPTY) ∧
+        ∀s. empty_locals s = s with locals := FEMPTY
+   
+   [eval_bst]  Theorem
+      
+      ⊢ eval (bst s) e = eval s e
+   
+   [eval_def]  Theorem
+      
+      ⊢ (∀w s. eval s (Const w) = SOME (ValWord w)) ∧
+        (∀v s. eval s (Var Local v) = FLOOKUP s.locals v) ∧
+        (∀v s. eval s (Var Global v) = FLOOKUP s.globals v) ∧
+        (∀s es.
+           eval s (RStruct es) =
+           case OPT_MMAP (λa. eval s a) es of
+             NONE => NONE
+           | SOME vs => SOME (RStruct vs)) ∧
+        (∀s index e.
+           eval s (RField index e) =
+           case eval s e of
+             NONE => NONE
+           | SOME (Val v6) => NONE
+           | SOME (RStruct vs) =>
+             if index < LENGTH vs then SOME vs❲index❳ else NONE
+           | SOME (NStruct v8 v9) => NONE) ∧
+        (∀s nm eflds.
+           eval s (NStruct nm eflds) =
+           (let
+              (field_names,field_exps) = UNZIP eflds
+            in
+              case ALOOKUP s.structs nm of
+                NONE => NONE
+              | SOME info =>
+                (let
+                   (field_names',field_shapes) = UNZIP info.fields
+                 in
+                   if field_names' = field_names then
+                     case OPT_MMAP (λa. eval s a) field_exps of
+                       NONE => NONE
+                     | SOME field_vals =>
+                       if
+                         EVERY (λ(s,v). s = shape_of v)
+                           (ZIP (field_shapes,field_vals))
+                       then
+                         SOME (NStruct nm (ZIP (field_names,field_vals)))
+                       else NONE
+                   else NONE))) ∧
+        (∀s fld e.
+           eval s (NField fld e) =
+           case eval s e of
+             NONE => NONE
+           | SOME (Val v6) => NONE
+           | SOME (RStruct v7) => NONE
+           | SOME (NStruct nm vflds) =>
+             if ALOOKUP s.structs nm ≠ NONE then ALOOKUP vflds fld
+             else NONE) ∧
+        (∀shape s addr.
+           eval s (Load shape addr) =
+           if is_wf_shape s.structs shape then
+             case eval s addr of
+               NONE => NONE
+             | SOME (ValWord w) =>
+               mem_load shape w s.memaddrs s.memory s.structs
+             | SOME (RStruct v7) => NONE
+             | SOME (NStruct v8 v9) => NONE
+           else NONE) ∧
+        (∀s addr.
+           eval s (Load32 addr) =
+           case eval s addr of
+             NONE => NONE
+           | SOME (ValWord w) =>
+             (case mem_load_32 s.memory s.memaddrs s.be w of
+                NONE => NONE
+              | SOME w => SOME (ValWord (w2w w)))
+           | SOME (RStruct v7) => NONE
+           | SOME (NStruct v8 v9) => NONE) ∧
+        (∀s addr.
+           eval s (LoadByte addr) =
+           case eval s addr of
+             NONE => NONE
+           | SOME (ValWord w) =>
+             (case mem_load_byte s.memory s.memaddrs s.be w of
+                NONE => NONE
+              | SOME w => SOME (ValWord (w2w w)))
+           | SOME (RStruct v7) => NONE
+           | SOME (NStruct v8 v9) => NONE) ∧
+        (∀s op es.
+           eval s (Op op es) =
+           case OPT_MMAP (λa. eval s a) es of
+             NONE => NONE
+           | SOME ws =>
+             if
+               EVERY
+                 (λw.
+                      case w of
+                        Val v4 => T
+                      | RStruct v5 => F
+                      | NStruct v6 v7 => F) ws
+             then
+               OPTION_MAP (λw. ValWord w)
+                 (word_op op
+                    (MAP
+                       (λw.
+                            case w of
+                              ValWord n => n
+                            | RStruct v1 => ARB
+                            | NStruct v3 v4 => ARB) ws))
+             else NONE) ∧
+        (∀s op es.
+           eval s (Panop op es) =
+           case OPT_MMAP (λa. eval s a) es of
+             NONE => NONE
+           | SOME ws =>
+             if
+               EVERY
+                 (λw.
+                      case w of
+                        Val v4 => T
+                      | RStruct v5 => F
+                      | NStruct v6 v7 => F) ws
+             then
+               OPTION_MAP (λw. ValWord w)
+                 (pan_op op
+                    (MAP
+                       (λw.
+                            case w of
+                              ValWord n => n
+                            | RStruct v1 => ARB
+                            | NStruct v3 v4 => ARB) ws))
+             else NONE) ∧
+        (∀s e2 e1 cmp.
+           eval s (Cmp cmp e1 e2) =
+           case (eval s e1,eval s e2) of
+             (NONE,v3) => NONE
+           | (SOME (Val v10),NONE) => NONE
+           | (SOME (ValWord w1),SOME (ValWord w2)) =>
+             SOME (ValWord (if word_cmp cmp w1 w2 then 1w else 0w))
+           | (SOME (Val v10),SOME (RStruct v21)) => NONE
+           | (SOME (Val v10),SOME (NStruct v22 v23)) => NONE
+           | (SOME (RStruct v11),v3) => NONE
+           | (SOME (NStruct v12 v13),v3) => NONE) ∧
+        (∀sh s n e.
+           eval s (Shift sh e n) =
+           case eval s e of
+             NONE => NONE
+           | SOME (ValWord w) =>
+             OPTION_MAP (λw. ValWord w) (word_sh sh w n)
+           | SOME (RStruct v7) => NONE
+           | SOME (NStruct v8 v9) => NONE) ∧
+        (∀s. eval s BaseAddr = SOME (ValWord s.base_addr)) ∧
+        (∀s. eval s TopAddr = SOME (ValWord s.top_addr)) ∧
+        ∀s. eval s BytesInWord = SOME (ValWord bytes_in_word)
+   
+   [eval_eq]  Theorem
+      
+      ⊢ (s = bst s' ⇒ eval s e = eval s' e) ∧
+        ∀t f. s' = ext s t f ⇒ eval s e = eval s' e
+   
+   [eval_ext]  Theorem
+      
+      ⊢ eval (ext s t ffi) e = eval s e
+   
+   [eval_ind]  Theorem
+      
+      ⊢ ∀P. (∀s w. P s (Const w)) ∧ (∀s v. P s (Var Local v)) ∧
+            (∀s v. P s (Var Global v)) ∧
+            (∀s es. (∀a. MEM a es ⇒ P s a) ⇒ P s (RStruct es)) ∧
+            (∀s index e. P s e ⇒ P s (RField index e)) ∧
+            (∀s nm eflds.
+               (∀field_names field_exps info field_names' field_shapes a.
+                  (field_names,field_exps) = UNZIP eflds ∧
+                  ALOOKUP s.structs nm = SOME info ∧
+                  (field_names',field_shapes) = UNZIP info.fields ∧
+                  field_names' = field_names ∧ MEM a field_exps ⇒
+                  P s a) ⇒
+               P s (NStruct nm eflds)) ∧
+            (∀s fld e. P s e ⇒ P s (NField fld e)) ∧
+            (∀s shape addr.
+               (is_wf_shape s.structs shape ⇒ P s addr) ⇒
+               P s (Load shape addr)) ∧
+            (∀s addr. P s addr ⇒ P s (Load32 addr)) ∧
+            (∀s addr. P s addr ⇒ P s (LoadByte addr)) ∧
+            (∀s op es. (∀a. MEM a es ⇒ P s a) ⇒ P s (Op op es)) ∧
+            (∀s op es. (∀a. MEM a es ⇒ P s a) ⇒ P s (Panop op es)) ∧
+            (∀s cmp e1 e2. P s e1 ∧ P s e2 ⇒ P s (Cmp cmp e1 e2)) ∧
+            (∀s sh e n. P s e ⇒ P s (Shift sh e n)) ∧ (∀s. P s BaseAddr) ∧
+            (∀s. P s TopAddr) ∧ (∀s. P s BytesInWord) ⇒
+            ∀v v1. P v v1
+   
+   [ext_access]  Theorem
+      
+      ⊢ (ext t k ffi).locals = t.locals ∧
+        (ext t k ffi).globals = t.globals ∧
+        (ext t k ffi).structs = t.structs ∧ (ext t k ffi).code = t.code ∧
+        (ext t k ffi).eshapes = t.eshapes ∧
+        (ext t k ffi).memory = t.memory ∧
+        (ext t k ffi).memaddrs = t.memaddrs ∧
+        (ext t k ffi).sh_memaddrs = t.sh_memaddrs ∧
+        ((ext t k ffi).be ⇔ t.be) ∧ (ext t k ffi).ffi = ffi ∧
+        (ext t k ffi).base_addr = t.base_addr ∧
+        (ext t k ffi).top_addr = t.top_addr ∧ (ext t k ffi).clock = k
+   
+   [ext_bst_id]  Theorem
+      
+      ⊢ ext (bst s) s.clock s.ffi = s ∧
+        ext (bst s with locals := x) s.clock s.ffi = s with locals := x ∧
+        ext (bst s with globals := x) s.clock s.ffi = s with globals := x ∧
+        ext (bst s with memory := m) s.clock s.ffi = s with memory := m ∧
+        ext (empty_locals (bst s)) s.clock s.ffi = empty_locals s ∧
+        ext (bst s) k s.ffi = s with clock := k ∧
+        ext (bst s) s.clock ffi = s with ffi := ffi ∧
+        ext (bst s) k ffi = s with <|clock := k; ffi := ffi|>
+   
+   [ext_normalise]  Theorem
+      
+      ⊢ ext s t f with locals := x = ext (s with locals := x) t f ∧
+        ext s t f with memory := m = ext (s with memory := m) t f ∧
+        ext s k ffi with clock := k' = ext s k' ffi ∧
+        ext s k ffi with ffi := ffi' = ext s k ffi' ∧
+        dec_clock (ext s k f) = ext s (k − 1) f
+   
+   [h_handle_call_ret_def]  Theorem
+      
+      ⊢ h_handle_call_ret calltyp s (INL v0) = Ret (INR (SOME Error,s)) ∧
+        h_handle_call_ret calltyp s (INR (NONE,s')) =
+        Ret (INR (SOME Error,s')) ∧
+        h_handle_call_ret calltyp s (INR (SOME Break,s')) =
+        Ret (INR (SOME Error,s')) ∧
+        h_handle_call_ret calltyp s (INR (SOME Continue,s')) =
+        Ret (INR (SOME Error,s')) ∧
+        h_handle_call_ret calltyp s (INR (SOME (Return retv),s')) =
+        (case calltyp of
+           NONE => Ret (INR (SOME (Return retv),empty_locals s'))
+         | SOME (NONE,v2) => Ret (INR (NONE,s' with locals := s.locals))
+         | SOME (SOME (rk,rt),v2) =>
+           if is_valid_value s rk rt retv then
+             Ret
+               (INR (NONE,set_kvar rk rt retv (s' with locals := s.locals)))
+           else Ret (INR (SOME Error,s'))) ∧
+        h_handle_call_ret calltyp s (INR (SOME (Exception eid exn),s')) =
+        (case calltyp of
+           NONE => Ret (INR (SOME (Exception eid exn),empty_locals s'))
+         | SOME (v5,NONE) =>
+           Ret (INR (SOME (Exception eid exn),empty_locals s'))
+         | SOME (v5,SOME (eid',evar,p)) =>
+           if eid = eid' then
+             case FLOOKUP s.eshapes eid of
+               NONE => Ret (INR (SOME Error,s'))
+             | SOME sh =>
+               if shape_of exn = sh ∧ is_valid_value s Local evar exn then
+                 Vis
+                   (INL (p,set_var evar exn (s' with locals := s.locals)))
+                   (λa.
+                        Ret
+                          (INR
+                             (case a of
+                                INL v => (SOME Error,s')
+                              | INR (v2,v3) => (v2,v3))))
+               else Ret (INR (SOME Error,s'))
+           else Ret (INR (SOME (Exception eid exn),empty_locals s'))) ∧
+        h_handle_call_ret calltyp s (INR (SOME Error,s')) =
+        Ret (INR (SOME Error,empty_locals s')) ∧
+        h_handle_call_ret calltyp s (INR (SOME TimeOut,s')) =
+        Ret (INR (SOME TimeOut,empty_locals s')) ∧
+        h_handle_call_ret calltyp s (INR (SOME (FinalFFI v22),s')) =
+        Ret (INR (SOME (FinalFFI v22),empty_locals s'))
+   
+   [h_handle_call_ret_ind]  Theorem
+      
+      ⊢ ∀P. (∀calltyp s v0. P calltyp s (INL v0)) ∧
+            (∀calltyp s s'. P calltyp s (INR (NONE,s'))) ∧
+            (∀calltyp s s'. P calltyp s (INR (SOME Break,s'))) ∧
+            (∀calltyp s s'. P calltyp s (INR (SOME Continue,s'))) ∧
+            (∀calltyp s retv s'. P calltyp s (INR (SOME (Return retv),s'))) ∧
+            (∀calltyp s eid exn s'.
+               P calltyp s (INR (SOME (Exception eid exn),s'))) ∧
+            (∀calltyp s s'. P calltyp s (INR (SOME Error,s'))) ∧
+            (∀calltyp s s'. P calltyp s (INR (SOME TimeOut,s'))) ∧
+            (∀calltyp s v22 s'. P calltyp s (INR (SOME (FinalFFI v22),s'))) ⇒
+            ∀v v1 v2. P v v1 v2
+   
+   [h_handle_deccall_ret_def]  Theorem
+      
+      ⊢ h_handle_deccall_ret rt shape prog1 s (INL v0) =
+        Ret (INR (SOME Error,s)) ∧
+        h_handle_deccall_ret rt shape prog1 s (INR (NONE,s')) =
+        Ret (INR (SOME Error,s')) ∧
+        h_handle_deccall_ret rt shape prog1 s (INR (SOME Break,s')) =
+        Ret (INR (SOME Error,s')) ∧
+        h_handle_deccall_ret rt shape prog1 s (INR (SOME Continue,s')) =
+        Ret (INR (SOME Error,s')) ∧
+        h_handle_deccall_ret rt shape prog1 s (INR (SOME (Return retv),s')) =
+        (if shape_of retv = shape then
+           Vis (INL (prog1,set_var rt retv (s' with locals := s.locals)))
+             (λa.
+                  Ret
+                    (INR
+                       (case a of
+                          INL v => (SOME Error,s')
+                        | INR (v2,v3) =>
+                          (v2,
+                           v3 with
+                           locals :=
+                             res_var v3.locals (rt,FLOOKUP s.locals rt)))))
+         else Ret (INR (SOME Error,s'))) ∧
+        h_handle_deccall_ret rt shape prog1 s (INR (SOME Error,s')) =
+        Ret (INR (SOME Error,empty_locals s')) ∧
+        h_handle_deccall_ret rt shape prog1 s (INR (SOME TimeOut,s')) =
+        Ret (INR (SOME TimeOut,empty_locals s')) ∧
+        h_handle_deccall_ret rt shape prog1 s
+          (INR (SOME (Exception v19 v20),s')) =
+        Ret (INR (SOME (Exception v19 v20),empty_locals s')) ∧
+        h_handle_deccall_ret rt shape prog1 s
+          (INR (SOME (FinalFFI v21),s')) =
+        Ret (INR (SOME (FinalFFI v21),empty_locals s'))
+   
+   [h_handle_deccall_ret_ind]  Theorem
+      
+      ⊢ ∀P. (∀rt shape prog1 s v0. P rt shape prog1 s (INL v0)) ∧
+            (∀rt shape prog1 s s'. P rt shape prog1 s (INR (NONE,s'))) ∧
+            (∀rt shape prog1 s s'. P rt shape prog1 s (INR (SOME Break,s'))) ∧
+            (∀rt shape prog1 s s'.
+               P rt shape prog1 s (INR (SOME Continue,s'))) ∧
+            (∀rt shape prog1 s retv s'.
+               P rt shape prog1 s (INR (SOME (Return retv),s'))) ∧
+            (∀rt shape prog1 s s'. P rt shape prog1 s (INR (SOME Error,s'))) ∧
+            (∀rt shape prog1 s s'.
+               P rt shape prog1 s (INR (SOME TimeOut,s'))) ∧
+            (∀rt shape prog1 s v19 v20 s'.
+               P rt shape prog1 s (INR (SOME (Exception v19 v20),s'))) ∧
+            (∀rt shape prog1 s v21 s'.
+               P rt shape prog1 s (INR (SOME (FinalFFI v21),s'))) ⇒
+            ∀v v1 v2 v3 v4. P v v1 v2 v3 v4
+   
+   [h_prog_def]  Theorem
+      
+      ⊢ h_prog (Skip,s) = Ret (INR (NONE,s)) ∧
+        h_prog (Annot v0 v1,s) = Ret (INR (NONE,s)) ∧
+        h_prog (Dec vname sh e p,s) = h_prog_dec vname sh e p s ∧
+        h_prog (Assign vk vname e,s) = h_prog_assign vk vname e s ∧
+        h_prog (Primitive vname pop es,s) = h_prog_primitive vname pop es s ∧
+        h_prog (Store dst src,s) = h_prog_store dst src s ∧
+        h_prog (Store32 dst src,s) = h_prog_store_32 dst src s ∧
+        h_prog (StoreByte dst src,s) = h_prog_store_byte dst src s ∧
+        h_prog (ShMemLoad op vk v ad,s) = h_prog_sh_mem_load op vk v ad s ∧
+        h_prog (ShMemStore op ad e,s) = h_prog_sh_mem_store op ad e s ∧
+        h_prog (Seq p1 p2,s) = h_prog_seq p1 p2 s ∧
+        h_prog (If gexp p1 p2,s) = h_prog_cond gexp p1 p2 s ∧
+        h_prog (While gexp p,s) = h_prog_while gexp p s ∧
+        h_prog (Break,s) = Ret (INR (SOME Break,s)) ∧
+        h_prog (Continue,s) = Ret (INR (SOME Continue,s)) ∧
+        h_prog (Call calltyp tgtexp argexps,s) =
+        h_prog_call calltyp tgtexp argexps s ∧
+        h_prog (DecCall rt shape tgtexp argexps prog1,s) =
+        h_prog_deccall rt shape tgtexp argexps prog1 s ∧
+        h_prog (ExtCall ffi_name conf_ptr conf_len array_ptr array_len,s) =
+        h_prog_ext_call ffi_name conf_ptr conf_len array_ptr array_len s ∧
+        h_prog (Raise eid e,s) = h_prog_raise eid e s ∧
+        h_prog (Return e,s) = h_prog_return e s ∧
+        h_prog (Tick,s) = Ret (INR (NONE,s))
+   
+   [h_prog_ind]  Theorem
+      
+      ⊢ ∀P. (∀s. P (Skip,s)) ∧ (∀v0 v1 s. P (Annot v0 v1,s)) ∧
+            (∀vname sh e p s. P (Dec vname sh e p,s)) ∧
+            (∀vk vname e s. P (Assign vk vname e,s)) ∧
+            (∀vname pop es s. P (Primitive vname pop es,s)) ∧
+            (∀dst src s. P (Store dst src,s)) ∧
+            (∀dst src s. P (Store32 dst src,s)) ∧
+            (∀dst src s. P (StoreByte dst src,s)) ∧
+            (∀op vk v ad s. P (ShMemLoad op vk v ad,s)) ∧
+            (∀op ad e s. P (ShMemStore op ad e,s)) ∧
+            (∀p1 p2 s. P (Seq p1 p2,s)) ∧
+            (∀gexp p1 p2 s. P (If gexp p1 p2,s)) ∧
+            (∀gexp p s. P (While gexp p,s)) ∧ (∀s. P (Break,s)) ∧
+            (∀s. P (Continue,s)) ∧
+            (∀calltyp tgtexp argexps s. P (Call calltyp tgtexp argexps,s)) ∧
+            (∀rt shape tgtexp argexps prog1 s.
+               P (DecCall rt shape tgtexp argexps prog1,s)) ∧
+            (∀ffi_name conf_ptr conf_len array_ptr array_len s.
+               P (ExtCall ffi_name conf_ptr conf_len array_ptr array_len,s)) ∧
+            (∀eid e s. P (Raise eid e,s)) ∧ (∀e s. P (Return e,s)) ∧
+            (∀s. P (Tick,s)) ⇒
+            ∀v v1. P (v,v1)
+   
+   [h_prog_simple_defs]  Theorem
+      
+      ⊢ (∀vname vk v1 v0 v tgtexp src shape sh s rt prog1 pop p2 p1 p op
+             gexp ffi_name es eid e dst conf_ptr conf_len calltyp array_ptr
+             array_len argexps ad.
+           h_prog (Skip,s) = Ret (INR (NONE,s)) ∧
+           h_prog (Annot v0 v1,s) = Ret (INR (NONE,s)) ∧
+           h_prog (Dec vname sh e p,s) = h_prog_dec vname sh e p s ∧
+           h_prog (Assign vk vname e,s) = h_prog_assign vk vname e s ∧
+           h_prog (Primitive vname pop es,s) =
+           h_prog_primitive vname pop es s ∧
+           h_prog (Store dst src,s) = h_prog_store dst src s ∧
+           h_prog (Store32 dst src,s) = h_prog_store_32 dst src s ∧
+           h_prog (StoreByte dst src,s) = h_prog_store_byte dst src s ∧
+           h_prog (ShMemLoad op vk v ad,s) =
+           h_prog_sh_mem_load op vk v ad s ∧
+           h_prog (ShMemStore op ad e,s) = h_prog_sh_mem_store op ad e s ∧
+           h_prog (Seq p1 p2,s) = h_prog_seq p1 p2 s ∧
+           h_prog (If gexp p1 p2,s) = h_prog_cond gexp p1 p2 s ∧
+           h_prog (While gexp p,s) = h_prog_while gexp p s ∧
+           h_prog (Break,s) = Ret (INR (SOME Break,s)) ∧
+           h_prog (Continue,s) = Ret (INR (SOME Continue,s)) ∧
+           h_prog (Call calltyp tgtexp argexps,s) =
+           h_prog_call calltyp tgtexp argexps s ∧
+           h_prog (DecCall rt shape tgtexp argexps prog1,s) =
+           h_prog_deccall rt shape tgtexp argexps prog1 s ∧
+           h_prog
+             (ExtCall ffi_name conf_ptr conf_len array_ptr array_len,s) =
+           h_prog_ext_call ffi_name conf_ptr conf_len array_ptr array_len s ∧
+           h_prog (Raise eid e,s) = h_prog_raise eid e s ∧
+           h_prog (Return e,s) = h_prog_return e s ∧
+           h_prog (Tick,s) = Ret (INR (NONE,s))) ∧
+        (∀vk vname e s.
+           h_prog_assign vk vname e s =
+           Ret
+             (INR
+                (case eval s e of
+                   NONE => (SOME Error,s)
+                 | SOME value =>
+                   if is_valid_value s vk vname value then
+                     (NONE,set_kvar vk vname value s)
+                   else (SOME Error,s)))) ∧
+        (∀vname pop es s.
+           h_prog_primitive vname pop es s =
+           Ret
+             (INR
+                (case OPT_MMAP (eval s) es of
+                   NONE => (SOME Error,s)
+                 | SOME vs =>
+                   case pan_primop pop vs of
+                     NONE => (SOME Error,s)
+                   | SOME value =>
+                     if is_valid_value s Local vname value then
+                       (NONE,set_var vname value s)
+                     else (SOME Error,s)))) ∧
+        (∀dst src s.
+           h_prog_store dst src s =
+           Ret
+             (INR
+                (case (eval s dst,eval s src) of
+                   (NONE,v3) => (SOME Error,s)
+                 | (SOME (Val v10),NONE) => (SOME Error,s)
+                 | (SOME (ValWord addr),SOME value) =>
+                   (case
+                      mem_stores addr (flatten value) s.memaddrs s.memory
+                    of
+                      NONE => (SOME Error,s)
+                    | SOME m => (NONE,s with memory := m))
+                 | (SOME (RStruct v11),v3) => (SOME Error,s)
+                 | (SOME (NStruct v12 v13),v3) => (SOME Error,s)))) ∧
+        (∀dst src s.
+           h_prog_store_32 dst src s =
+           Ret
+             (INR
+                (case (eval s dst,eval s src) of
+                   (NONE,v3) => (SOME Error,s)
+                 | (SOME (Val v10),NONE) => (SOME Error,s)
+                 | (SOME (ValWord addr),SOME (ValWord w)) =>
+                   (case
+                      mem_store_32 s.memory s.memaddrs s.be addr (w2w w)
+                    of
+                      NONE => (SOME Error,s)
+                    | SOME m => (NONE,s with memory := m))
+                 | (SOME (Val v10),SOME (RStruct v21)) => (SOME Error,s)
+                 | (SOME (Val v10),SOME (NStruct v22 v23)) =>
+                   (SOME Error,s)
+                 | (SOME (RStruct v11),v3) => (SOME Error,s)
+                 | (SOME (NStruct v12 v13),v3) => (SOME Error,s)))) ∧
+        (∀dst src s.
+           h_prog_store_byte dst src s =
+           Ret
+             (INR
+                (case (eval s dst,eval s src) of
+                   (NONE,v3) => (SOME Error,s)
+                 | (SOME (Val v10),NONE) => (SOME Error,s)
+                 | (SOME (ValWord addr),SOME (ValWord w)) =>
+                   (case
+                      mem_store_byte s.memory s.memaddrs s.be addr (w2w w)
+                    of
+                      NONE => (SOME Error,s)
+                    | SOME m => (NONE,s with memory := m))
+                 | (SOME (Val v10),SOME (RStruct v21)) => (SOME Error,s)
+                 | (SOME (Val v10),SOME (NStruct v22 v23)) =>
+                   (SOME Error,s)
+                 | (SOME (RStruct v11),v3) => (SOME Error,s)
+                 | (SOME (NStruct v12 v13),v3) => (SOME Error,s)))) ∧
+        (∀eid e s.
+           h_prog_raise eid e s =
+           Ret
+             (INR
+                (case (FLOOKUP s.eshapes eid,eval s e) of
+                   (NONE,v3) => (SOME Error,s)
+                 | (SOME sh,NONE) => (SOME Error,s)
+                 | (SOME sh,SOME value) =>
+                   if
+                     shape_of value = sh ∧
+                     size_of_sh_with_ctxt s.structs (shape_of value) ≤ 32
+                   then
+                     (SOME (Exception eid value),empty_locals s)
+                   else (SOME Error,s)))) ∧
+        ∀e s.
+          h_prog_return e s =
+          Ret
+            (INR
+               (case eval s e of
+                  NONE => (SOME Error,s)
+                | SOME value =>
+                  if
+                    size_of_sh_with_ctxt s.structs (shape_of value) ≤ 32
+                  then
+                    (SOME (Return value),empty_locals s)
+                  else (SOME Error,s)))
+   
+   [is_valid_value_defs]  Theorem
+      
+      ⊢ (∀s vk v value.
+           is_valid_value s vk v value ⇔
+           case lookup_kvar vk v s of
+             NONE => F
+           | SOME w => shape_of value = shape_of w) ∧
+        ∀s vk v value.
+          is_valid_value s vk v value ⇔
+          case lookup_kvar vk v s of
+            NONE => F
+          | SOME w => shape_of value = shape_of w
+   
+   [itree_bind_cases]  Theorem
+      
+      ⊢ itree_bind t k = t' ⇔
+        (∃r n. t = FUNPOW Tau n (Ret r) ∧ t' = FUNPOW Tau n (k r)) ∨
+        (∃a g n.
+           t = FUNPOW Tau n (Vis a g) ∧
+           t' = FUNPOW Tau n (Vis a (λx. itree_bind (g x) k))) ∨
+        t = spin ∧ t' = spin
+   
+   [itree_unfold_FUNPOW_Tau]  Theorem
+      
+      ⊢ (∀u. f (Tau u) = Tau' u) ⇒
+        itree_unfold f (FUNPOW Tau n t) = FUNPOW Tau n (itree_unfold f t)
+   
+   [kvar_defs2]  Theorem
+      
+      ⊢ ((∀s vk v value.
+            is_valid_value s vk v value ⇔
+            case lookup_kvar vk v s of
+              NONE => F
+            | SOME w => shape_of value = shape_of w) ∧
+         ∀s vk v value.
+           is_valid_value s vk v value ⇔
+           case lookup_kvar vk v s of
+             NONE => F
+           | SOME w => shape_of value = shape_of w) ∧
+        ((∀vk v value s.
+            set_kvar vk v value s =
+            case vk of
+              Local => set_var v value s
+            | Global => set_global v value s) ∧
+         ∀vk v value s.
+           set_kvar vk v value s =
+           case vk of
+             Local => set_var v value s
+           | Global => set_global v value s) ∧
+        ((∀v value s.
+            set_var v value s = s with locals := s.locals⟨v ↦ value⟩) ∧
+         ∀v value s.
+           set_var v value s = s with locals := s.locals⟨v ↦ value⟩) ∧
+        ((∀v value s.
+            set_global v value s = s with globals := s.globals⟨v ↦ value⟩) ∧
+         ∀v value s.
+           set_global v value s = s with globals := s.globals⟨v ↦ value⟩) ∧
+        (∀vk v s.
+           lookup_kvar vk v s =
+           case vk of
+             Local => FLOOKUP s.locals v
+           | Global => FLOOKUP s.globals v) ∧
+        ∀vk v s.
+          lookup_kvar vk v s =
+          case vk of
+            Local => FLOOKUP s.locals v
+          | Global => FLOOKUP s.globals v
+   
+   [lookup_kvar_defs]  Theorem
+      
+      ⊢ (∀vk v s.
+           lookup_kvar vk v s =
+           case vk of
+             Local => FLOOKUP s.locals v
+           | Global => FLOOKUP s.globals v) ∧
+        ∀vk v s.
+          lookup_kvar vk v s =
+          case vk of
+            Local => FLOOKUP s.locals v
+          | Global => FLOOKUP s.globals v
+   
+   [ltree_simps]  Theorem
+      
+      ⊢ ltree fs (Ret r) = Ret r ∧ ltree fs (Tau u) = Tau (ltree fs u) ∧
+        ltree fs (Vis (s,c,ws) g) =
+        case FST fs s (SND fs) c ws of
+          Oracle_return fs' ws' =>
+            if LENGTH ws = LENGTH ws' then
+              Tau (ltree (FST fs,fs') (g (INL (INR ws'))))
+            else Tau (ltree fs (g (INL (INL FFI_failed))))
+        | Oracle_final outcome => Tau (ltree fs (g (INL (INL outcome))))
+   
+   [mrec_Assign]  Theorem
+      
+      ⊢ mrec_sem (Assign vk x v) s =
+        case eval s v of
+          NONE => Ret (INR (SOME Error,s))
+        | SOME v =>
+          Ret
+            (INR
+               (if is_valid_value s vk x v then (NONE,set_kvar vk x v s)
+                else (SOME Error,s)))
+   
+   [mrec_Call]  Theorem
+      
+      ⊢ mrec_sem (Call typ fname aexps) s =
+        case OPT_MMAP (eval s) aexps of
+          NONE => Ret (INR (SOME Error,s))
+        | SOME args =>
+          case lookup_code s.code fname args of
+            NONE => Ret (INR (SOME Error,s))
+          | SOME (q,r) =>
+            Tau
+              (itree_bind (mrec_sem q (s with locals := r))
+                 (mrec h_prog ∘ h_handle_call_ret typ s))
+   
+   [mrec_Dec]  Theorem
+      
+      ⊢ mrec_sem (Dec x sh e p) s =
+        case eval s e of
+          NONE => Ret (INR (SOME Error,s))
+        | SOME v =>
+          if shape_of v = sh then
+            Tau
+              (itree_bind (mrec_sem p (s with locals := s.locals⟨x ↦ v⟩))
+                 (λa.
+                      Ret
+                        (INR
+                           (case a of
+                              INL l => (SOME Error,s)
+                            | INR (res,s') =>
+                              (res,
+                               s' with
+                               locals :=
+                                 res_var s'.locals (x,FLOOKUP s.locals x))))))
+          else Ret (INR (SOME Error,s))
+   
+   [mrec_DecCall]  Theorem
+      
+      ⊢ mrec_sem (DecCall rt sh fname aexps prog) s =
+        case OPT_MMAP (eval s) aexps of
+          NONE => Ret (INR (SOME Error,s))
+        | SOME args =>
+          case lookup_code s.code fname args of
+            NONE => Ret (INR (SOME Error,s))
+          | SOME (q,r) =>
+            Tau
+              (itree_bind (mrec_sem q (s with locals := r))
+                 (mrec h_prog ∘ h_handle_deccall_ret rt sh prog s))
+   
+   [mrec_ExtCall]  Theorem
+      
+      ⊢ mrec_sem (ExtCall ffiname cptr clen aptr alen) s =
+        case (eval s cptr,eval s clen,eval s aptr,eval s alen) of
+          (NONE,v5) => Ret (INR (SOME Error,s))
+        | (SOME (Val v12),NONE,v19) => Ret (INR (SOME Error,s))
+        | (SOME (Val v12),SOME (Val v26),NONE,v33) =>
+          Ret (INR (SOME Error,s))
+        | (SOME (Val v12),SOME (Val v26),SOME (Val v40),NONE) =>
+          Ret (INR (SOME Error,s))
+        | (SOME (ValWord c3),SOME (ValWord c2),SOME (ValWord c'),
+         SOME (ValWord c)) =>
+          (case
+             read_bytearray c3 (w2n c2)
+               (mem_load_byte s.memory s.memaddrs s.be)
+           of
+             NONE => Ret (INR (SOME Error,s))
+           | SOME x' =>
+             case
+               read_bytearray c' (w2n c)
+                 (mem_load_byte s.memory s.memaddrs s.be)
+             of
+               NONE => Ret (INR (SOME Error,s))
+             | SOME x =>
+               if explode ffiname ≠ "" then
+                 Vis (ExtCall ffiname,x',x)
+                   (Tau ∘ mrec h_prog ∘
+                    (λres.
+                         Ret
+                           (INR
+                              (case res of
+                                 INL (INL outcome) =>
+                                   (SOME
+                                      (FinalFFI
+                                         (Final_event (ExtCall ffiname) x'
+                                            x outcome)),empty_locals s)
+                               | INL (INR new_bytes) =>
+                                 if LENGTH new_bytes = LENGTH x then
+                                   (NONE,
+                                    s with
+                                    memory :=
+                                      write_bytearray c' new_bytes s.memory
+                                        s.memaddrs s.be)
+                                 else
+                                   (SOME
+                                      (FinalFFI
+                                         (Final_event (ExtCall ffiname) x'
+                                            x FFI_failed)),empty_locals s)
+                               | INR v1 => (SOME Error,s)))))
+               else
+                 Ret
+                   (INR
+                      (NONE,
+                       s with
+                       memory :=
+                         write_bytearray c' x s.memory s.memaddrs s.be)))
+        | (SOME (Val v12),SOME (Val v26),SOME (Val v40),SOME (RStruct v51)) =>
+          Ret (INR (SOME Error,s))
+        | (SOME (Val v12),SOME (Val v26),SOME (Val v40),
+         SOME (NStruct v52 v53)) =>
+          Ret (INR (SOME Error,s))
+        | (SOME (Val v12),SOME (Val v26),SOME (RStruct v41),v33) =>
+          Ret (INR (SOME Error,s))
+        | (SOME (Val v12),SOME (Val v26),SOME (NStruct v42 v43),v33) =>
+          Ret (INR (SOME Error,s))
+        | (SOME (Val v12),SOME (RStruct v27),v19) =>
+          Ret (INR (SOME Error,s))
+        | (SOME (Val v12),SOME (NStruct v28 v29),v19) =>
+          Ret (INR (SOME Error,s))
+        | (SOME (RStruct v13),v5) => Ret (INR (SOME Error,s))
+        | (SOME (NStruct v14 v15),v5) => Ret (INR (SOME Error,s))
+   
+   [mrec_FUNPOW_Ret_INR]  Theorem
+      
+      ⊢ mrec_sem p s = FUNPOW Tau n (Ret x) ⇒ ∃y. x = INR y
+   
+   [mrec_If]  Theorem
+      
+      ⊢ mrec_sem (If e p q) s =
+        case eval s e of
+          NONE => Ret (INR (SOME Error,s))
+        | SOME (ValWord v) =>
+          Tau
+            (itree_bind (mrec_sem (if v ≠ 0w then p else q) s)
+               (λa.
+                    Ret
+                      (INR
+                         (case a of
+                            INL l => (SOME Error,s)
+                          | INR (res,s') => (res,s')))))
+        | SOME (RStruct v9) => Ret (INR (SOME Error,s))
+        | SOME (NStruct v10 v11) => Ret (INR (SOME Error,s))
+   
+   [mrec_Primitive]  Theorem
+      
+      ⊢ mrec_sem (Primitive vname pop es) s =
+        Ret
+          (INR
+             (case OPT_MMAP (eval s) es of
+                NONE => (SOME Error,s)
+              | SOME vs =>
+                case pan_primop pop vs of
+                  NONE => (SOME Error,s)
+                | SOME value =>
+                  if is_valid_value s Local vname value then
+                    (NONE,set_var vname value s)
+                  else (SOME Error,s)))
+   
+   [mrec_Raise]  Theorem
+      
+      ⊢ mrec_sem (Raise eid e) s =
+        Ret
+          (INR
+             (case (FLOOKUP s.eshapes eid,eval s e) of
+                (NONE,v4) => (SOME Error,s)
+              | (SOME sh,NONE) => (SOME Error,s)
+              | (SOME sh,SOME v) =>
+                if
+                  shape_of v = sh ∧
+                  size_of_sh_with_ctxt s.structs (shape_of v) ≤ 32
+                then
+                  (SOME (Exception eid v),empty_locals s)
+                else (SOME Error,s)))
+   
+   [mrec_Ret_INR]  Theorem
+      
+      ⊢ mrec_sem p s = Ret x ⇒ ∃y. x = INR y
+   
+   [mrec_Return]  Theorem
+      
+      ⊢ mrec_sem (Return e) s =
+        Ret
+          (INR
+             (case eval s e of
+                NONE => (SOME Error,s)
+              | SOME v =>
+                if size_of_sh_with_ctxt s.structs (shape_of v) ≤ 32 then
+                  (SOME (Return v),empty_locals s)
+                else (SOME Error,s)))
+   
+   [mrec_Seq]  Theorem
+      
+      ⊢ mrec_sem (Seq p q) s =
+        Tau
+          (itree_bind (mrec_sem p s)
+             (λa.
+                  case a of
+                    INL l => Ret (INR (SOME Error,s))
+                  | INR (NONE,s') =>
+                    Tau
+                      (itree_bind (mrec_sem q s')
+                         (λa.
+                              Ret
+                                (INR
+                                   (case a of
+                                      INL v => (SOME Error,s)
+                                    | INR (res,s') => (res,s')))))
+                  | INR (SOME res,s') => Ret (INR (SOME res,s'))))
+   
+   [mrec_ShMemLoad]  Theorem
+      
+      ⊢ mrec_sem (ShMemLoad op vk v addr) s =
+        case (eval s addr,lookup_kvar vk v s) of
+          (NONE,v6) => Ret (INR (SOME Error,s))
+        | (SOME (Val v13),NONE) => Ret (INR (SOME Error,s))
+        | (SOME (ValWord ad),SOME (Val v23)) =>
+          if nb_op op = 0 then
+            if ad ∈ s.sh_memaddrs then
+              Vis (SharedMem MappedRead,[0w],word_to_bytes ad F)
+                (Tau ∘ mrec h_prog ∘
+                 (λres.
+                      Ret
+                        (INR
+                           (case res of
+                              INL (INL outcome) =>
+                                (SOME
+                                   (FinalFFI
+                                      (Final_event (SharedMem MappedRead)
+                                         [0w] (word_to_bytes ad F) outcome)),
+                                 empty_locals s)
+                            | INL (INR new_bytes) =>
+                              if
+                                LENGTH new_bytes = dimindex (:α) DIV 8
+                              then
+                                (NONE,
+                                 set_kvar vk v
+                                   (ValWord (word_of_bytes F 0w new_bytes))
+                                   s)
+                              else
+                                (SOME
+                                   (FinalFFI
+                                      (Final_event (SharedMem MappedRead)
+                                         [0w] (word_to_bytes ad F)
+                                         FFI_failed)),empty_locals s)
+                            | INR v2 => (SOME Error,s)))))
+            else Ret (INR (SOME Error,s))
+          else if byte_align ad ∈ s.sh_memaddrs then
+            Vis (SharedMem MappedRead,[n2w (nb_op op)],word_to_bytes ad F)
+              (Tau ∘ mrec h_prog ∘
+               (λres.
+                    Ret
+                      (INR
+                         (case res of
+                            INL (INL outcome) =>
+                              (SOME
+                                 (FinalFFI
+                                    (Final_event (SharedMem MappedRead)
+                                       [n2w (nb_op op)]
+                                       (word_to_bytes ad F) outcome)),
+                               empty_locals s)
+                          | INL (INR new_bytes) =>
+                            if LENGTH new_bytes = dimindex (:α) DIV 8 then
+                              (NONE,
+                               set_kvar vk v
+                                 (ValWord (word_of_bytes F 0w new_bytes)) s)
+                            else
+                              (SOME
+                                 (FinalFFI
+                                    (Final_event (SharedMem MappedRead)
+                                       [n2w (nb_op op)]
+                                       (word_to_bytes ad F) FFI_failed)),
+                               empty_locals s)
+                          | INR v2 => (SOME Error,s)))))
+          else Ret (INR (SOME Error,s))
+        | (SOME (Val v13),SOME (RStruct v24)) => Ret (INR (SOME Error,s))
+        | (SOME (Val v13),SOME (NStruct v25 v26)) =>
+          Ret (INR (SOME Error,s))
+        | (SOME (RStruct v14),v6) => Ret (INR (SOME Error,s))
+        | (SOME (NStruct v15 v16),v6) => Ret (INR (SOME Error,s))
+   
+   [mrec_ShMemStore]  Theorem
+      
+      ⊢ mrec_sem (ShMemStore op addr e) s =
+        case (eval s addr,eval s e) of
+          (NONE,v5) => Ret (INR (SOME Error,s))
+        | (SOME (Val v12),NONE) => Ret (INR (SOME Error,s))
+        | (SOME (ValWord ad),SOME (ValWord w)) =>
+          if nb_op op = 0 then
+            if ad ∈ s.sh_memaddrs then
+              Vis
+                (SharedMem MappedWrite,[0w],
+                 word_to_bytes w F ++ word_to_bytes ad F)
+                (Tau ∘ mrec h_prog ∘
+                 (λres.
+                      Ret
+                        (INR
+                           (case res of
+                              INL (INL outcome) =>
+                                (SOME
+                                   (FinalFFI
+                                      (Final_event (SharedMem MappedWrite)
+                                         [0w]
+                                         (word_to_bytes w F ++
+                                          word_to_bytes ad F) outcome)),s)
+                            | INL (INR new_bytes) =>
+                              if
+                                LENGTH new_bytes =
+                                2 * (dimindex (:α) DIV 8)
+                              then
+                                (NONE,s)
+                              else
+                                (SOME
+                                   (FinalFFI
+                                      (Final_event (SharedMem MappedWrite)
+                                         [0w]
+                                         (word_to_bytes w F ++
+                                          word_to_bytes ad F) FFI_failed)),
+                                 s)
+                            | INR v1 => (SOME Error,s)))))
+            else Ret (INR (SOME Error,s))
+          else if byte_align ad ∈ s.sh_memaddrs then
+            Vis
+              (SharedMem MappedWrite,[n2w (nb_op op)],
+               TAKE (nb_op op) (word_to_bytes w F) ++ word_to_bytes ad F)
+              (Tau ∘ mrec h_prog ∘
+               (λres.
+                    Ret
+                      (INR
+                         (case res of
+                            INL (INL outcome) =>
+                              (SOME
+                                 (FinalFFI
+                                    (Final_event (SharedMem MappedWrite)
+                                       [n2w (nb_op op)]
+                                       (TAKE (nb_op op) (word_to_bytes w F) ++
+                                        word_to_bytes ad F) outcome)),s)
+                          | INL (INR new_bytes) =>
+                            if
+                              LENGTH new_bytes =
+                              LENGTH (TAKE (nb_op op) (word_to_bytes w F)) +
+                              dimindex (:α) DIV 8
+                            then
+                              (NONE,s)
+                            else
+                              (SOME
+                                 (FinalFFI
+                                    (Final_event (SharedMem MappedWrite)
+                                       [n2w (nb_op op)]
+                                       (TAKE (nb_op op) (word_to_bytes w F) ++
+                                        word_to_bytes ad F) FFI_failed)),s)
+                          | INR v1 => (SOME Error,s)))))
+          else Ret (INR (SOME Error,s))
+        | (SOME (Val v12),SOME (RStruct v23)) => Ret (INR (SOME Error,s))
+        | (SOME (Val v12),SOME (NStruct v24 v25)) =>
+          Ret (INR (SOME Error,s))
+        | (SOME (RStruct v13),v5) => Ret (INR (SOME Error,s))
+        | (SOME (NStruct v14 v15),v5) => Ret (INR (SOME Error,s))
+   
+   [mrec_Skip_loop_spin]  Theorem
+      
+      ⊢ mrec_sem (While (Const 1w) Skip) s = spin
+   
+   [mrec_Store]  Theorem
+      
+      ⊢ mrec_sem (Store dst src) s =
+        Ret
+          (INR
+             (case (eval s dst,eval s src) of
+                (NONE,v3) => (SOME Error,s)
+              | (SOME (Val v12),NONE) => (SOME Error,s)
+              | (SOME (ValWord ad),SOME v) =>
+                (case mem_stores ad (flatten v) s.memaddrs s.memory of
+                   NONE => (SOME Error,s)
+                 | SOME m => (NONE,s with memory := m))
+              | (SOME (RStruct v13),v3) => (SOME Error,s)
+              | (SOME (NStruct v14 v15),v3) => (SOME Error,s)))
+   
+   [mrec_Store32]  Theorem
+      
+      ⊢ mrec_sem (Store32 dst src) s =
+        Ret
+          (INR
+             (case (eval s dst,eval s src) of
+                (NONE,v3) => (SOME Error,s)
+              | (SOME (Val v12),NONE) => (SOME Error,s)
+              | (SOME (ValWord ad),SOME (ValWord v)) =>
+                (case mem_store_32 s.memory s.memaddrs s.be ad (w2w v) of
+                   NONE => (SOME Error,s)
+                 | SOME m => (NONE,s with memory := m))
+              | (SOME (Val v12),SOME (RStruct v25)) => (SOME Error,s)
+              | (SOME (Val v12),SOME (NStruct v26 v27)) => (SOME Error,s)
+              | (SOME (RStruct v13),v3) => (SOME Error,s)
+              | (SOME (NStruct v14 v15),v3) => (SOME Error,s)))
+   
+   [mrec_StoreByte]  Theorem
+      
+      ⊢ mrec_sem (StoreByte dst src) s =
+        Ret
+          (INR
+             (case (eval s dst,eval s src) of
+                (NONE,v3) => (SOME Error,s)
+              | (SOME (Val v12),NONE) => (SOME Error,s)
+              | (SOME (ValWord ad),SOME (ValWord v)) =>
+                (case mem_store_byte s.memory s.memaddrs s.be ad (w2w v) of
+                   NONE => (SOME Error,s)
+                 | SOME m => (NONE,s with memory := m))
+              | (SOME (Val v12),SOME (RStruct v25)) => (SOME Error,s)
+              | (SOME (Val v12),SOME (NStruct v26 v27)) => (SOME Error,s)
+              | (SOME (RStruct v13),v3) => (SOME Error,s)
+              | (SOME (NStruct v14 v15),v3) => (SOME Error,s)))
+   
+   [mrec_While]  Theorem
+      
+      ⊢ mrec_sem (While e p) s =
+        case eval s e of
+          NONE => Ret (INR (SOME Error,s))
+        | SOME (ValWord 0w) => Ret (INR (NONE,s))
+        | SOME (ValWord w) =>
+          Tau
+            (itree_bind (mrec_sem p s)
+               (λa.
+                    case a of
+                      INL l => Ret (INR (SOME Error,s))
+                    | INR (res,s') =>
+                      case res of
+                        NONE => Tau (mrec_sem (While e p) s')
+                      | SOME Error => Ret (INR (res,s'))
+                      | SOME TimeOut => Ret (INR (res,s'))
+                      | SOME Break => Ret (INR (NONE,s'))
+                      | SOME Continue => Tau (mrec_sem (While e p) s')
+                      | SOME (Return v6) => Ret (INR (res,s'))
+                      | SOME (Exception v7 v8) => Ret (INR (res,s'))
+                      | SOME (FinalFFI v9) => Ret (INR (res,s'))))
+        | SOME (RStruct v13) => Ret (INR (SOME Error,s))
+        | SOME (NStruct v14 v15) => Ret (INR (SOME Error,s))
+   
+   [mrec_bind]  Theorem
+      
+      ⊢ mrec rh (itree_bind ht k) = itree_bind (mrec rh ht) (mrec rh ∘ k)
+   
+   [mrec_h_handle_call_ret_lemma]  Theorem
+      
+      ⊢ mrec h_prog (h_handle_call_ret ct s res) =
+        case res of
+          INL v4 => Ret (INR (SOME Error,s))
+        | INR (NONE,s') => Ret (INR (SOME Error,s'))
+        | INR (SOME Error,s') => Ret (INR (SOME Error,empty_locals s'))
+        | INR (SOME TimeOut,s') => Ret (INR (SOME TimeOut,empty_locals s'))
+        | INR (SOME Break,s') => Ret (INR (SOME Error,s'))
+        | INR (SOME Continue,s') => Ret (INR (SOME Error,s'))
+        | INR (SOME (Return retv),s') =>
+          (case ct of
+             NONE => Ret (INR (SOME (Return retv),empty_locals s'))
+           | SOME (NONE,v2) => Ret (INR (NONE,s' with locals := s.locals))
+           | SOME (SOME (rk,rt),v2) =>
+             if is_valid_value s rk rt retv then
+               Ret
+                 (INR
+                    (NONE,set_kvar rk rt retv (s' with locals := s.locals)))
+             else Ret (INR (SOME Error,s')))
+        | INR (SOME (Exception eid exn),s') =>
+          (case ct of
+             NONE => Ret (INR (SOME (Exception eid exn),empty_locals s'))
+           | SOME (v6,NONE) =>
+             Ret (INR (SOME (Exception eid exn),empty_locals s'))
+           | SOME (v6,SOME (eid',evar,p)) =>
+             if eid' = eid then
+               case FLOOKUP s.eshapes eid of
+                 NONE => Ret (INR (SOME Error,s'))
+               | SOME sh =>
+                 if
+                   shape_of exn = sh ∧ is_valid_value s Local evar exn
+                 then
+                   Tau
+                     (itree_bind
+                        (mrec_sem p
+                           (set_var evar exn (s' with locals := s.locals)))
+                        (mrec h_prog ∘
+                         (λa.
+                              Ret
+                                (INR
+                                   (case a of
+                                      INL v => (SOME Error,s')
+                                    | INR (q,t) => (q,t))))))
+                 else Ret (INR (SOME Error,s'))
+             else Ret (INR (SOME (Exception eid exn),empty_locals s')))
+        | INR (SOME (FinalFFI v21),s') =>
+          Ret (INR (SOME (FinalFFI v21),empty_locals s'))
+   
+   [mrec_h_handle_deccall_ret_lemma]  Theorem
+      
+      ⊢ mrec h_prog (h_handle_deccall_ret rt sh p s res) =
+        case res of
+          INL v1 => Ret (INR (SOME Error,s))
+        | INR (NONE,s') => Ret (INR (SOME Error,s'))
+        | INR (SOME Error,s') => Ret (INR (SOME Error,empty_locals s'))
+        | INR (SOME TimeOut,s') => Ret (INR (SOME TimeOut,empty_locals s'))
+        | INR (SOME Break,s') => Ret (INR (SOME Error,s'))
+        | INR (SOME Continue,s') => Ret (INR (SOME Error,s'))
+        | INR (SOME (Return retv),s') =>
+          if shape_of retv = sh then
+            Tau
+              (itree_bind
+                 (mrec_sem p (set_var rt retv (s' with locals := s.locals)))
+                 (mrec h_prog ∘
+                  (λa.
+                       Ret
+                         (INR
+                            (case a of
+                               INL v => (SOME Error,s')
+                             | INR (q,r') =>
+                               (q,
+                                r' with
+                                locals :=
+                                  res_var r'.locals
+                                    (rt,FLOOKUP s.locals rt)))))))
+          else Ret (INR (SOME Error,s'))
+        | INR (SOME (Exception v13 v14),s') =>
+          Ret (INR (SOME (Exception v13 v14),empty_locals s'))
+        | INR (SOME (FinalFFI v15),s') =>
+          Ret (INR (SOME (FinalFFI v15),empty_locals s'))
+   
+   [mrec_prog_nonrec]  Theorem
+      
+      ⊢ ((mrec_sem Skip s = Ret (INR (NONE,s)) ∧
+          mrec_sem Break s = Ret (INR (SOME Break,s)) ∧
+          mrec_sem Tick s = Ret (INR (NONE,s)) ∧
+          mrec_sem (Annot x y) s = Ret (INR (NONE,s)) ∧
+          mrec_sem Continue s = Ret (INR (SOME Continue,s))) ∧
+         mrec_sem (Return e) s =
+         Ret
+           (INR
+              (case eval s e of
+                 NONE => (SOME Error,s)
+               | SOME v =>
+                 if size_of_sh_with_ctxt s.structs (shape_of v) ≤ 32 then
+                   (SOME (Return v),empty_locals s)
+                 else (SOME Error,s))) ∧
+         mrec_sem (Raise eid e) s =
+         Ret
+           (INR
+              (case (FLOOKUP s.eshapes eid,eval s e) of
+                 (NONE,v4) => (SOME Error,s)
+               | (SOME sh,NONE) => (SOME Error,s)
+               | (SOME sh,SOME v) =>
+                 if
+                   shape_of v = sh ∧
+                   size_of_sh_with_ctxt s.structs (shape_of v) ≤ 32
+                 then
+                   (SOME (Exception eid v),empty_locals s)
+                 else (SOME Error,s))) ∧
+         mrec_sem (Dec x sh e p) s =
+         (case eval s e of
+            NONE => Ret (INR (SOME Error,s))
+          | SOME v =>
+            if shape_of v = sh then
+              Tau
+                (itree_bind (mrec_sem p (s with locals := s.locals⟨x ↦ v⟩))
+                   (λa.
+                        Ret
+                          (INR
+                             (case a of
+                                INL l => (SOME Error,s)
+                              | INR (res,s') =>
+                                (res,
+                                 s' with
+                                 locals :=
+                                   res_var s'.locals (x,FLOOKUP s.locals x))))))
+            else Ret (INR (SOME Error,s))) ∧
+         mrec_sem (Assign vk x v) s =
+         (case eval s v of
+            NONE => Ret (INR (SOME Error,s))
+          | SOME v =>
+            Ret
+              (INR
+                 (if is_valid_value s vk x v then (NONE,set_kvar vk x v s)
+                  else (SOME Error,s)))) ∧
+         mrec_sem (Primitive vname pop es) s =
+         Ret
+           (INR
+              (case OPT_MMAP (eval s) es of
+                 NONE => (SOME Error,s)
+               | SOME vs =>
+                 case pan_primop pop vs of
+                   NONE => (SOME Error,s)
+                 | SOME value =>
+                   if is_valid_value s Local vname value then
+                     (NONE,set_var vname value s)
+                   else (SOME Error,s))) ∧
+         mrec_sem (Store dst src) s =
+         Ret
+           (INR
+              (case (eval s dst,eval s src) of
+                 (NONE,v3) => (SOME Error,s)
+               | (SOME (Val v12),NONE) => (SOME Error,s)
+               | (SOME (ValWord ad),SOME v) =>
+                 (case mem_stores ad (flatten v) s.memaddrs s.memory of
+                    NONE => (SOME Error,s)
+                  | SOME m => (NONE,s with memory := m))
+               | (SOME (RStruct v13),v3) => (SOME Error,s)
+               | (SOME (NStruct v14 v15),v3) => (SOME Error,s))) ∧
+         mrec_sem (Store32 dst src) s =
+         Ret
+           (INR
+              (case (eval s dst,eval s src) of
+                 (NONE,v3) => (SOME Error,s)
+               | (SOME (Val v12),NONE) => (SOME Error,s)
+               | (SOME (ValWord ad),SOME (ValWord v)) =>
+                 (case mem_store_32 s.memory s.memaddrs s.be ad (w2w v) of
+                    NONE => (SOME Error,s)
+                  | SOME m => (NONE,s with memory := m))
+               | (SOME (Val v12),SOME (RStruct v25)) => (SOME Error,s)
+               | (SOME (Val v12),SOME (NStruct v26 v27)) => (SOME Error,s)
+               | (SOME (RStruct v13),v3) => (SOME Error,s)
+               | (SOME (NStruct v14 v15),v3) => (SOME Error,s))) ∧
+         mrec_sem (StoreByte dst src) s =
+         Ret
+           (INR
+              (case (eval s dst,eval s src) of
+                 (NONE,v3) => (SOME Error,s)
+               | (SOME (Val v12),NONE) => (SOME Error,s)
+               | (SOME (ValWord ad),SOME (ValWord v)) =>
+                 (case
+                    mem_store_byte s.memory s.memaddrs s.be ad (w2w v)
+                  of
+                    NONE => (SOME Error,s)
+                  | SOME m => (NONE,s with memory := m))
+               | (SOME (Val v12),SOME (RStruct v25)) => (SOME Error,s)
+               | (SOME (Val v12),SOME (NStruct v26 v27)) => (SOME Error,s)
+               | (SOME (RStruct v13),v3) => (SOME Error,s)
+               | (SOME (NStruct v14 v15),v3) => (SOME Error,s)))) ∧
+        mrec_sem (ShMemStore op addr e) s =
+        (case (eval s addr,eval s e) of
+           (NONE,v5) => Ret (INR (SOME Error,s))
+         | (SOME (Val v12),NONE) => Ret (INR (SOME Error,s))
+         | (SOME (ValWord ad),SOME (ValWord w)) =>
+           if nb_op op = 0 then
+             if ad ∈ s.sh_memaddrs then
+               Vis
+                 (SharedMem MappedWrite,[0w],
+                  word_to_bytes w F ++ word_to_bytes ad F)
+                 (Tau ∘ mrec h_prog ∘
+                  (λres.
+                       Ret
+                         (INR
+                            (case res of
+                               INL (INL outcome) =>
+                                 (SOME
+                                    (FinalFFI
+                                       (Final_event (SharedMem MappedWrite)
+                                          [0w]
+                                          (word_to_bytes w F ++
+                                           word_to_bytes ad F) outcome)),s)
+                             | INL (INR new_bytes) =>
+                               if
+                                 LENGTH new_bytes =
+                                 2 * (dimindex (:α) DIV 8)
+                               then
+                                 (NONE,s)
+                               else
+                                 (SOME
+                                    (FinalFFI
+                                       (Final_event (SharedMem MappedWrite)
+                                          [0w]
+                                          (word_to_bytes w F ++
+                                           word_to_bytes ad F) FFI_failed)),
+                                  s)
+                             | INR v1 => (SOME Error,s)))))
+             else Ret (INR (SOME Error,s))
+           else if byte_align ad ∈ s.sh_memaddrs then
+             Vis
+               (SharedMem MappedWrite,[n2w (nb_op op)],
+                TAKE (nb_op op) (word_to_bytes w F) ++ word_to_bytes ad F)
+               (Tau ∘ mrec h_prog ∘
+                (λres.
+                     Ret
+                       (INR
+                          (case res of
+                             INL (INL outcome) =>
+                               (SOME
+                                  (FinalFFI
+                                     (Final_event (SharedMem MappedWrite)
+                                        [n2w (nb_op op)]
+                                        (TAKE (nb_op op)
+                                           (word_to_bytes w F) ++
+                                         word_to_bytes ad F) outcome)),s)
+                           | INL (INR new_bytes) =>
+                             if
+                               LENGTH new_bytes =
+                               LENGTH (TAKE (nb_op op) (word_to_bytes w F)) +
+                               dimindex (:α) DIV 8
+                             then
+                               (NONE,s)
+                             else
+                               (SOME
+                                  (FinalFFI
+                                     (Final_event (SharedMem MappedWrite)
+                                        [n2w (nb_op op)]
+                                        (TAKE (nb_op op)
+                                           (word_to_bytes w F) ++
+                                         word_to_bytes ad F) FFI_failed)),s)
+                           | INR v1 => (SOME Error,s)))))
+           else Ret (INR (SOME Error,s))
+         | (SOME (Val v12),SOME (RStruct v23)) => Ret (INR (SOME Error,s))
+         | (SOME (Val v12),SOME (NStruct v24 v25)) =>
+           Ret (INR (SOME Error,s))
+         | (SOME (RStruct v13),v5) => Ret (INR (SOME Error,s))
+         | (SOME (NStruct v14 v15),v5) => Ret (INR (SOME Error,s))) ∧
+        mrec_sem (ShMemLoad op vk v addr) s =
+        (case (eval s addr,lookup_kvar vk v s) of
+           (NONE,v6) => Ret (INR (SOME Error,s))
+         | (SOME (Val v13),NONE) => Ret (INR (SOME Error,s))
+         | (SOME (ValWord ad),SOME (Val v23)) =>
+           if nb_op op = 0 then
+             if ad ∈ s.sh_memaddrs then
+               Vis (SharedMem MappedRead,[0w],word_to_bytes ad F)
+                 (Tau ∘ mrec h_prog ∘
+                  (λres.
+                       Ret
+                         (INR
+                            (case res of
+                               INL (INL outcome) =>
+                                 (SOME
+                                    (FinalFFI
+                                       (Final_event (SharedMem MappedRead)
+                                          [0w] (word_to_bytes ad F) outcome)),
+                                  empty_locals s)
+                             | INL (INR new_bytes) =>
+                               if
+                                 LENGTH new_bytes = dimindex (:α) DIV 8
+                               then
+                                 (NONE,
+                                  set_kvar vk v
+                                    (ValWord (word_of_bytes F 0w new_bytes))
+                                    s)
+                               else
+                                 (SOME
+                                    (FinalFFI
+                                       (Final_event (SharedMem MappedRead)
+                                          [0w] (word_to_bytes ad F)
+                                          FFI_failed)),empty_locals s)
+                             | INR v2 => (SOME Error,s)))))
+             else Ret (INR (SOME Error,s))
+           else if byte_align ad ∈ s.sh_memaddrs then
+             Vis (SharedMem MappedRead,[n2w (nb_op op)],word_to_bytes ad F)
+               (Tau ∘ mrec h_prog ∘
+                (λres.
+                     Ret
+                       (INR
+                          (case res of
+                             INL (INL outcome) =>
+                               (SOME
+                                  (FinalFFI
+                                     (Final_event (SharedMem MappedRead)
+                                        [n2w (nb_op op)]
+                                        (word_to_bytes ad F) outcome)),
+                                empty_locals s)
+                           | INL (INR new_bytes) =>
+                             if LENGTH new_bytes = dimindex (:α) DIV 8 then
+                               (NONE,
+                                set_kvar vk v
+                                  (ValWord (word_of_bytes F 0w new_bytes))
+                                  s)
+                             else
+                               (SOME
+                                  (FinalFFI
+                                     (Final_event (SharedMem MappedRead)
+                                        [n2w (nb_op op)]
+                                        (word_to_bytes ad F) FFI_failed)),
+                                empty_locals s)
+                           | INR v2 => (SOME Error,s)))))
+           else Ret (INR (SOME Error,s))
+         | (SOME (Val v13),SOME (RStruct v24)) => Ret (INR (SOME Error,s))
+         | (SOME (Val v13),SOME (NStruct v25 v26)) =>
+           Ret (INR (SOME Error,s))
+         | (SOME (RStruct v14),v6) => Ret (INR (SOME Error,s))
+         | (SOME (NStruct v15 v16),v6) => Ret (INR (SOME Error,s))) ∧
+        mrec_sem (Seq p q) s =
+        Tau
+          (itree_bind (mrec_sem p s)
+             (λa.
+                  case a of
+                    INL l => Ret (INR (SOME Error,s))
+                  | INR (NONE,s') =>
+                    Tau
+                      (itree_bind (mrec_sem q s')
+                         (λa.
+                              Ret
+                                (INR
+                                   (case a of
+                                      INL v => (SOME Error,s)
+                                    | INR (res,s') => (res,s')))))
+                  | INR (SOME res,s') => Ret (INR (SOME res,s')))) ∧
+        mrec_sem (Call typ fname aexps) s =
+        (case OPT_MMAP (eval s) aexps of
+           NONE => Ret (INR (SOME Error,s))
+         | SOME args =>
+           case lookup_code s.code fname args of
+             NONE => Ret (INR (SOME Error,s))
+           | SOME (q,r) =>
+             Tau
+               (itree_bind (mrec_sem q (s with locals := r))
+                  (mrec h_prog ∘ h_handle_call_ret typ s))) ∧
+        mrec_sem (DecCall rt sh fname aexps prog) s =
+        case OPT_MMAP (eval s) aexps of
+          NONE => Ret (INR (SOME Error,s))
+        | SOME args =>
+          case lookup_code s.code fname args of
+            NONE => Ret (INR (SOME Error,s))
+          | SOME (q,r) =>
+            Tau
+              (itree_bind (mrec_sem q (s with locals := r))
+                 (mrec h_prog ∘ h_handle_deccall_ret rt sh prog s))
+   
+   [mrec_prog_simps]  Theorem
+      
+      ⊢ (mrec_sem Skip s = Ret (INR (NONE,s)) ∧
+         mrec_sem Break s = Ret (INR (SOME Break,s)) ∧
+         mrec_sem Tick s = Ret (INR (NONE,s)) ∧
+         mrec_sem (Annot x y) s = Ret (INR (NONE,s)) ∧
+         mrec_sem Continue s = Ret (INR (SOME Continue,s))) ∧
+        mrec_sem (Return e) s =
+        Ret
+          (INR
+             (case eval s e of
+                NONE => (SOME Error,s)
+              | SOME v =>
+                if size_of_sh_with_ctxt s.structs (shape_of v) ≤ 32 then
+                  (SOME (Return v),empty_locals s)
+                else (SOME Error,s))) ∧
+        mrec_sem (Raise eid e) s =
+        Ret
+          (INR
+             (case (FLOOKUP s.eshapes eid,eval s e) of
+                (NONE,v4) => (SOME Error,s)
+              | (SOME sh,NONE) => (SOME Error,s)
+              | (SOME sh,SOME v) =>
+                if
+                  shape_of v = sh ∧
+                  size_of_sh_with_ctxt s.structs (shape_of v) ≤ 32
+                then
+                  (SOME (Exception eid v),empty_locals s)
+                else (SOME Error,s))) ∧
+        mrec_sem (Dec x sh e p) s =
+        (case eval s e of
+           NONE => Ret (INR (SOME Error,s))
+         | SOME v =>
+           if shape_of v = sh then
+             Tau
+               (itree_bind (mrec_sem p (s with locals := s.locals⟨x ↦ v⟩))
+                  (λa.
+                       Ret
+                         (INR
+                            (case a of
+                               INL l => (SOME Error,s)
+                             | INR (res,s') =>
+                               (res,
+                                s' with
+                                locals :=
+                                  res_var s'.locals (x,FLOOKUP s.locals x))))))
+           else Ret (INR (SOME Error,s))) ∧
+        mrec_sem (Assign vk x v) s =
+        (case eval s v of
+           NONE => Ret (INR (SOME Error,s))
+         | SOME v =>
+           Ret
+             (INR
+                (if is_valid_value s vk x v then (NONE,set_kvar vk x v s)
+                 else (SOME Error,s)))) ∧
+        mrec_sem (Primitive vname pop es) s =
+        Ret
+          (INR
+             (case OPT_MMAP (eval s) es of
+                NONE => (SOME Error,s)
+              | SOME vs =>
+                case pan_primop pop vs of
+                  NONE => (SOME Error,s)
+                | SOME value =>
+                  if is_valid_value s Local vname value then
+                    (NONE,set_var vname value s)
+                  else (SOME Error,s))) ∧
+        mrec_sem (Store dst src) s =
+        Ret
+          (INR
+             (case (eval s dst,eval s src) of
+                (NONE,v3) => (SOME Error,s)
+              | (SOME (Val v12),NONE) => (SOME Error,s)
+              | (SOME (ValWord ad),SOME v) =>
+                (case mem_stores ad (flatten v) s.memaddrs s.memory of
+                   NONE => (SOME Error,s)
+                 | SOME m => (NONE,s with memory := m))
+              | (SOME (RStruct v13),v3) => (SOME Error,s)
+              | (SOME (NStruct v14 v15),v3) => (SOME Error,s))) ∧
+        mrec_sem (Store32 dst src) s =
+        Ret
+          (INR
+             (case (eval s dst,eval s src) of
+                (NONE,v3) => (SOME Error,s)
+              | (SOME (Val v12),NONE) => (SOME Error,s)
+              | (SOME (ValWord ad),SOME (ValWord v)) =>
+                (case mem_store_32 s.memory s.memaddrs s.be ad (w2w v) of
+                   NONE => (SOME Error,s)
+                 | SOME m => (NONE,s with memory := m))
+              | (SOME (Val v12),SOME (RStruct v25)) => (SOME Error,s)
+              | (SOME (Val v12),SOME (NStruct v26 v27)) => (SOME Error,s)
+              | (SOME (RStruct v13),v3) => (SOME Error,s)
+              | (SOME (NStruct v14 v15),v3) => (SOME Error,s))) ∧
+        mrec_sem (StoreByte dst src) s =
+        Ret
+          (INR
+             (case (eval s dst,eval s src) of
+                (NONE,v3) => (SOME Error,s)
+              | (SOME (Val v12),NONE) => (SOME Error,s)
+              | (SOME (ValWord ad),SOME (ValWord v)) =>
+                (case mem_store_byte s.memory s.memaddrs s.be ad (w2w v) of
+                   NONE => (SOME Error,s)
+                 | SOME m => (NONE,s with memory := m))
+              | (SOME (Val v12),SOME (RStruct v25)) => (SOME Error,s)
+              | (SOME (Val v12),SOME (NStruct v26 v27)) => (SOME Error,s)
+              | (SOME (RStruct v13),v3) => (SOME Error,s)
+              | (SOME (NStruct v14 v15),v3) => (SOME Error,s)))
+   
+   [mrec_prog_triv]  Theorem
+      
+      ⊢ mrec_sem Skip s = Ret (INR (NONE,s)) ∧
+        mrec_sem Break s = Ret (INR (SOME Break,s)) ∧
+        mrec_sem Tick s = Ret (INR (NONE,s)) ∧
+        mrec_sem (Annot x y) s = Ret (INR (NONE,s)) ∧
+        mrec_sem Continue s = Ret (INR (SOME Continue,s))
+   
+   [mrec_simps]  Theorem
+      
+      ⊢ mrec rh (Ret r) = Ret r ∧ mrec rh (Tau u) = Tau (mrec rh u) ∧
+        mrec rh (Vis (INL seed) k) = Tau (mrec rh (itree_bind (rh seed) k)) ∧
+        mrec rh (Vis (INR e) k) = Vis e (Tau ∘ mrec rh ∘ k)
+   
+   [nondiv_eq_Ret]  Theorem
+      
+      ⊢ ¬div fs X ⇔ ∃n r. ltree fs X = FUNPOW Tau n (Ret r)
+   
+   [opt_mmap_eval_bst]  Theorem
+      
+      ⊢ OPT_MMAP (eval (bst s)) es = OPT_MMAP (eval s) es
+   
+   [opt_mmap_eval_ext]  Theorem
+      
+      ⊢ OPT_MMAP (eval (ext s t ffi)) es = OPT_MMAP (eval s) es
+   
+   [set_global_defs]  Theorem
+      
+      ⊢ (∀v value s.
+           set_global v value s = s with globals := s.globals⟨v ↦ value⟩) ∧
+        ∀v value s.
+          set_global v value s = s with globals := s.globals⟨v ↦ value⟩
+   
+   [set_kvar_defs]  Theorem
+      
+      ⊢ (∀vk v value s.
+           set_kvar vk v value s =
+           case vk of
+             Local => set_var v value s
+           | Global => set_global v value s) ∧
+        ∀vk v value s.
+          set_kvar vk v value s =
+          case vk of
+            Local => set_var v value s
+          | Global => set_global v value s
+   
+   [set_var_defs]  Theorem
+      
+      ⊢ (∀v value s.
+           set_var v value s = s with locals := s.locals⟨v ↦ value⟩) ∧
+        ∀v value s.
+          set_var v value s = s with locals := s.locals⟨v ↦ value⟩
+   
+   [trace_prefix0_simps]  Theorem
+      
+      ⊢ trace_prefix0 fs (Ret r) = [||] ∧
+        trace_prefix0 fs (Tau u) = trace_prefix0 fs u ∧
+        trace_prefix0 fs (Vis (s,c,ws) k) =
+        case FST fs s (SND fs) c ws of
+          Oracle_return fs' ws' =>
+            if LENGTH ws ≠ LENGTH ws' then
+              trace_prefix0 fs (k (INL FFI_failed))
+            else
+              IO_event s c (ZIP (ws,ws')):::
+                  trace_prefix0 (FST fs,fs') (k (INR ws'))
+        | Oracle_final outcome => trace_prefix0 fs (k (INL outcome))
+   
+   [trace_prefix_simps]  Theorem
+      
+      ⊢ trace_prefix fs (Ret r) = [||] ∧
+        trace_prefix fs (Tau u) = trace_prefix fs u ∧
+        trace_prefix fs (Vis (s,c,ws) k) =
+        case FST fs s (SND fs) c ws of
+          Oracle_return fs' ws' =>
+            if LENGTH ws ≠ LENGTH ws' then
+              trace_prefix fs (k (INL (INL FFI_failed)))
+            else
+              IO_event s c (ZIP (ws,ws')):::
+                  trace_prefix (FST fs,fs') (k (INL (INR ws')))
+        | Oracle_final outcome => trace_prefix fs (k (INL (INL outcome)))
+   
+   

@@ -1,0 +1,7 @@
+[misc] Parent theory of "pan_common"
+   
+   [distinct_lists_def]  Definition
+      
+      ⊢ ∀xs ys. distinct_lists xs ys ⇔ EVERY (λx. ¬MEM x ys) xs
+   
+   

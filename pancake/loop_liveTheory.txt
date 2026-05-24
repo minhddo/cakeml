@@ -1,0 +1,345 @@
+[loop_call] Parent theory of "loop_live"
+   
+   [arith_vars]  Definition
+      
+      ⊢ (∀r1 r2 r3 r4 l.
+           arith_vars (LLongMul r1 r2 r3 r4) l =
+           insert r3 () (insert r4 () (delete r1 (delete r2 l)))) ∧
+        (∀r1 r2 r3 l.
+           arith_vars (LDiv r1 r2 r3) l =
+           insert r2 () (insert r3 () (delete r1 l))) ∧
+        ∀r1 r2 r3 r4 r5 l.
+          arith_vars (LLongDiv r1 r2 r3 r4 r5) l =
+          insert r3 ()
+            (insert r4 () (insert r5 () (delete r1 (delete r2 l))))
+   
+   [comp_def]  Definition
+      
+      ⊢ ∀prog. comp prog = FST (mark_all (FST (shrink (LN,LN) prog LN)))
+   
+   [optimise_def]  Definition
+      
+      ⊢ ∀prog. optimise prog = (comp ∘ FST ∘ comp LN) prog
+   
+   [exp_ind]  Theorem
+      
+      ⊢ ∀P Q.
+          (∀v. P (Var v)) ∧ (∀v0. P (Const v0)) ∧ P BaseAddr ∧ P TopAddr ∧
+          (∀v1. P (Lookup v1)) ∧ (∀a. P a ⇒ P (Load a)) ∧
+          (∀x vs. Q vs ⇒ P (Op x vs)) ∧
+          (∀v2 x v3. P x ⇒ P (Shift v2 x v3)) ∧
+          (∀xs.
+             (∀x xs'. xs = x::xs' ⇒ P x) ∧ (∀x xs'. xs = x::xs' ⇒ Q xs') ⇒
+             Q xs) ⇒
+          (∀v0. P v0) ∧ ∀v0. Q v0
+   
+   [fixedpoint_thm]  Theorem
+      
+      ⊢ ∀live_in l1 l2 body l0 b.
+          fixedpoint live_in l1 l2 body = SOME (b,l0) ⇒
+          shrink (inter live_in l0,l2) body l2 = (b,l0)
+   
+   [mark_all_def]  Theorem
+      
+      ⊢ (∀p2 p1.
+           mark_all (Seq p1 p2) =
+           (let
+              (p1',t1) = mark_all p1;
+              (p2',t2) = mark_all p2;
+              t3 = (t1 ∧ t2)
+            in
+              (if t3 then Mark (Seq p1' p2') else Seq p1' p2',t3))) ∧
+        (∀l2 l1 body.
+           mark_all (Loop l1 body l2) =
+           (let (body',t1) = mark_all body in (Loop l1 body' l2,F))) ∧
+        (∀x3 x2 x1 p2 p1 l1.
+           mark_all (If x1 x2 x3 p1 p2 l1) =
+           (let
+              (p1',t1) = mark_all p1;
+              (p2',t2) = mark_all p2;
+              p3 = If x1 x2 x3 p1' p2' l1;
+              t3 = (t1 ∧ t2)
+            in
+              (if t3 then Mark p3 else p3,t3))) ∧
+        (∀p1. mark_all (Mark p1) = mark_all p1) ∧
+        (∀ret handler dest args.
+           mark_all (Call ret dest args handler) =
+           case handler of
+             NONE => (Mark (Call ret dest args handler),T)
+           | SOME (ns,p1,p2,l) =>
+             (let
+                (p1',t1) = mark_all p1;
+                (p2',t2) = mark_all p2;
+                t3 = (t1 ∧ t2);
+                p3 = Call ret dest args (SOME (ns,p1',p2',l))
+              in
+                (if t3 then Mark p3 else p3,t3))) ∧
+        mark_all Skip = (Mark Skip,T) ∧
+        (∀v3 v1. mark_all (Assign v1 v3) = (Mark (Assign v1 v3),T)) ∧
+        (∀v7 v6 v5.
+           mark_all (Primitive v5 v6 v7) = (Mark (Primitive v5 v6 v7),T)) ∧
+        (∀v8. mark_all (Arith v8) = (Mark (Arith v8),T)) ∧
+        (∀v9 v10. mark_all (Store v9 v10) = (Mark (Store v9 v10),T)) ∧
+        (∀v12 v11.
+           mark_all (SetGlobal v11 v12) = (Mark (SetGlobal v11 v12),T)) ∧
+        (∀v14 v13. mark_all (Load32 v13 v14) = (Mark (Load32 v13 v14),T)) ∧
+        (∀v16 v15.
+           mark_all (LoadByte v15 v16) = (Mark (LoadByte v15 v16),T)) ∧
+        (∀v18 v17. mark_all (Store32 v17 v18) = (Mark (Store32 v17 v18),T)) ∧
+        (∀v20 v19.
+           mark_all (StoreByte v19 v20) = (Mark (StoreByte v19 v20),T)) ∧
+        mark_all Break = (Mark Break,T) ∧
+        mark_all Continue = (Mark Continue,T) ∧
+        (∀v32. mark_all (Raise v32) = (Mark (Raise v32),T)) ∧
+        (∀v33. mark_all (Return v33) = (Mark (Return v33),T)) ∧
+        (∀v36 v35 v34.
+           mark_all (ShMem v34 v35 v36) = (Mark (ShMem v34 v35 v36),T)) ∧
+        mark_all Tick = (Mark Tick,T) ∧ mark_all Fail = (Mark Fail,T) ∧
+        (∀v39 v38.
+           mark_all (LocValue v38 v39) = (Mark (LocValue v38 v39),T)) ∧
+        ∀v49 v48 v47 v46 v45 v44.
+          mark_all (FFI v44 v45 v46 v47 v48 v49) =
+          (Mark (FFI v44 v45 v46 v47 v48 v49),T)
+   
+   [mark_all_ind]  Theorem
+      
+      ⊢ ∀P. (∀p1 p2.
+               (∀p1' t1. (p1',t1) = mark_all p1 ⇒ P p2) ∧ P p1 ⇒
+               P (Seq p1 p2)) ∧
+            (∀l1 body l2. P body ⇒ P (Loop l1 body l2)) ∧
+            (∀x1 x2 x3 p1 p2 l1.
+               (∀p1' t1. (p1',t1) = mark_all p1 ⇒ P p2) ∧ P p1 ⇒
+               P (If x1 x2 x3 p1 p2 l1)) ∧ (∀p1. P p1 ⇒ P (Mark p1)) ∧
+            (∀ret dest args handler.
+               (∀v ns v2 p1 v4 p2 l p1' t1.
+                  handler = SOME v ∧ v = (ns,v2) ∧ v2 = (p1,v4) ∧
+                  v4 = (p2,l) ∧ (p1',t1) = mark_all p1 ⇒
+                  P p2) ∧
+               (∀v ns v2 p1 v4 p2 l.
+                  handler = SOME v ∧ v = (ns,v2) ∧ v2 = (p1,v4) ∧
+                  v4 = (p2,l) ⇒
+                  P p1) ⇒
+               P (Call ret dest args handler)) ∧ P Skip ∧
+            (∀v1 v3. P (Assign v1 v3)) ∧
+            (∀v5 v6 v7. P (Primitive v5 v6 v7)) ∧ (∀v8. P (Arith v8)) ∧
+            (∀v9 v10. P (Store v9 v10)) ∧
+            (∀v11 v12. P (SetGlobal v11 v12)) ∧
+            (∀v13 v14. P (Load32 v13 v14)) ∧
+            (∀v15 v16. P (LoadByte v15 v16)) ∧
+            (∀v17 v18. P (Store32 v17 v18)) ∧
+            (∀v19 v20. P (StoreByte v19 v20)) ∧ P Break ∧ P Continue ∧
+            (∀v32. P (Raise v32)) ∧ (∀v33. P (Return v33)) ∧
+            (∀v34 v35 v36. P (ShMem v34 v35 v36)) ∧ P Tick ∧ P Fail ∧
+            (∀v38 v39. P (LocValue v38 v39)) ∧
+            (∀v44 v45 v46 v47 v48 v49. P (FFI v44 v45 v46 v47 v48 v49)) ⇒
+            ∀v. P v
+   
+   [shrink_def]  Theorem
+      
+      ⊢ (∀p2 p1 l b.
+           shrink b (Seq p1 p2) l =
+           (let
+              (p2',l') = shrink b p2 l;
+              (p1',l'') = shrink b p1 l'
+            in
+              (Seq p1' p2',l''))) ∧
+        (∀live_out live_in l body b.
+           shrink b (Loop live_in body live_out) l =
+           (let
+              l2 = inter live_out l
+            in
+              case fixedpoint live_in LN l2 body of
+                NONE =>
+                  (let
+                     (b,_0) = shrink (live_in,l2) body l2
+                   in
+                     (Loop live_in b l2,live_in))
+              | SOME (v1,v2) =>
+                (let l = inter live_in v2 in (Loop l v1 l2,l)))) ∧
+        (∀x3 x2 x1 p2 p1 l1 l b.
+           shrink b (If x1 x2 x3 p1 p2 l1) l =
+           (let
+              l' = inter l l1;
+              (p1',l1') = shrink b p1 l';
+              (p2',l2) = shrink b p2 l';
+              l3 = case x3 of Reg r => insert r () LN | Imm v3 => LN
+            in
+              (If x1 x2 x3 p1' p2' l',
+               insert x2 () (union l3 (union l1' l2))))) ∧
+        (∀p1 l b. shrink b (Mark p1) l = shrink b p1 l) ∧
+        (∀l b. shrink b Break l = (Break,SND b)) ∧
+        (∀l b. shrink b Continue l = (Continue,FST b)) ∧
+        (∀l b. shrink b Fail l = (Fail,LN)) ∧
+        (∀l b. shrink b Skip l = (Skip,l)) ∧
+        (∀vs l b. shrink b (Return vs) l = (Return vs,list_insert vs LN)) ∧
+        (∀v l b. shrink b (Raise v) l = (Raise v,insert v () LN)) ∧
+        (∀l b arith.
+           shrink b (Arith arith) l = (Arith arith,arith_vars arith l)) ∧
+        (∀rhss pop lhss l b.
+           shrink b (Primitive lhss pop rhss) l =
+           (Primitive lhss pop rhss,list_insert rhss (list_delete lhss l))) ∧
+        (∀n m l b.
+           shrink b (LocValue n m) l =
+           case lookup n l of
+             NONE => (Skip,l)
+           | SOME v => (LocValue n m,delete n l)) ∧
+        (∀x n l b.
+           shrink b (Assign n x) l =
+           case lookup n l of
+             NONE => (Skip,l)
+           | SOME v => (Assign n x,vars_of_exp x (delete n l))) ∧
+        (∀r op l b ad.
+           shrink b (ShMem op r ad) l =
+           (ShMem op r ad,vars_of_exp ad (insert r () l))) ∧
+        (∀n l e b.
+           shrink b (Store e n) l =
+           (Store e n,vars_of_exp e (insert n () l))) ∧
+        (∀name l e b.
+           shrink b (SetGlobal name e) l =
+           (SetGlobal name e,vars_of_exp e l)) ∧
+        (∀ret l handler dest b args.
+           shrink b (Call ret dest args handler) l =
+           (let
+              a = fromAList (MAP (λx. (x,())) args)
+            in
+              case ret of
+                NONE => (Call NONE dest args NONE,union a l)
+              | SOME (ns,l1) =>
+                case handler of
+                  NONE =>
+                    (let
+                       l3 = list_delete ns (inter l l1)
+                     in
+                       (Call (SOME (ns,l3)) dest args NONE,union a l3))
+                | SOME (e,h,r,live_out) =>
+                  (let
+                     (r',l2) = shrink b r l;
+                     (h',l3) = shrink b h l;
+                     l1 =
+                       inter l1 (union (list_delete ns l2) (delete e l3))
+                   in
+                     (Call (SOME (ns,l1)) dest args
+                        (SOME (e,h',r',inter l live_out)),union a l1)))) ∧
+        (∀r4 r3 r2 r1 n l1 l b.
+           shrink b (FFI n r1 r2 r3 r4 l1) l =
+           (FFI n r1 r2 r3 r4 (inter l1 l),
+            insert r1 ()
+              (insert r2 () (insert r3 () (insert r4 () (inter l1 l)))))) ∧
+        (∀y x l b.
+           shrink b (Load32 x y) l = (Load32 x y,insert x () (delete y l))) ∧
+        (∀y x l b.
+           shrink b (LoadByte x y) l =
+           (LoadByte x y,insert x () (delete y l))) ∧
+        (∀y x l b.
+           shrink b (Store32 x y) l =
+           (Store32 x y,insert x () (insert y () l))) ∧
+        (∀y x l b.
+           shrink b (StoreByte x y) l =
+           (StoreByte x y,insert x () (insert y () l))) ∧
+        (∀l b. shrink b Tick l = (Tick,l)) ∧
+        ∀live_in l2 l1 body.
+          fixedpoint live_in l1 l2 body =
+          (let
+             (b,l0) = shrink (inter live_in l1,l2) body l2;
+             l0' = inter live_in l0
+           in
+             if l0' = l1 then SOME (b,l0)
+             else if size l0' ≤ size l1 then NONE
+             else fixedpoint live_in l0' l2 body)
+   
+   [shrink_ind]  Theorem
+      
+      ⊢ ∀P0 P1.
+          (∀b p1 p2 l.
+             (∀p2' l'. (p2',l') = shrink b p2 l ⇒ P0 b p1 l') ∧ P0 b p2 l ⇒
+             P0 b (Seq p1 p2) l) ∧
+          (∀b live_in body live_out l.
+             (∀l2.
+                l2 = inter live_out l ∧
+                fixedpoint live_in LN l2 body = NONE ⇒
+                P0 (live_in,l2) body l2) ∧
+             (∀l2. l2 = inter live_out l ⇒ P1 live_in LN l2 body) ⇒
+             P0 b (Loop live_in body live_out) l) ∧
+          (∀b x1 x2 x3 p1 p2 l1 l.
+             (∀l' p1' l1'.
+                l' = inter l l1 ∧ (p1',l1') = shrink b p1 l' ⇒ P0 b p2 l') ∧
+             (∀l'. l' = inter l l1 ⇒ P0 b p1 l') ⇒
+             P0 b (If x1 x2 x3 p1 p2 l1) l) ∧
+          (∀b p1 l. P0 b p1 l ⇒ P0 b (Mark p1) l) ∧ (∀b l. P0 b Break l) ∧
+          (∀b l. P0 b Continue l) ∧ (∀b l. P0 b Fail l) ∧
+          (∀b l. P0 b Skip l) ∧ (∀b vs l. P0 b (Return vs) l) ∧
+          (∀b v l. P0 b (Raise v) l) ∧ (∀b arith l. P0 b (Arith arith) l) ∧
+          (∀b lhss pop rhss l. P0 b (Primitive lhss pop rhss) l) ∧
+          (∀b n m l. P0 b (LocValue n m) l) ∧
+          (∀b n x l. P0 b (Assign n x) l) ∧
+          (∀b op r ad l. P0 b (ShMem op r ad) l) ∧
+          (∀b e n l. P0 b (Store e n) l) ∧
+          (∀b name e l. P0 b (SetGlobal name e) l) ∧
+          (∀b ret dest args handler l.
+             (∀a v1 ns l1 v e v2 h v4 r live_out r' l2.
+                a = fromAList (MAP (λx. (x,())) args) ∧ ret = SOME v1 ∧
+                v1 = (ns,l1) ∧ handler = SOME v ∧ v = (e,v2) ∧
+                v2 = (h,v4) ∧ v4 = (r,live_out) ∧ (r',l2) = shrink b r l ⇒
+                P0 b h l) ∧
+             (∀a v1 ns l1 v e v2 h v4 r live_out.
+                a = fromAList (MAP (λx. (x,())) args) ∧ ret = SOME v1 ∧
+                v1 = (ns,l1) ∧ handler = SOME v ∧ v = (e,v2) ∧
+                v2 = (h,v4) ∧ v4 = (r,live_out) ⇒
+                P0 b r l) ⇒
+             P0 b (Call ret dest args handler) l) ∧
+          (∀b n r1 r2 r3 r4 l1 l. P0 b (FFI n r1 r2 r3 r4 l1) l) ∧
+          (∀b x y l. P0 b (Load32 x y) l) ∧
+          (∀b x y l. P0 b (LoadByte x y) l) ∧
+          (∀b x y l. P0 b (Store32 x y) l) ∧
+          (∀b x y l. P0 b (StoreByte x y) l) ∧ (∀b l. P0 b Tick l) ∧
+          (∀live_in l1 l2 body.
+             (∀b l0 l0'.
+                (b,l0) = shrink (inter live_in l1,l2) body l2 ∧
+                l0' = inter live_in l0 ∧ l0' ≠ l1 ∧ ¬(size l0' ≤ size l1) ⇒
+                P1 live_in l0' l2 body) ∧ P0 (inter live_in l1,l2) body l2 ⇒
+             P1 live_in l1 l2 body) ⇒
+          (∀v0 v1 v2. P0 v0 v1 v2) ∧ ∀v0 v1 v2 v3. P1 v0 v1 v2 v3
+   
+   [size_inter]  Theorem
+      
+      ⊢ ∀l1 l2. size (inter l1 l2) ≤ size l1
+   
+   [size_mk_BN]  Theorem
+      
+      ⊢ ∀t1 t2. size (mk_BN t1 t2) = size (BN t1 t2)
+   
+   [size_mk_BS]  Theorem
+      
+      ⊢ ∀t1 t2 x. size (mk_BS t1 x t2) = size (BS t1 x t2)
+   
+   [vars_of_exp_def]  Theorem
+      
+      ⊢ (∀v l. vars_of_exp (Var v) l = insert v () l) ∧
+        (∀v0 l. vars_of_exp (Const v0) l = l) ∧
+        (∀l. vars_of_exp BaseAddr l = l) ∧
+        (∀l. vars_of_exp TopAddr l = l) ∧
+        (∀v1 l. vars_of_exp (Lookup v1) l = l) ∧
+        (∀l a. vars_of_exp (Load a) l = vars_of_exp a l) ∧
+        (∀x vs l. vars_of_exp (Op x vs) l = vars_of_exp_list vs l) ∧
+        (∀x v3 v2 l. vars_of_exp (Shift v2 x v3) l = vars_of_exp x l) ∧
+        ∀xs l.
+          vars_of_exp_list xs l =
+          case xs of
+            [] => l
+          | x::xs' => vars_of_exp x (vars_of_exp_list xs' l)
+   
+   [vars_of_exp_ind]  Theorem
+      
+      ⊢ ∀P0 P1.
+          (∀v l. P0 (Var v) l) ∧ (∀v0 l. P0 (Const v0) l) ∧
+          (∀l. P0 BaseAddr l) ∧ (∀l. P0 TopAddr l) ∧
+          (∀v1 l. P0 (Lookup v1) l) ∧ (∀a l. P0 a l ⇒ P0 (Load a) l) ∧
+          (∀x vs l. P1 vs l ⇒ P0 (Op x vs) l) ∧
+          (∀v2 x v3 l. P0 x l ⇒ P0 (Shift v2 x v3) l) ∧
+          (∀xs l.
+             (∀x xs'. xs = x::xs' ⇒ P0 x (vars_of_exp_list xs' l)) ∧
+             (∀x xs'. xs = x::xs' ⇒ P1 xs' l) ⇒
+             P1 xs l) ⇒
+          (∀v0 v1. P0 v0 v1) ∧ ∀v0 v1. P1 v0 v1
+   
+   

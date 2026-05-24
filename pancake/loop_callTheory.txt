@@ -1,0 +1,170 @@
+[loopLang] Parent theory of "loop_call"
+   
+   [is_load_def_primitive]  Definition
+      
+      ⊢ is_load =
+        WFREC (@R. WF R)
+          (λis_load a.
+               case a of
+                 Load => I T
+               | Load8 => I T
+               | Load16 => I T
+               | Load32 => I T
+               | Store => I F
+               | Store8 => I F
+               | Store16 => I F
+               | Store32 => I F)
+   
+   [comp_def]  Theorem
+      
+      ⊢ (∀l. comp l Skip = (Skip,l)) ∧
+        (∀ret l handler dest args.
+           comp l (Call ret dest args handler) =
+           ((case dest of
+               NONE =>
+                 (case args of
+                    [] => Skip
+                  | v2::v3 =>
+                    case lookup (LAST args) l of
+                      NONE => Call ret NONE args handler
+                    | SOME n => Call ret (SOME n) (FRONT args) handler)
+             | SOME v => Call ret dest args handler),LN)) ∧
+        (∀n m l. comp l (LocValue n m) = (LocValue n m,insert n m l)) ∧
+        (∀n m l.
+           comp l (Assign n (Var m)) =
+           (Assign n (Var m),
+            case (lookup n l,lookup m l) of
+              (NONE,NONE) => l
+            | (SOME v3,NONE) => delete n l
+            | (v,SOME loc) => insert n loc l)) ∧
+        (∀v102 n l.
+           comp l (Assign n (Const v102)) =
+           (Assign n (Const v102),
+            case lookup n l of NONE => l | SOME v1 => delete n l)) ∧
+        (∀v104 n l.
+           comp l (Assign n (Lookup v104)) =
+           (Assign n (Lookup v104),
+            case lookup n l of NONE => l | SOME v1 => delete n l)) ∧
+        (∀v105 n l.
+           comp l (Assign n (Load v105)) =
+           (Assign n (Load v105),
+            case lookup n l of NONE => l | SOME v1 => delete n l)) ∧
+        (∀v107 v106 n l.
+           comp l (Assign n (Op v106 v107)) =
+           (Assign n (Op v106 v107),
+            case lookup n l of NONE => l | SOME v1 => delete n l)) ∧
+        (∀v110 v109 v108 n l.
+           comp l (Assign n (Shift v108 v109 v110)) =
+           (Assign n (Shift v108 v109 v110),
+            case lookup n l of NONE => l | SOME v1 => delete n l)) ∧
+        (∀n l.
+           comp l (Assign n BaseAddr) =
+           (Assign n BaseAddr,
+            case lookup n l of NONE => l | SOME v1 => delete n l)) ∧
+        (∀n l.
+           comp l (Assign n TopAddr) =
+           (Assign n TopAddr,
+            case lookup n l of NONE => l | SOME v1 => delete n l)) ∧
+        (∀op n l e. comp l (ShMem op n e) = (ShMem op n e,LN)) ∧
+        (∀n m l.
+           comp l (Load32 m n) =
+           (Load32 m n,case lookup n l of NONE => l | SOME v1 => delete n l)) ∧
+        (∀n m l.
+           comp l (LoadByte m n) =
+           (LoadByte m n,
+            case lookup n l of NONE => l | SOME v1 => delete n l)) ∧
+        (∀q p l.
+           comp l (Seq p q) =
+           (let (np,nl) = comp l p; (nq,nl') = comp nl q in (Seq np nq,LN))) ∧
+        (∀ri q p ns n l c.
+           comp l (If c n ri p q ns) =
+           (let
+              (np,nl) = comp l p;
+              (nq,ml) = comp l q
+            in
+              (If c n ri np nq ns,LN))) ∧
+        (∀p ns ms l.
+           comp l (Loop ns p ms) =
+           (let (np,nl) = comp LN p in (Loop ns np ms,LN))) ∧
+        (∀p l. comp l (Mark p) = (let (np,nl) = comp l p in (Mark np,nl))) ∧
+        (∀str nl n' n m' m l.
+           comp l (FFI str n m n' m' nl) = (FFI str n m n' m' nl,LN)) ∧
+        (∀l. comp l Tick = (Tick,LN)) ∧
+        (∀n l. comp l (Raise n) = (Raise n,LN)) ∧
+        (∀n l. comp l (Return n) = (Return n,LN)) ∧
+        (∀rhss pop lhss l.
+           comp l (Primitive lhss pop rhss) =
+           (Primitive lhss pop rhss,list_delete lhss l)) ∧
+        (∀l arith.
+           comp l (Arith arith) =
+           (Arith arith,
+            case arith of
+              LLongMul r1 r2 r3 r4 =>
+                (case (lookup r1 l,lookup r2 l) of
+                   (NONE,NONE) => l
+                 | (NONE,SOME loc) => delete r2 l
+                 | (SOME v5,NONE) => delete r1 l
+                 | (SOME v5,SOME v9) => delete r1 (delete r2 l))
+            | LLongDiv r1' r2' r3' r4' r5 =>
+              (case (lookup r1' l,lookup r2' l) of
+                 (NONE,NONE) => l
+               | (NONE,SOME loc) => delete r2' l
+               | (SOME v5,NONE) => delete r1' l
+               | (SOME v5,SOME v9) => delete r1' (delete r2' l))
+            | LDiv r1'' r2'' r3'' =>
+              case lookup r1'' l of NONE => l | SOME v1 => delete r1'' l)) ∧
+        (∀v15 v14 l. comp l (Store v14 v15) = (Store v14 v15,l)) ∧
+        (∀v17 v16 l. comp l (SetGlobal v16 v17) = (SetGlobal v16 v17,l)) ∧
+        (∀v23 v22 l. comp l (Store32 v22 v23) = (Store32 v22 v23,l)) ∧
+        (∀v25 v24 l. comp l (StoreByte v24 v25) = (StoreByte v24 v25,l)) ∧
+        (∀l. comp l Break = (Break,l)) ∧
+        (∀l. comp l Continue = (Continue,l)) ∧ ∀l. comp l Fail = (Fail,l)
+   
+   [comp_ind]  Theorem
+      
+      ⊢ ∀P. (∀l. P l Skip) ∧
+            (∀l ret dest args handler. P l (Call ret dest args handler)) ∧
+            (∀l n m. P l (LocValue n m)) ∧
+            (∀l n m. P l (Assign n (Var m))) ∧
+            (∀l n v102. P l (Assign n (Const v102))) ∧
+            (∀l n v104. P l (Assign n (Lookup v104))) ∧
+            (∀l n v105. P l (Assign n (Load v105))) ∧
+            (∀l n v106 v107. P l (Assign n (Op v106 v107))) ∧
+            (∀l n v108 v109 v110. P l (Assign n (Shift v108 v109 v110))) ∧
+            (∀l n. P l (Assign n BaseAddr)) ∧
+            (∀l n. P l (Assign n TopAddr)) ∧
+            (∀l op n e. P l (ShMem op n e)) ∧ (∀l m n. P l (Load32 m n)) ∧
+            (∀l m n. P l (LoadByte m n)) ∧
+            (∀l p q.
+               (∀np nl. (np,nl) = comp l p ⇒ P nl q) ∧ P l p ⇒
+               P l (Seq p q)) ∧
+            (∀l c n ri p q ns.
+               (∀np nl. (np,nl) = comp l p ⇒ P l q) ∧ P l p ⇒
+               P l (If c n ri p q ns)) ∧
+            (∀l ns p ms. P LN p ⇒ P l (Loop ns p ms)) ∧
+            (∀l p. P l p ⇒ P l (Mark p)) ∧
+            (∀l str n m n' m' nl. P l (FFI str n m n' m' nl)) ∧
+            (∀l. P l Tick) ∧ (∀l n. P l (Raise n)) ∧
+            (∀l n. P l (Return n)) ∧
+            (∀l lhss pop rhss. P l (Primitive lhss pop rhss)) ∧
+            (∀l arith. P l (Arith arith)) ∧
+            (∀l v14 v15. P l (Store v14 v15)) ∧
+            (∀l v16 v17. P l (SetGlobal v16 v17)) ∧
+            (∀l v22 v23. P l (Store32 v22 v23)) ∧
+            (∀l v24 v25. P l (StoreByte v24 v25)) ∧ (∀l. P l Break) ∧
+            (∀l. P l Continue) ∧ (∀l. P l Fail) ⇒
+            ∀v v1. P v v1
+   
+   [is_load_def]  Theorem
+      
+      ⊢ (is_load Load ⇔ T) ∧ (is_load Load8 ⇔ T) ∧ (is_load Load16 ⇔ T) ∧
+        (is_load Load32 ⇔ T) ∧ (is_load Store ⇔ F) ∧ (is_load Store8 ⇔ F) ∧
+        (is_load Store16 ⇔ F) ∧ (is_load Store32 ⇔ F)
+   
+   [is_load_ind]  Theorem
+      
+      ⊢ ∀P. P Load ∧ P Load8 ∧ P Load16 ∧ P Load32 ∧ P Store ∧ P Store8 ∧
+            P Store16 ∧ P Store32 ⇒
+            ∀v. P v
+   
+   

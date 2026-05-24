@@ -329,7 +329,9 @@ Proof
   >~ [‘evaluate (Call _ _ _, _)’] >-
    (rw [evaluate_def]
     >> every_case_tac
-    >> fs [assigned_free_vars_def, FLOOKUP_SIMP])
+    >> fs [assigned_free_vars_def, FLOOKUP_SIMP]
+    >> metis_tac[flookup_fupdate_zip_not_mem, MEM, LENGTH]
+   )
   >~ [‘evaluate (If _ _ _, _)’] >-
    (rw [evaluate_def, AllCaseEqs()]
     >> rename1 ‘if w ≠ 0w then _ else _’
@@ -907,7 +909,7 @@ Proof
   fs [evaluate_def, eval_upd_clock_eq, AllCaseEqs () ,
       set_var_def, mem_store_def, set_globals_def,
       dec_clock_def, empty_locals_def] >> rveq >>
-  fs [state_component_equality]>>
+  fs [state_component_equality, opt_mmap_eval_upd_clock_eq]>>
   (Cases_on ‘op’>>fs[sh_mem_op_def,sh_mem_load_def,sh_mem_store_def]>>
    every_case_tac>>fs[set_var_def,empty_locals_def]>>rveq>>fs[])
 QED
@@ -1067,7 +1069,8 @@ Proof
   >- (fs [evaluate_def, AllCaseEqs()] >> rveq >> fs [] >>
       every_case_tac >> fs [eval_upd_clock_eq])
   >~ [‘Call’]
-  >- (once_rewrite_tac [evaluate_def, LET_THM] >>
+  >- (
+      once_rewrite_tac [evaluate_def, LET_THM] >>
       fs [eval_upd_clock_eq, opt_mmap_eval_upd_clock_eq] >>
       TOP_CASE_TAC >> fs [] >>
       TOP_CASE_TAC >> fs [] >>
@@ -1083,8 +1086,11 @@ Proof
             cases_on ‘evaluate (p,s' with locals := s.locals)’) >> fs [] >>
        TRY (rename1 ‘evaluate (p,s' with locals := s.locals |+ (x',w))’>>
             cases_on ‘evaluate (p,s' with locals := s.locals |+ (x',w))’) >> fs [] >>
+       TRY (rename1 `evaluate (p, s' with locals := s.locals |++ ZIP(xs, ws))` >>
+            cases_on `evaluate (p, s' with locals := s.locals |++ ZIP(xs, ws))`) >> fs[] >>
        imp_res_tac evaluate_io_events_mono >>
-       fs [] >> metis_tac [IS_PREFIX_TRANS]) >>
+       fs [] >> metis_tac [IS_PREFIX_TRANS]
+       ) >>
       fs [dec_clock_def] >>
       TOP_CASE_TAC >> gvs []
       >- (
@@ -1105,8 +1111,10 @@ Proof
            imp_res_tac evaluate_io_events_mono >>
            fs [] >> metis_tac [IS_PREFIX_TRANS]) >>
          TOP_CASE_TAC >> fs [] >> rveq >> fs [] >>
-         rename1 ‘evaluate (p,r'' with locals := s.locals |+ (x',w))’ >>
-         cases_on ‘evaluate (p,r'' with locals := s.locals |+ (x',w))’ >>
+         TOP_CASE_TAC >> fs [] >> rveq >> fs [] >>
+         TOP_CASE_TAC >> fs [] >> rveq >> fs [] >>
+         rename1 ‘evaluate (p,r'' with locals := s.locals |++ ZIP(xs,ws))’ >>
+         cases_on ‘evaluate (p,r'' with locals := s.locals |++ ZIP(xs,ws))’ >>
          fs [] >>
          imp_res_tac evaluate_io_events_mono >>
          fs [] >> metis_tac [IS_PREFIX_TRANS]) >>
@@ -1137,8 +1145,8 @@ Proof
            cases_on ‘evaluate (p,r'' with locals := s.locals)’ >>
            imp_res_tac evaluate_io_events_mono >>
            fs [] >> metis_tac [IS_PREFIX_TRANS]) >>
-         rename1 ‘evaluate (p,r'' with locals := s.locals |+ (x',w))’ >>
-         cases_on ‘evaluate (p,r'' with locals := s.locals |+ (x',w))’ >>
+         rename1 ‘evaluate (p,r'' with locals := s.locals |++ ZIP(xs,ws))’ >>
+         cases_on ‘evaluate (p,r'' with locals := s.locals |++ ZIP(xs,ws))’ >>
          imp_res_tac evaluate_io_events_mono >>
          fs [] >> metis_tac [IS_PREFIX_TRANS]) >>
        every_case_tac >> fs [] >> rveq >> fs [] >>
@@ -1163,9 +1171,13 @@ Proof
          TOP_CASE_TAC >> fs [] >> rveq >> fs []>>
          TOP_CASE_TAC >> fs [] >> rveq >> fs []
          >- (drule evaluate_add_clock_eq >> fs []) >>
+         TOP_CASE_TAC >> fs [] >> rveq >> fs []
+         >- (drule evaluate_add_clock_eq >> fs [])
+         >- (drule evaluate_add_clock_eq >> fs []) >>
+         TOP_CASE_TAC >> fs [] >> rveq >> fs []
+         >- (drule evaluate_add_clock_eq >> fs []) >>
          TOP_CASE_TAC >> fs [] >> rveq >> fs [] >>
-         drule evaluate_add_clock_eq >> fs []) >>
-       drule evaluate_add_clock_eq >> fs []) >> (* ? *)
+         drule evaluate_add_clock_eq >> fs [])) >> (* ? *)
       TOP_CASE_TAC >> fs [] >> rveq >> fs []
       >- (
        first_x_assum (qspec_then ‘extra’ mp_tac) >>
@@ -1255,7 +1267,7 @@ Definition exps_of_def:
   (exps_of (Store32 e1 e2) = [e1;e2]) ∧
   (exps_of (StoreByte e1 e2) = [e1;e2]) ∧
   (exps_of (StoreGlob _ e) = [e]) ∧
-  (exps_of (Return e) = [e]) ∧
+  (exps_of (Return es) = es) ∧
   (exps_of (Assign _ e) = [e]) ∧
   (exps_of (ShMem _ _ e) = [e]) ∧
   (exps_of _ = [])

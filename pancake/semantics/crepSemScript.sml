@@ -38,7 +38,7 @@ Datatype:
          | TimeOut
          | Break
          | Continue
-         | Return    ('a word_lab)
+         | Return    (('a word_lab) list)
          | Exception ('a word)
          | FinalFFI final_event
 End
@@ -318,9 +318,9 @@ Definition evaluate_def:
           | _ => (res,s1))
        else (NONE,s)
     | _ => (SOME Error,s)) /\
-  (evaluate (Return e,s) =
-    case (eval s e) of
-     | SOME w => (SOME (Return w),empty_locals s)
+  (evaluate (Return es,s) =
+    case OPT_MMAP (eval s) es of
+     | SOME ws => (SOME (Return ws),empty_locals s)
      | _ => (SOME Error,s)) /\
  (evaluate (Raise eid,s) = (SOME (Exception eid), empty_locals s)) /\
  (evaluate (Tick,s) =
@@ -337,14 +337,16 @@ Definition evaluate_def:
               | (NONE,st) => (SOME Error,st)
               | (SOME Break,st) => (SOME Error,st)
               | (SOME Continue,st) => (SOME Error,st)
-              | (SOME (Return retv),st) =>
+              | (SOME (Return retvs),st) =>
                    (case caltyp of
-                    | NONE    => (SOME (Return retv),empty_locals st)
-                    | SOME (NONE, p, _) => evaluate (p, st with locals := s.locals)
-                    | SOME (SOME rt, p, _) =>
-                     (case FLOOKUP s.locals rt of
-                       | SOME _ => evaluate (p, st with locals := s.locals |+ (rt,retv))
-                       | _ => (SOME Error, st)))
+                    | NONE    => (SOME (Return retvs),empty_locals st)
+                    | SOME ([], p, _) => evaluate (p, st with locals := s.locals)
+                    | SOME (rts, p, _) =>
+                      if ¬ALL_DISTINCT rts then (SOME Error, st) else
+                        if LENGTH retvs ≠ LENGTH rts then (SOME Error, st) else
+                           (case OPT_MMAP (FLOOKUP s.locals) rts of
+                             | SOME vals => evaluate (p, st with locals := s.locals |++ ZIP(rts,retvs))
+                             | _ => (SOME Error, st)))
               | (SOME (Exception eid),st) =>
                    (case caltyp of
                     | NONE    => (SOME (Exception eid),empty_locals st)

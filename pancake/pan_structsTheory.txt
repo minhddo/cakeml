@@ -1,0 +1,581 @@
+[panLang] Parent theory of "pan_structs"
+   
+   [compile_top_def]  Definition
+      
+      ⊢ ∀decs.
+          compile_top decs =
+          (let
+             ctxt = <|structs := []; locals := []; globals := []|>
+           in
+             FST (compile_decs (get_names ctxt decs) decs))
+   
+   [context_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0'.
+                 ∀ $var$('context').
+                   (∀a0'.
+                      (∃a0 a1 a2.
+                         a0' =
+                         (λa0 a1 a2.
+                              ind_type$CONSTR 0 (a0,a1,a2)
+                                (λn. ind_type$BOTTOM)) a0 a1 a2) ⇒
+                      $var$('context') a0') ⇒
+                   $var$('context') a0') rep
+   
+   [context_case_def]  Definition
+      
+      ⊢ ∀a0 a1 a2 f. context_CASE (context a0 a1 a2) f = f a0 a1 a2
+   
+   [context_size_def]  Definition
+      
+      ⊢ ∀a0 a1 a2.
+          context_size (context a0 a1 a2) =
+          1 +
+          (list_size
+             (pair_size mlstring_size
+                (list_size (pair_size mlstring_size shape_size))) a0 +
+           (list_size (pair_size mlstring_size shape_size) a1 +
+            list_size (pair_size mlstring_size shape_size) a2))
+   
+   [recordtype_context_seldef_globals_def]  Definition
+      
+      ⊢ ∀l l0 l1. (context l l0 l1).globals = l1
+   
+   [recordtype_context_seldef_globals_fupd_def]  Definition
+      
+      ⊢ ∀f l l0 l1.
+          context l l0 l1 with globals updated_by f = context l l0 (f l1)
+   
+   [recordtype_context_seldef_locals_def]  Definition
+      
+      ⊢ ∀l l0 l1. (context l l0 l1).locals = l0
+   
+   [recordtype_context_seldef_locals_fupd_def]  Definition
+      
+      ⊢ ∀f l l0 l1.
+          context l l0 l1 with locals updated_by f = context l (f l0) l1
+   
+   [recordtype_context_seldef_structs_def]  Definition
+      
+      ⊢ ∀l l0 l1. (context l l0 l1).structs = l
+   
+   [recordtype_context_seldef_structs_fupd_def]  Definition
+      
+      ⊢ ∀f l l0 l1.
+          context l l0 l1 with structs updated_by f = context (f l) l0 l1
+   
+   [EXISTS_context]  Theorem
+      
+      ⊢ ∀P. (∃c. P c) ⇔
+            ∃l1 l0 l. P <|structs := l1; locals := l0; globals := l|>
+   
+   [FORALL_context]  Theorem
+      
+      ⊢ ∀P. (∀c. P c) ⇔
+            ∀l1 l0 l. P <|structs := l1; locals := l0; globals := l|>
+   
+   [afindi_def]  Theorem
+      
+      ⊢ (∀x. afindi x [] = NONE) ∧
+        ∀x v t k.
+          afindi x ((k,v)::t) =
+          if x = k then SOME 0
+          else case afindi x t of NONE => NONE | SOME i => SOME (1 + i)
+   
+   [afindi_ind]  Theorem
+      
+      ⊢ ∀P. (∀x. P x []) ∧ (∀x k v t. (x ≠ k ⇒ P x t) ⇒ P x ((k,v)::t)) ⇒
+            ∀v v1. P v v1
+   
+   [compile_decs_def]  Theorem
+      
+      ⊢ (∀ctxt. compile_decs ctxt [] = ([],ctxt)) ∧
+        (∀v sh e ds ctxt.
+           compile_decs ctxt (Decl sh v e::ds) =
+           (let
+              (ds',ctxt') =
+                compile_decs (ctxt with globals := (v,sh)::ctxt.globals) ds
+            in
+              (Decl (compile_shape ctxt.structs sh) v (compile_exp ctxt e)::
+                 ds',ctxt'))) ∧
+        (∀fi ds ctxt.
+           compile_decs ctxt (Function fi::ds) =
+           (let
+              (ds',ctxt') = compile_decs ctxt ds;
+              params = fi.params;
+              fi' =
+                fi with
+                <|params updated_by
+                    MAP (λ(p,s). (p,compile_shape ctxt.structs s));
+                  body updated_by compile (ctxt' with locals := params);
+                  return updated_by compile_shape ctxt.structs|>
+            in
+              (Function fi'::ds',ctxt'))) ∧
+        ∀nm flds ds ctxt.
+          compile_decs ctxt (Name nm flds::ds) = compile_decs ctxt ds
+   
+   [compile_decs_ind]  Theorem
+      
+      ⊢ ∀P. (∀ctxt. P ctxt []) ∧
+            (∀ctxt sh v e ds.
+               P (ctxt with globals := (v,sh)::ctxt.globals) ds ⇒
+               P ctxt (Decl sh v e::ds)) ∧
+            (∀ctxt fi ds. P ctxt ds ⇒ P ctxt (Function fi::ds)) ∧
+            (∀ctxt nm flds ds. P ctxt ds ⇒ P ctxt (Name nm flds::ds)) ⇒
+            ∀v v1. P v v1
+   
+   [compile_def]  Theorem
+      
+      ⊢ (∀v s p e ctxt.
+           compile ctxt (Dec v s e p) =
+           Dec v (compile_shape ctxt.structs s) (compile_exp ctxt e)
+             (compile (ctxt with locals := (v,s)::ctxt.locals) p)) ∧
+        (∀vk v e ctxt.
+           compile ctxt (Assign vk v e) = Assign vk v (compile_exp ctxt e)) ∧
+        (∀v ctxt ad.
+           compile ctxt (Store ad v) =
+           Store (compile_exp ctxt ad) (compile_exp ctxt v)) ∧
+        (∀v ctxt ad.
+           compile ctxt (Store32 ad v) =
+           Store32 (compile_exp ctxt ad) (compile_exp ctxt v)) ∧
+        (∀src dest ctxt.
+           compile ctxt (StoreByte dest src) =
+           StoreByte (compile_exp ctxt dest) (compile_exp ctxt src)) ∧
+        (∀p' p ctxt.
+           compile ctxt (Seq p p') = Seq (compile ctxt p) (compile ctxt p')) ∧
+        (∀p' p e ctxt.
+           compile ctxt (If e p p') =
+           If (compile_exp ctxt e) (compile ctxt p) (compile ctxt p')) ∧
+        (∀p e ctxt.
+           compile ctxt (While e p) =
+           While (compile_exp ctxt e) (compile ctxt p)) ∧
+        (∀rtyp f es ctxt.
+           compile ctxt (Call rtyp f es) =
+           (let
+              cexps = compile_exps ctxt es
+            in
+              case rtyp of
+                NONE => TailCall f cexps
+              | SOME (tl,hdl) =>
+                Call
+                  (SOME
+                     (tl,
+                      case hdl of
+                        NONE => NONE
+                      | SOME (eid,evar,p) => SOME (eid,evar,compile ctxt p)))
+                  f cexps)) ∧
+        (∀v s p f es ctxt.
+           compile ctxt (DecCall v s f es p) =
+           DecCall v (compile_shape ctxt.structs s) f
+             (compile_exps ctxt es)
+             (compile (ctxt with locals := (v,s)::ctxt.locals) p)) ∧
+        (∀ptr2 ptr1 len2 len1 f ctxt.
+           compile ctxt (ExtCall f ptr1 len1 ptr2 len2) =
+           ExtCall f (compile_exp ctxt ptr1) (compile_exp ctxt len1)
+             (compile_exp ctxt ptr2) (compile_exp ctxt len2)) ∧
+        (∀rt ctxt. compile ctxt (Return rt) = Return (compile_exp ctxt rt)) ∧
+        (∀excp eid ctxt.
+           compile ctxt (Raise eid excp) =
+           Raise eid (compile_exp ctxt excp)) ∧
+        (∀r op ctxt ad.
+           compile ctxt (ShMemStore op r ad) =
+           ShMemStore op (compile_exp ctxt r) (compile_exp ctxt ad)) ∧
+        (∀vk r op ctxt ad.
+           compile ctxt (ShMemLoad op vk r ad) =
+           ShMemLoad op vk r (compile_exp ctxt ad)) ∧
+        (∀v0. compile v0 Skip = Skip) ∧
+        (∀v14 v13 v12 v0.
+           compile v0 (Primitive v12 v13 v14) = Primitive v12 v13 v14) ∧
+        (∀v0. compile v0 Break = Break) ∧
+        (∀v0. compile v0 Continue = Continue) ∧
+        (∀v0. compile v0 Tick = Tick) ∧
+        ∀v52 v51 v0. compile v0 (Annot v51 v52) = Annot v51 v52
+   
+   [compile_exp_def]  Theorem
+      
+      ⊢ (∀es ctxt.
+           compile_exp ctxt (RStruct es) = RStruct (compile_exps ctxt es)) ∧
+        (∀index e ctxt.
+           compile_exp ctxt (RField index e) =
+           RField index (compile_exp ctxt e)) ∧
+        (∀nm eflds ctxt.
+           compile_exp ctxt (NStruct nm eflds) =
+           (let
+              eflds' = compile_fields ctxt eflds;
+              es' =
+                case ALOOKUP ctxt.structs nm of
+                  NONE => []
+                | SOME flds =>
+                  FLAT
+                    (MAP
+                       (λ(nm',sh).
+                            case ALOOKUP eflds' nm' of
+                              NONE => []
+                            | SOME e => [e]) flds)
+            in
+              RStruct es')) ∧
+        (∀fld e ctxt.
+           compile_exp ctxt (NField fld e) =
+           (let
+              e'' = compile_exp ctxt e;
+              index =
+                case old_exp_shape ctxt e of
+                  One => 0
+                | Comb v2 => 0
+                | Named nm =>
+                  case ALOOKUP ctxt.structs nm of
+                    NONE => 0
+                  | SOME flds =>
+                    case afindi fld flds of NONE => 0 | SOME i => i
+            in
+              RField index e'')) ∧
+        (∀sh e ctxt.
+           compile_exp ctxt (Load sh e) =
+           Load (compile_shape ctxt.structs sh) (compile_exp ctxt e)) ∧
+        (∀e ctxt.
+           compile_exp ctxt (LoadByte e) = LoadByte (compile_exp ctxt e)) ∧
+        (∀e ctxt. compile_exp ctxt (Load32 e) = Load32 (compile_exp ctxt e)) ∧
+        (∀es ctxt bop.
+           compile_exp ctxt (Op bop es) = Op bop (compile_exps ctxt es)) ∧
+        (∀pop es ctxt.
+           compile_exp ctxt (Panop pop es) =
+           Panop pop (compile_exps ctxt es)) ∧
+        (∀e2 e1 ctxt cmp.
+           compile_exp ctxt (Cmp cmp e1 e2) =
+           Cmp cmp (compile_exp ctxt e1) (compile_exp ctxt e2)) ∧
+        (∀sh n e ctxt.
+           compile_exp ctxt (Shift sh e n) =
+           Shift sh (compile_exp ctxt e) n) ∧
+        (∀v5 ctxt. compile_exp ctxt (Const v5) = Const v5) ∧
+        (∀v7 v6 ctxt. compile_exp ctxt (Var v6 v7) = Var v6 v7) ∧
+        (∀ctxt. compile_exp ctxt BaseAddr = BaseAddr) ∧
+        (∀ctxt. compile_exp ctxt TopAddr = TopAddr) ∧
+        (∀ctxt. compile_exp ctxt BytesInWord = BytesInWord) ∧
+        (∀ctxt. compile_exps ctxt [] = []) ∧
+        (∀es e ctxt.
+           compile_exps ctxt (e::es) =
+           compile_exp ctxt e::compile_exps ctxt es) ∧
+        (∀ctxt. compile_fields ctxt [] = []) ∧
+        ∀fld exp eflds ctxt.
+          compile_fields ctxt ((fld,exp)::eflds) =
+          (fld,compile_exp ctxt exp)::compile_fields ctxt eflds
+   
+   [compile_exp_ind]  Theorem
+      
+      ⊢ ∀P0 P1 P2.
+          (∀ctxt es. P1 ctxt es ⇒ P0 ctxt (RStruct es)) ∧
+          (∀ctxt index e. P0 ctxt e ⇒ P0 ctxt (RField index e)) ∧
+          (∀ctxt nm eflds. P2 ctxt eflds ⇒ P0 ctxt (NStruct nm eflds)) ∧
+          (∀ctxt fld e. P0 ctxt e ⇒ P0 ctxt (NField fld e)) ∧
+          (∀ctxt sh e. P0 ctxt e ⇒ P0 ctxt (Load sh e)) ∧
+          (∀ctxt e. P0 ctxt e ⇒ P0 ctxt (LoadByte e)) ∧
+          (∀ctxt e. P0 ctxt e ⇒ P0 ctxt (Load32 e)) ∧
+          (∀ctxt bop es. P1 ctxt es ⇒ P0 ctxt (Op bop es)) ∧
+          (∀ctxt pop es. P1 ctxt es ⇒ P0 ctxt (Panop pop es)) ∧
+          (∀ctxt cmp e1 e2.
+             P0 ctxt e1 ∧ P0 ctxt e2 ⇒ P0 ctxt (Cmp cmp e1 e2)) ∧
+          (∀ctxt sh e n. P0 ctxt e ⇒ P0 ctxt (Shift sh e n)) ∧
+          (∀ctxt v5. P0 ctxt (Const v5)) ∧
+          (∀ctxt v6 v7. P0 ctxt (Var v6 v7)) ∧ (∀ctxt. P0 ctxt BaseAddr) ∧
+          (∀ctxt. P0 ctxt TopAddr) ∧ (∀ctxt. P0 ctxt BytesInWord) ∧
+          (∀ctxt. P1 ctxt []) ∧
+          (∀ctxt e es. P0 ctxt e ∧ P1 ctxt es ⇒ P1 ctxt (e::es)) ∧
+          (∀ctxt. P2 ctxt []) ∧
+          (∀ctxt fld exp eflds.
+             P0 ctxt exp ∧ P2 ctxt eflds ⇒ P2 ctxt ((fld,exp)::eflds)) ⇒
+          (∀v0 v1. P0 v0 v1) ∧ (∀v0 v1. P1 v0 v1) ∧ ∀v0 v1. P2 v0 v1
+   
+   [compile_ind]  Theorem
+      
+      ⊢ ∀P. (∀ctxt v s e p.
+               P (ctxt with locals := (v,s)::ctxt.locals) p ⇒
+               P ctxt (Dec v s e p)) ∧
+            (∀ctxt vk v e. P ctxt (Assign vk v e)) ∧
+            (∀ctxt ad v. P ctxt (Store ad v)) ∧
+            (∀ctxt ad v. P ctxt (Store32 ad v)) ∧
+            (∀ctxt dest src. P ctxt (StoreByte dest src)) ∧
+            (∀ctxt p p'. P ctxt p ∧ P ctxt p' ⇒ P ctxt (Seq p p')) ∧
+            (∀ctxt e p p'. P ctxt p ∧ P ctxt p' ⇒ P ctxt (If e p p')) ∧
+            (∀ctxt e p. P ctxt p ⇒ P ctxt (While e p)) ∧
+            (∀ctxt rtyp f es.
+               (∀cexps v1 tl hdl v eid v2 evar p.
+                  cexps = compile_exps ctxt es ∧ rtyp = SOME v1 ∧
+                  v1 = (tl,hdl) ∧ hdl = SOME v ∧ v = (eid,v2) ∧
+                  v2 = (evar,p) ⇒
+                  P ctxt p) ⇒
+               P ctxt (Call rtyp f es)) ∧
+            (∀ctxt v s f es p.
+               P (ctxt with locals := (v,s)::ctxt.locals) p ⇒
+               P ctxt (DecCall v s f es p)) ∧
+            (∀ctxt f ptr1 len1 ptr2 len2.
+               P ctxt (ExtCall f ptr1 len1 ptr2 len2)) ∧
+            (∀ctxt rt. P ctxt (Return rt)) ∧
+            (∀ctxt eid excp. P ctxt (Raise eid excp)) ∧
+            (∀ctxt op r ad. P ctxt (ShMemStore op r ad)) ∧
+            (∀ctxt op vk r ad. P ctxt (ShMemLoad op vk r ad)) ∧
+            (∀v0. P v0 Skip) ∧
+            (∀v0 v12 v13 v14. P v0 (Primitive v12 v13 v14)) ∧
+            (∀v0. P v0 Break) ∧ (∀v0. P v0 Continue) ∧ (∀v0. P v0 Tick) ∧
+            (∀v0 v51 v52. P v0 (Annot v51 v52)) ⇒
+            ∀v v1. P v v1
+   
+   [compile_shape_def]  Theorem
+      
+      ⊢ (∀sctxt. compile_shape sctxt One = One) ∧
+        (∀shapes sctxt.
+           compile_shape sctxt (Comb shapes) =
+           Comb (compile_shapes sctxt shapes)) ∧
+        (∀sctxt nm.
+           compile_shape sctxt (Named nm) =
+           case dropWhile (λ(n,fs). n ≠ nm) sctxt of
+             [] => One
+           | (nm',flds)::sctxt' =>
+             Comb (compile_shapes sctxt' (MAP SND flds))) ∧
+        (∀sctxt. compile_shapes sctxt [] = []) ∧
+        ∀shs sh sctxt.
+          compile_shapes sctxt (sh::shs) =
+          compile_shape sctxt sh::compile_shapes sctxt shs
+   
+   [compile_shape_ind]  Theorem
+      
+      ⊢ ∀P0 P1.
+          (∀sctxt. P0 sctxt One) ∧
+          (∀sctxt shapes. P1 sctxt shapes ⇒ P0 sctxt (Comb shapes)) ∧
+          (∀sctxt nm.
+             (∀v2 sctxt' nm' flds.
+                dropWhile (λ(n,fs). n ≠ nm) sctxt = v2::sctxt' ∧
+                v2 = (nm',flds) ⇒
+                P1 sctxt' (MAP SND flds)) ⇒
+             P0 sctxt (Named nm)) ∧ (∀sctxt. P1 sctxt []) ∧
+          (∀sctxt sh shs. P0 sctxt sh ∧ P1 sctxt shs ⇒ P1 sctxt (sh::shs)) ⇒
+          (∀v0 v1. P0 v0 v1) ∧ ∀v0 v1. P1 v0 v1
+   
+   [context_11]  Theorem
+      
+      ⊢ ∀a0 a1 a2 a0' a1' a2'.
+          context a0 a1 a2 = context a0' a1' a2' ⇔
+          a0 = a0' ∧ a1 = a1' ∧ a2 = a2'
+   
+   [context_Axiom]  Theorem
+      
+      ⊢ ∀f. ∃fn. ∀a0 a1 a2. fn (context a0 a1 a2) = f a0 a1 a2
+   
+   [context_accessors]  Theorem
+      
+      ⊢ (∀l l0 l1. (context l l0 l1).structs = l) ∧
+        (∀l l0 l1. (context l l0 l1).locals = l0) ∧
+        ∀l l0 l1. (context l l0 l1).globals = l1
+   
+   [context_accfupds]  Theorem
+      
+      ⊢ (∀f c. (c with locals updated_by f).structs = c.structs) ∧
+        (∀f c. (c with globals updated_by f).structs = c.structs) ∧
+        (∀f c. (c with structs updated_by f).locals = c.locals) ∧
+        (∀f c. (c with globals updated_by f).locals = c.locals) ∧
+        (∀f c. (c with structs updated_by f).globals = c.globals) ∧
+        (∀f c. (c with locals updated_by f).globals = c.globals) ∧
+        (∀f c. (c with structs updated_by f).structs = f c.structs) ∧
+        (∀f c. (c with locals updated_by f).locals = f c.locals) ∧
+        ∀f c. (c with globals updated_by f).globals = f c.globals
+   
+   [context_case_cong]  Theorem
+      
+      ⊢ ∀M M' f.
+          M = M' ∧
+          (∀a0 a1 a2. M' = context a0 a1 a2 ⇒ f a0 a1 a2 = f' a0 a1 a2) ⇒
+          context_CASE M f = context_CASE M' f'
+   
+   [context_case_eq]  Theorem
+      
+      ⊢ context_CASE x f = v ⇔
+        ∃l l0 l1. x = context l l0 l1 ∧ f l l0 l1 = v
+   
+   [context_component_equality]  Theorem
+      
+      ⊢ ∀c1 c2.
+          c1 = c2 ⇔
+          c1.structs = c2.structs ∧ c1.locals = c2.locals ∧
+          c1.globals = c2.globals
+   
+   [context_fn_updates]  Theorem
+      
+      ⊢ (∀f l l0 l1.
+           context l l0 l1 with structs updated_by f = context (f l) l0 l1) ∧
+        (∀f l l0 l1.
+           context l l0 l1 with locals updated_by f = context l (f l0) l1) ∧
+        ∀f l l0 l1.
+          context l l0 l1 with globals updated_by f = context l l0 (f l1)
+   
+   [context_fupdcanon]  Theorem
+      
+      ⊢ (∀g f c.
+           c with <|locals updated_by f; structs updated_by g|> =
+           c with <|structs updated_by g; locals updated_by f|>) ∧
+        (∀g f c.
+           c with <|globals updated_by f; structs updated_by g|> =
+           c with <|structs updated_by g; globals updated_by f|>) ∧
+        ∀g f c.
+          c with <|globals updated_by f; locals updated_by g|> =
+          c with <|locals updated_by g; globals updated_by f|>
+   
+   [context_fupdcanon_comp]  Theorem
+      
+      ⊢ ((∀g f.
+            locals_fupd f ∘ structs_fupd g = structs_fupd g ∘ locals_fupd f) ∧
+         ∀h g f.
+           locals_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ locals_fupd f ∘ h) ∧
+        ((∀g f.
+            globals_fupd f ∘ structs_fupd g =
+            structs_fupd g ∘ globals_fupd f) ∧
+         ∀h g f.
+           globals_fupd f ∘ structs_fupd g ∘ h =
+           structs_fupd g ∘ globals_fupd f ∘ h) ∧
+        (∀g f.
+           globals_fupd f ∘ locals_fupd g = locals_fupd g ∘ globals_fupd f) ∧
+        ∀h g f.
+          globals_fupd f ∘ locals_fupd g ∘ h =
+          locals_fupd g ∘ globals_fupd f ∘ h
+   
+   [context_fupdfupds]  Theorem
+      
+      ⊢ (∀g f c.
+           c with <|structs updated_by f; structs updated_by g|> =
+           c with structs updated_by f ∘ g) ∧
+        (∀g f c.
+           c with <|locals updated_by f; locals updated_by g|> =
+           c with locals updated_by f ∘ g) ∧
+        ∀g f c.
+          c with <|globals updated_by f; globals updated_by g|> =
+          c with globals updated_by f ∘ g
+   
+   [context_fupdfupds_comp]  Theorem
+      
+      ⊢ ((∀g f. structs_fupd f ∘ structs_fupd g = structs_fupd (f ∘ g)) ∧
+         ∀h g f.
+           structs_fupd f ∘ structs_fupd g ∘ h = structs_fupd (f ∘ g) ∘ h) ∧
+        ((∀g f. locals_fupd f ∘ locals_fupd g = locals_fupd (f ∘ g)) ∧
+         ∀h g f.
+           locals_fupd f ∘ locals_fupd g ∘ h = locals_fupd (f ∘ g) ∘ h) ∧
+        (∀g f. globals_fupd f ∘ globals_fupd g = globals_fupd (f ∘ g)) ∧
+        ∀h g f.
+          globals_fupd f ∘ globals_fupd g ∘ h = globals_fupd (f ∘ g) ∘ h
+   
+   [context_induction]  Theorem
+      
+      ⊢ ∀P. (∀l l0 l1. P (context l l0 l1)) ⇒ ∀c. P c
+   
+   [context_literal_11]  Theorem
+      
+      ⊢ ∀l11 l01 l1 l12 l02 l2.
+          <|structs := l11; locals := l01; globals := l1|> =
+          <|structs := l12; locals := l02; globals := l2|> ⇔
+          l11 = l12 ∧ l01 = l02 ∧ l1 = l2
+   
+   [context_literal_nchotomy]  Theorem
+      
+      ⊢ ∀c. ∃l1 l0 l. c = <|structs := l1; locals := l0; globals := l|>
+   
+   [context_nchotomy]  Theorem
+      
+      ⊢ ∀cc. ∃l l0 l1. cc = context l l0 l1
+   
+   [context_updates_eq_literal]  Theorem
+      
+      ⊢ ∀c l1 l0 l.
+          c with <|structs := l1; locals := l0; globals := l|> =
+          <|structs := l1; locals := l0; globals := l|>
+   
+   [datatype_context]  Theorem
+      
+      ⊢ DATATYPE (record context structs locals globals)
+   
+   [get_names_def]  Theorem
+      
+      ⊢ (∀ctxt. get_names ctxt [] = ctxt) ∧
+        (∀nm flds ds ctxt.
+           get_names ctxt (Name nm flds::ds) =
+           get_names (ctxt with structs := (nm,flds)::ctxt.structs) ds) ∧
+        (∀v4 ds ctxt. get_names ctxt (Function v4::ds) = get_names ctxt ds) ∧
+        ∀v7 v6 v5 ds ctxt.
+          get_names ctxt (Decl v5 v6 v7::ds) = get_names ctxt ds
+   
+   [get_names_ind]  Theorem
+      
+      ⊢ ∀P. (∀ctxt. P ctxt []) ∧
+            (∀ctxt nm flds ds.
+               P (ctxt with structs := (nm,flds)::ctxt.structs) ds ⇒
+               P ctxt (Name nm flds::ds)) ∧
+            (∀ctxt v4 ds. P ctxt ds ⇒ P ctxt (Function v4::ds)) ∧
+            (∀ctxt v5 v6 v7 ds. P ctxt ds ⇒ P ctxt (Decl v5 v6 v7::ds)) ⇒
+            ∀v v1. P v v1
+   
+   [old_exp_shape_def]  Theorem
+      
+      ⊢ (∀v ctxt.
+           old_exp_shape ctxt (Var Local v) =
+           case ALOOKUP ctxt.locals v of NONE => One | SOME sh => sh) ∧
+        (∀v ctxt.
+           old_exp_shape ctxt (Var Global v) =
+           case ALOOKUP ctxt.globals v of NONE => One | SOME sh => sh) ∧
+        (∀es ctxt.
+           old_exp_shape ctxt (RStruct es) = Comb (old_exp_shapes ctxt es)) ∧
+        (∀index e ctxt.
+           old_exp_shape ctxt (RField index e) =
+           case old_exp_shape ctxt e of
+             One => One
+           | Comb shs =>
+             (case LLOOKUP shs index of NONE => One | SOME sh => sh)
+           | Named v3 => One) ∧
+        (∀nm eflds ctxt. old_exp_shape ctxt (NStruct nm eflds) = Named nm) ∧
+        (∀fld e ctxt.
+           old_exp_shape ctxt (NField fld e) =
+           case old_exp_shape ctxt e of
+             One => One
+           | Comb v2 => One
+           | Named nm =>
+             case ALOOKUP ctxt.structs nm of
+               NONE => One
+             | SOME flds =>
+               case ALOOKUP flds fld of NONE => One | SOME sh => sh) ∧
+        (∀sh e ctxt. old_exp_shape ctxt (Load sh e) = sh) ∧
+        (∀v7 ctxt. old_exp_shape ctxt (Const v7) = One) ∧
+        (∀v19 ctxt. old_exp_shape ctxt (Load32 v19) = One) ∧
+        (∀v20 ctxt. old_exp_shape ctxt (LoadByte v20) = One) ∧
+        (∀v22 v21 ctxt. old_exp_shape ctxt (Op v21 v22) = One) ∧
+        (∀v24 v23 ctxt. old_exp_shape ctxt (Panop v23 v24) = One) ∧
+        (∀v27 v26 v25 ctxt. old_exp_shape ctxt (Cmp v25 v26 v27) = One) ∧
+        (∀v30 v29 v28 ctxt. old_exp_shape ctxt (Shift v28 v29 v30) = One) ∧
+        (∀ctxt. old_exp_shape ctxt BaseAddr = One) ∧
+        (∀ctxt. old_exp_shape ctxt TopAddr = One) ∧
+        (∀ctxt. old_exp_shape ctxt BytesInWord = One) ∧
+        (∀ctxt. old_exp_shapes ctxt [] = []) ∧
+        ∀es e ctxt.
+          old_exp_shapes ctxt (e::es) =
+          old_exp_shape ctxt e::old_exp_shapes ctxt es
+   
+   [old_exp_shape_ind]  Theorem
+      
+      ⊢ ∀P0 P1.
+          (∀ctxt v. P0 ctxt (Var Local v)) ∧
+          (∀ctxt v. P0 ctxt (Var Global v)) ∧
+          (∀ctxt es. P1 ctxt es ⇒ P0 ctxt (RStruct es)) ∧
+          (∀ctxt index e. P0 ctxt e ⇒ P0 ctxt (RField index e)) ∧
+          (∀ctxt nm eflds. P0 ctxt (NStruct nm eflds)) ∧
+          (∀ctxt fld e. P0 ctxt e ⇒ P0 ctxt (NField fld e)) ∧
+          (∀ctxt sh e. P0 ctxt (Load sh e)) ∧
+          (∀ctxt v7. P0 ctxt (Const v7)) ∧
+          (∀ctxt v19. P0 ctxt (Load32 v19)) ∧
+          (∀ctxt v20. P0 ctxt (LoadByte v20)) ∧
+          (∀ctxt v21 v22. P0 ctxt (Op v21 v22)) ∧
+          (∀ctxt v23 v24. P0 ctxt (Panop v23 v24)) ∧
+          (∀ctxt v25 v26 v27. P0 ctxt (Cmp v25 v26 v27)) ∧
+          (∀ctxt v28 v29 v30. P0 ctxt (Shift v28 v29 v30)) ∧
+          (∀ctxt. P0 ctxt BaseAddr) ∧ (∀ctxt. P0 ctxt TopAddr) ∧
+          (∀ctxt. P0 ctxt BytesInWord) ∧ (∀ctxt. P1 ctxt []) ∧
+          (∀ctxt e es. P0 ctxt e ∧ P1 ctxt es ⇒ P1 ctxt (e::es)) ⇒
+          (∀v0 v1. P0 v0 v1) ∧ ∀v0 v1. P1 v0 v1
+   
+   

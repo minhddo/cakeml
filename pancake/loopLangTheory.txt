@@ -1,0 +1,1727 @@
+[panLang] Parent theory of "loopLang"
+   
+   [assigned_vars_def_primitive]  Definition
+      
+      ⊢ assigned_vars =
+        WFREC
+          (@R. WF R ∧ (∀p q. R q (Seq p q)) ∧ (∀q p. R p (Seq p q)) ∧
+               (∀ns p r n cmp q. R q (If cmp n r p q ns)) ∧
+               (∀ns q r n cmp p. R p (If cmp n r p q ns)) ∧
+               (∀p. R p (Mark p)) ∧ (∀v6 v0 p. R p (Loop v0 p v6)) ∧
+               (∀v16 q m v15 v14 v13 ns p.
+                  R p (Call (SOME (ns,v13)) v14 v15 (SOME (m,p,q,v16)))) ∧
+               ∀v16 p m v15 v14 v13 ns q.
+                 R q (Call (SOME (ns,v13)) v14 v15 (SOME (m,p,q,v16))))
+          (λassigned_vars a.
+               case a of
+                 Skip => I []
+               | Assign n e => I [n]
+               | Primitive lhss pop rhss => I lhss
+               | Arith arith =>
+                 I
+                   (case arith of
+                      LLongMul v1 v2 v3 v4 => [v1; v2]
+                    | LLongDiv v1' v2' v3' v4' v5 => [v1'; v2']
+                    | LDiv v1'' v2'' v3'' => [v1''])
+               | Store v70 v71 => I []
+               | SetGlobal v72 v73 => I []
+               | Load32 n' m => I [m]
+               | LoadByte n'' m' => I [m']
+               | Store32 v78 v79 => I []
+               | StoreByte v80 v81 => I []
+               | Seq p q => I (assigned_vars p ++ assigned_vars q)
+               | If cmp n'³' r p' q' ns =>
+                 I (assigned_vars p' ++ assigned_vars q')
+               | Loop v0 p'³' v6 => I (assigned_vars p'³')
+               | Break => I []
+               | Continue => I []
+               | Raise v93 => I []
+               | Return v94 => I []
+               | ShMem op n'⁵' e' => I [n'⁵']
+               | Tick => I []
+               | Mark p'' => I (assigned_vars p'')
+               | Fail => I []
+               | LocValue n'⁴' m'' => I [n'⁴']
+               | Call NONE v7 v8 v9 => I []
+               | Call (SOME (ns',v10)) v7 v8 NONE => I ns'
+               | Call (SOME (ns',v10)) v7 v8 (SOME (m'³',p'⁴',q'',v16)) =>
+                 I (ns' ++ m'³'::assigned_vars p'⁴' ++ assigned_vars q'')
+               | FFI v105 v106 v107 v108 v109 v110 => I [])
+   
+   [exp_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0'.
+                 ∀ $var$('exp') $var$('@temp@ind_typeloopLang0list').
+                   (∀a0'.
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR 0 (a,ARB,ARB,ARB,ARB)
+                                  (λn. ind_type$BOTTOM)) a) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR (SUC 0) (ARB,a,ARB,ARB,ARB)
+                                  (λn. ind_type$BOTTOM)) a) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR (SUC (SUC 0))
+                                  (ARB,ARB,a,ARB,ARB) (λn. ind_type$BOTTOM))
+                             a) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR (SUC (SUC (SUC 0)))
+                                  (ARB,ARB,ARB,ARB,ARB)
+                                  (ind_type$FCONS a (λn. ind_type$BOTTOM)))
+                             a ∧ $var$('exp') a) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR (SUC (SUC (SUC (SUC 0))))
+                                (ARB,ARB,ARB,a0,ARB)
+                                (ind_type$FCONS a1 (λn. ind_type$BOTTOM)))
+                           a0 a1 ∧ $var$('@temp@ind_typeloopLang0list') a1) ∨
+                      (∃a0 a1 a2.
+                         a0' =
+                         (λa0 a1 a2.
+                              ind_type$CONSTR
+                                (SUC (SUC (SUC (SUC (SUC 0)))))
+                                (ARB,a2,ARB,ARB,a0)
+                                (ind_type$FCONS a1 (λn. ind_type$BOTTOM)))
+                           a0 a1 a2 ∧ $var$('exp') a1) ∨
+                      a0' =
+                      ind_type$CONSTR (SUC (SUC (SUC (SUC (SUC (SUC 0))))))
+                        (ARB,ARB,ARB,ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      a0' =
+                      ind_type$CONSTR
+                        (SUC (SUC (SUC (SUC (SUC (SUC (SUC 0)))))))
+                        (ARB,ARB,ARB,ARB,ARB) (λn. ind_type$BOTTOM) ⇒
+                      $var$('exp') a0') ∧
+                   (∀a1'.
+                      a1' =
+                      ind_type$CONSTR
+                        (SUC (SUC (SUC (SUC (SUC (SUC (SUC (SUC 0))))))))
+                        (ARB,ARB,ARB,ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      (∃a0 a1.
+                         a1' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC (SUC (SUC (SUC (SUC 0)))))))))
+                                (ARB,ARB,ARB,ARB,ARB)
+                                (ind_type$FCONS a0
+                                   (ind_type$FCONS a1 (λn. ind_type$BOTTOM))))
+                           a0 a1 ∧ $var$('exp') a0 ∧
+                         $var$('@temp@ind_typeloopLang0list') a1) ⇒
+                      $var$('@temp@ind_typeloopLang0list') a1') ⇒
+                   $var$('exp') a0') rep
+   
+   [exp_case_def]  Definition
+      
+      ⊢ (∀a f f1 f2 f3 f4 f5 v v1.
+           exp_CASE (Const a) f f1 f2 f3 f4 f5 v v1 = f a) ∧
+        (∀a f f1 f2 f3 f4 f5 v v1.
+           exp_CASE (Var a) f f1 f2 f3 f4 f5 v v1 = f1 a) ∧
+        (∀a f f1 f2 f3 f4 f5 v v1.
+           exp_CASE (Lookup a) f f1 f2 f3 f4 f5 v v1 = f2 a) ∧
+        (∀a f f1 f2 f3 f4 f5 v v1.
+           exp_CASE (Load a) f f1 f2 f3 f4 f5 v v1 = f3 a) ∧
+        (∀a0 a1 f f1 f2 f3 f4 f5 v v1.
+           exp_CASE (Op a0 a1) f f1 f2 f3 f4 f5 v v1 = f4 a0 a1) ∧
+        (∀a0 a1 a2 f f1 f2 f3 f4 f5 v v1.
+           exp_CASE (Shift a0 a1 a2) f f1 f2 f3 f4 f5 v v1 = f5 a0 a1 a2) ∧
+        (∀f f1 f2 f3 f4 f5 v v1.
+           exp_CASE BaseAddr f f1 f2 f3 f4 f5 v v1 = v) ∧
+        ∀f f1 f2 f3 f4 f5 v v1. exp_CASE TopAddr f f1 f2 f3 f4 f5 v v1 = v1
+   
+   [exp_size_def]  Definition
+      
+      ⊢ (∀f a. exp_size f (Const a) = 1 + w2n a) ∧
+        (∀f a. exp_size f (Var a) = 1 + a) ∧
+        (∀f a. exp_size f (Lookup a) = 1 + w2n a) ∧
+        (∀f a. exp_size f (Load a) = 1 + exp_size f a) ∧
+        (∀f a0 a1.
+           exp_size f (Op a0 a1) = 1 + (binop_size a0 + exp1_size f a1)) ∧
+        (∀f a0 a1 a2.
+           exp_size f (Shift a0 a1 a2) =
+           1 + (shift_size a0 + (exp_size f a1 + a2))) ∧
+        (∀f. exp_size f BaseAddr = 0) ∧ (∀f. exp_size f TopAddr = 0) ∧
+        (∀f. exp1_size f [] = 0) ∧
+        ∀f a0 a1.
+          exp1_size f (a0::a1) = 1 + (exp_size f a0 + exp1_size f a1)
+   
+   [locals_touched_def_primitive]  Definition
+      
+      ⊢ locals_touched =
+        WFREC
+          (@R. WF R ∧ (∀addr. R addr (Load addr)) ∧
+               (∀op wexps a. MEM a wexps ⇒ R a (Op op wexps)) ∧
+               ∀n sh wexp. R wexp (Shift sh wexp n))
+          (λlocals_touched a'.
+               case a' of
+                 Const w => I []
+               | Var v => I [v]
+               | Lookup name => I []
+               | Load addr => I (locals_touched addr)
+               | Op op wexps => I (FLAT (MAP (λa. locals_touched a) wexps))
+               | Shift sh wexp n => I (locals_touched wexp)
+               | BaseAddr => I []
+               | TopAddr => I [])
+   
+   [loop_arith_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0'.
+                 ∀ $var$('loop_arith').
+                   (∀a0'.
+                      (∃a0 a1 a2 a3.
+                         a0' =
+                         (λa0 a1 a2 a3.
+                              ind_type$CONSTR 0 (a0,a1,a2,a3,ARB)
+                                (λn. ind_type$BOTTOM)) a0 a1 a2 a3) ∨
+                      (∃a0 a1 a2 a3 a4.
+                         a0' =
+                         (λa0 a1 a2 a3 a4.
+                              ind_type$CONSTR (SUC 0) (a0,a1,a2,a3,a4)
+                                (λn. ind_type$BOTTOM)) a0 a1 a2 a3 a4) ∨
+                      (∃a0 a1 a2.
+                         a0' =
+                         (λa0 a1 a2.
+                              ind_type$CONSTR (SUC (SUC 0))
+                                (a0,a1,a2,ARB,ARB) (λn. ind_type$BOTTOM))
+                           a0 a1 a2) ⇒
+                      $var$('loop_arith') a0') ⇒
+                   $var$('loop_arith') a0') rep
+   
+   [loop_arith_case_def]  Definition
+      
+      ⊢ (∀a0 a1 a2 a3 f f1 f2.
+           loop_arith_CASE (LLongMul a0 a1 a2 a3) f f1 f2 = f a0 a1 a2 a3) ∧
+        (∀a0 a1 a2 a3 a4 f f1 f2.
+           loop_arith_CASE (LLongDiv a0 a1 a2 a3 a4) f f1 f2 =
+           f1 a0 a1 a2 a3 a4) ∧
+        ∀a0 a1 a2 f f1 f2.
+          loop_arith_CASE (LDiv a0 a1 a2) f f1 f2 = f2 a0 a1 a2
+   
+   [loop_arith_size_def]  Definition
+      
+      ⊢ (∀a0 a1 a2 a3.
+           loop_arith_size (LLongMul a0 a1 a2 a3) =
+           1 + (a0 + (a1 + (a2 + a3)))) ∧
+        (∀a0 a1 a2 a3 a4.
+           loop_arith_size (LLongDiv a0 a1 a2 a3 a4) =
+           1 + (a0 + (a1 + (a2 + (a3 + a4))))) ∧
+        ∀a0 a1 a2. loop_arith_size (LDiv a0 a1 a2) = 1 + (a0 + (a1 + a2))
+   
+   [nested_seq_def]  Definition
+      
+      ⊢ nested_seq [] = Skip ∧
+        ∀e es. nested_seq (e::es) = Seq e (nested_seq es)
+   
+   [prog_TY_DEF]  Definition
+      
+      ⊢ ∃rep.
+          TYPE_DEFINITION
+            (λa0'.
+                 ∀ $var$('prog') $var$('@temp@ind_typeloopLang21option')
+                     $var$('@temp@ind_typeloopLang22prod')
+                     $var$('@temp@ind_typeloopLang23prod')
+                     $var$('@temp@ind_typeloopLang24prod').
+                   (∀a0'.
+                      a0' =
+                      ind_type$CONSTR 0
+                        (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                         ARB,ARB,ARB,ARB,ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR (SUC 0)
+                                (a0,a1,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                (λn. ind_type$BOTTOM)) a0 a1) ∨
+                      (∃a0 a1 a2.
+                         a0' =
+                         (λa0 a1 a2.
+                              ind_type$CONSTR (SUC (SUC 0))
+                                (ARB,ARB,a0,a1,a2,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                (λn. ind_type$BOTTOM)) a0 a1 a2) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR (SUC (SUC (SUC 0)))
+                                  (ARB,ARB,ARB,ARB,ARB,a,ARB,ARB,ARB,ARB,
+                                   ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                  (λn. ind_type$BOTTOM)) a) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR (SUC (SUC (SUC (SUC 0))))
+                                (a1,a0,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                (λn. ind_type$BOTTOM)) a0 a1) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC (SUC (SUC (SUC (SUC 0)))))
+                                (ARB,a1,ARB,ARB,ARB,ARB,a0,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                (λn. ind_type$BOTTOM)) a0 a1) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC (SUC (SUC (SUC (SUC (SUC 0))))))
+                                (a0,ARB,ARB,ARB,ARB,ARB,ARB,a1,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                (λn. ind_type$BOTTOM)) a0 a1) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC (SUC (SUC (SUC (SUC (SUC (SUC 0)))))))
+                                (a0,ARB,ARB,ARB,ARB,ARB,ARB,a1,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                (λn. ind_type$BOTTOM)) a0 a1) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC (SUC (SUC (SUC (SUC (SUC 0))))))))
+                                (a0,ARB,ARB,ARB,ARB,ARB,ARB,a1,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                (λn. ind_type$BOTTOM)) a0 a1) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC (SUC (SUC (SUC (SUC 0)))))))))
+                                (a0,ARB,ARB,ARB,ARB,ARB,ARB,a1,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                (λn. ind_type$BOTTOM)) a0 a1) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC (SUC (SUC (SUC 0))))))))))
+                                (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                (ind_type$FCONS a0
+                                   (ind_type$FCONS a1 (λn. ind_type$BOTTOM))))
+                           a0 a1 ∧ $var$('prog') a0 ∧ $var$('prog') a1) ∨
+                      (∃a0 a1 a2 a3 a4 a5.
+                         a0' =
+                         (λa0 a1 a2 a3 a4 a5.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC
+                                                     (SUC
+                                                        (SUC (SUC (SUC 0)))))))))))
+                                (a1,ARB,ARB,ARB,ARB,ARB,ARB,ARB,a0,a2,a5,
+                                 ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                (ind_type$FCONS a3
+                                   (ind_type$FCONS a4 (λn. ind_type$BOTTOM))))
+                           a0 a1 a2 a3 a4 a5 ∧ $var$('prog') a3 ∧
+                         $var$('prog') a4) ∨
+                      (∃a0 a1 a2.
+                         a0' =
+                         (λa0 a1 a2.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC
+                                                     (SUC
+                                                        (SUC
+                                                           (SUC
+                                                              (SUC (SUC 0))))))))))))
+                                (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 a0,a2,ARB,ARB,ARB,ARB,ARB,ARB)
+                                (ind_type$FCONS a1 (λn. ind_type$BOTTOM)))
+                           a0 a1 a2 ∧ $var$('prog') a1) ∨
+                      a0' =
+                      ind_type$CONSTR
+                        (SUC
+                           (SUC
+                              (SUC
+                                 (SUC
+                                    (SUC
+                                       (SUC
+                                          (SUC
+                                             (SUC
+                                                (SUC
+                                                   (SUC (SUC (SUC (SUC 0)))))))))))))
+                        (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                         ARB,ARB,ARB,ARB,ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      a0' =
+                      ind_type$CONSTR
+                        (SUC
+                           (SUC
+                              (SUC
+                                 (SUC
+                                    (SUC
+                                       (SUC
+                                          (SUC
+                                             (SUC
+                                                (SUC
+                                                   (SUC
+                                                      (SUC
+                                                         (SUC (SUC (SUC 0))))))))))))))
+                        (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                         ARB,ARB,ARB,ARB,ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR
+                                  (SUC
+                                     (SUC
+                                        (SUC
+                                           (SUC
+                                              (SUC
+                                                 (SUC
+                                                    (SUC
+                                                       (SUC
+                                                          (SUC
+                                                             (SUC
+                                                                (SUC
+                                                                   (SUC
+                                                                      (SUC
+                                                                         (SUC
+                                                                            (SUC
+                                                                               0)))))))))))))))
+                                  (a,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                   ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                  (λn. ind_type$BOTTOM)) a) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR
+                                  (SUC
+                                     (SUC
+                                        (SUC
+                                           (SUC
+                                              (SUC
+                                                 (SUC
+                                                    (SUC
+                                                       (SUC
+                                                          (SUC
+                                                             (SUC
+                                                                (SUC
+                                                                   (SUC
+                                                                      (SUC
+                                                                         (SUC
+                                                                            (SUC
+                                                                               (SUC
+                                                                                  0))))))))))))))))
+                                  (ARB,ARB,a,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                   ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                  (λn. ind_type$BOTTOM)) a) ∨
+                      (∃a0 a1 a2.
+                         a0' =
+                         (λa0 a1 a2.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC
+                                                     (SUC
+                                                        (SUC
+                                                           (SUC
+                                                              (SUC
+                                                                 (SUC
+                                                                    (SUC
+                                                                       (SUC
+                                                                          (SUC
+                                                                             (SUC
+                                                                                (SUC
+                                                                                   0)))))))))))))))))
+                                (a1,a2,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,a0,ARB,ARB,ARB,ARB,ARB)
+                                (λn. ind_type$BOTTOM)) a0 a1 a2) ∨
+                      a0' =
+                      ind_type$CONSTR
+                        (SUC
+                           (SUC
+                              (SUC
+                                 (SUC
+                                    (SUC
+                                       (SUC
+                                          (SUC
+                                             (SUC
+                                                (SUC
+                                                   (SUC
+                                                      (SUC
+                                                         (SUC
+                                                            (SUC
+                                                               (SUC
+                                                                  (SUC
+                                                                     (SUC
+                                                                        (SUC
+                                                                           (SUC
+                                                                              0))))))))))))))))))
+                        (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                         ARB,ARB,ARB,ARB,ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      (∃a. a0' =
+                           (λa.
+                                ind_type$CONSTR
+                                  (SUC
+                                     (SUC
+                                        (SUC
+                                           (SUC
+                                              (SUC
+                                                 (SUC
+                                                    (SUC
+                                                       (SUC
+                                                          (SUC
+                                                             (SUC
+                                                                (SUC
+                                                                   (SUC
+                                                                      (SUC
+                                                                         (SUC
+                                                                            (SUC
+                                                                               (SUC
+                                                                                  (SUC
+                                                                                     (SUC
+                                                                                        (SUC
+                                                                                           0)))))))))))))))))))
+                                  (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                   ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                  (ind_type$FCONS a (λn. ind_type$BOTTOM)))
+                             a ∧ $var$('prog') a) ∨
+                      a0' =
+                      ind_type$CONSTR
+                        (SUC
+                           (SUC
+                              (SUC
+                                 (SUC
+                                    (SUC
+                                       (SUC
+                                          (SUC
+                                             (SUC
+                                                (SUC
+                                                   (SUC
+                                                      (SUC
+                                                         (SUC
+                                                            (SUC
+                                                               (SUC
+                                                                  (SUC
+                                                                     (SUC
+                                                                        (SUC
+                                                                           (SUC
+                                                                              (SUC
+                                                                                 (SUC
+                                                                                    0))))))))))))))))))))
+                        (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                         ARB,ARB,ARB,ARB,ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      (∃a0 a1.
+                         a0' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC
+                                                     (SUC
+                                                        (SUC
+                                                           (SUC
+                                                              (SUC
+                                                                 (SUC
+                                                                    (SUC
+                                                                       (SUC
+                                                                          (SUC
+                                                                             (SUC
+                                                                                (SUC
+                                                                                   (SUC
+                                                                                      (SUC
+                                                                                         (SUC
+                                                                                            (SUC
+                                                                                               0)))))))))))))))))))))
+                                (a0,ARB,ARB,ARB,ARB,ARB,ARB,a1,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                (λn. ind_type$BOTTOM)) a0 a1) ∨
+                      (∃a0 a1 a2 a3.
+                         a0' =
+                         (λa0 a1 a2 a3.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC
+                                                     (SUC
+                                                        (SUC
+                                                           (SUC
+                                                              (SUC
+                                                                 (SUC
+                                                                    (SUC
+                                                                       (SUC
+                                                                          (SUC
+                                                                             (SUC
+                                                                                (SUC
+                                                                                   (SUC
+                                                                                      (SUC
+                                                                                         (SUC
+                                                                                            (SUC
+                                                                                               (SUC
+                                                                                                  0))))))))))))))))))))))
+                                (ARB,ARB,a2,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,a0,a1,ARB,ARB,ARB)
+                                (ind_type$FCONS a3 (λn. ind_type$BOTTOM)))
+                           a0 a1 a2 a3 ∧
+                         $var$('@temp@ind_typeloopLang21option') a3) ∨
+                      (∃a0 a1 a2 a3 a4 a5.
+                         a0' =
+                         (λa0 a1 a2 a3 a4 a5.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC
+                                                     (SUC
+                                                        (SUC
+                                                           (SUC
+                                                              (SUC
+                                                                 (SUC
+                                                                    (SUC
+                                                                       (SUC
+                                                                          (SUC
+                                                                             (SUC
+                                                                                (SUC
+                                                                                   (SUC
+                                                                                      (SUC
+                                                                                         (SUC
+                                                                                            (SUC
+                                                                                               (SUC
+                                                                                                  (SUC
+                                                                                                     0)))))))))))))))))))))))
+                                (a1,ARB,ARB,ARB,ARB,ARB,ARB,a2,ARB,ARB,a5,
+                                 ARB,ARB,ARB,ARB,a0,a3,a4)
+                                (λn. ind_type$BOTTOM)) a0 a1 a2 a3 a4 a5) ⇒
+                      $var$('prog') a0') ∧
+                   (∀a1'.
+                      a1' =
+                      ind_type$CONSTR
+                        (SUC
+                           (SUC
+                              (SUC
+                                 (SUC
+                                    (SUC
+                                       (SUC
+                                          (SUC
+                                             (SUC
+                                                (SUC
+                                                   (SUC
+                                                      (SUC
+                                                         (SUC
+                                                            (SUC
+                                                               (SUC
+                                                                  (SUC
+                                                                     (SUC
+                                                                        (SUC
+                                                                           (SUC
+                                                                              (SUC
+                                                                                 (SUC
+                                                                                    (SUC
+                                                                                       (SUC
+                                                                                          (SUC
+                                                                                             (SUC
+                                                                                                0))))))))))))))))))))))))
+                        (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                         ARB,ARB,ARB,ARB,ARB,ARB) (λn. ind_type$BOTTOM) ∨
+                      (∃a. a1' =
+                           (λa.
+                                ind_type$CONSTR
+                                  (SUC
+                                     (SUC
+                                        (SUC
+                                           (SUC
+                                              (SUC
+                                                 (SUC
+                                                    (SUC
+                                                       (SUC
+                                                          (SUC
+                                                             (SUC
+                                                                (SUC
+                                                                   (SUC
+                                                                      (SUC
+                                                                         (SUC
+                                                                            (SUC
+                                                                               (SUC
+                                                                                  (SUC
+                                                                                     (SUC
+                                                                                        (SUC
+                                                                                           (SUC
+                                                                                              (SUC
+                                                                                                 (SUC
+                                                                                                    (SUC
+                                                                                                       (SUC
+                                                                                                          (SUC
+                                                                                                             0)))))))))))))))))))))))))
+                                  (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                   ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                  (ind_type$FCONS a (λn. ind_type$BOTTOM)))
+                             a ∧ $var$('@temp@ind_typeloopLang22prod') a) ⇒
+                      $var$('@temp@ind_typeloopLang21option') a1') ∧
+                   (∀a2'.
+                      (∃a0 a1.
+                         a2' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC
+                                                     (SUC
+                                                        (SUC
+                                                           (SUC
+                                                              (SUC
+                                                                 (SUC
+                                                                    (SUC
+                                                                       (SUC
+                                                                          (SUC
+                                                                             (SUC
+                                                                                (SUC
+                                                                                   (SUC
+                                                                                      (SUC
+                                                                                         (SUC
+                                                                                            (SUC
+                                                                                               (SUC
+                                                                                                  (SUC
+                                                                                                     (SUC
+                                                                                                        (SUC
+                                                                                                           (SUC
+                                                                                                              0))))))))))))))))))))))))))
+                                (a0,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                (ind_type$FCONS a1 (λn. ind_type$BOTTOM)))
+                           a0 a1 ∧ $var$('@temp@ind_typeloopLang23prod') a1) ⇒
+                      $var$('@temp@ind_typeloopLang22prod') a2') ∧
+                   (∀a3'.
+                      (∃a0 a1.
+                         a3' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC
+                                                     (SUC
+                                                        (SUC
+                                                           (SUC
+                                                              (SUC
+                                                                 (SUC
+                                                                    (SUC
+                                                                       (SUC
+                                                                          (SUC
+                                                                             (SUC
+                                                                                (SUC
+                                                                                   (SUC
+                                                                                      (SUC
+                                                                                         (SUC
+                                                                                            (SUC
+                                                                                               (SUC
+                                                                                                  (SUC
+                                                                                                     (SUC
+                                                                                                        (SUC
+                                                                                                           (SUC
+                                                                                                              (SUC
+                                                                                                                 0)))))))))))))))))))))))))))
+                                (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                (ind_type$FCONS a0
+                                   (ind_type$FCONS a1 (λn. ind_type$BOTTOM))))
+                           a0 a1 ∧ $var$('prog') a0 ∧
+                         $var$('@temp@ind_typeloopLang24prod') a1) ⇒
+                      $var$('@temp@ind_typeloopLang23prod') a3') ∧
+                   (∀a4'.
+                      (∃a0 a1.
+                         a4' =
+                         (λa0 a1.
+                              ind_type$CONSTR
+                                (SUC
+                                   (SUC
+                                      (SUC
+                                         (SUC
+                                            (SUC
+                                               (SUC
+                                                  (SUC
+                                                     (SUC
+                                                        (SUC
+                                                           (SUC
+                                                              (SUC
+                                                                 (SUC
+                                                                    (SUC
+                                                                       (SUC
+                                                                          (SUC
+                                                                             (SUC
+                                                                                (SUC
+                                                                                   (SUC
+                                                                                      (SUC
+                                                                                         (SUC
+                                                                                            (SUC
+                                                                                               (SUC
+                                                                                                  (SUC
+                                                                                                     (SUC
+                                                                                                        (SUC
+                                                                                                           (SUC
+                                                                                                              (SUC
+                                                                                                                 (SUC
+                                                                                                                    0))))))))))))))))))))))))))))
+                                (ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,ARB,
+                                 a1,ARB,ARB,ARB,ARB,ARB,ARB,ARB)
+                                (ind_type$FCONS a0 (λn. ind_type$BOTTOM)))
+                           a0 a1 ∧ $var$('prog') a0) ⇒
+                      $var$('@temp@ind_typeloopLang24prod') a4') ⇒
+                   $var$('prog') a0') rep
+   
+   [prog_case_def]  Definition
+      
+      ⊢ (∀v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3 f15
+             v4 f16 f17 f18.
+           prog_CASE Skip v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12
+             f13 f14 v3 f15 v4 f16 f17 f18 = v) ∧
+        (∀a0 a1 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3
+             f15 v4 f16 f17 f18.
+           prog_CASE (Assign a0 a1) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11
+             v1 v2 f12 f13 f14 v3 f15 v4 f16 f17 f18 = f a0 a1) ∧
+        (∀a0 a1 a2 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14
+             v3 f15 v4 f16 f17 f18.
+           prog_CASE (Primitive a0 a1 a2) v f f1 f2 f3 f4 f5 f6 f7 f8 f9
+             f10 f11 v1 v2 f12 f13 f14 v3 f15 v4 f16 f17 f18 = f1 a0 a1 a2) ∧
+        (∀a v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3 f15
+             v4 f16 f17 f18.
+           prog_CASE (Arith a) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2
+             f12 f13 f14 v3 f15 v4 f16 f17 f18 = f2 a) ∧
+        (∀a0 a1 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3
+             f15 v4 f16 f17 f18.
+           prog_CASE (Store a0 a1) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11
+             v1 v2 f12 f13 f14 v3 f15 v4 f16 f17 f18 = f3 a0 a1) ∧
+        (∀a0 a1 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3
+             f15 v4 f16 f17 f18.
+           prog_CASE (SetGlobal a0 a1) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10
+             f11 v1 v2 f12 f13 f14 v3 f15 v4 f16 f17 f18 = f4 a0 a1) ∧
+        (∀a0 a1 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3
+             f15 v4 f16 f17 f18.
+           prog_CASE (Load32 a0 a1) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11
+             v1 v2 f12 f13 f14 v3 f15 v4 f16 f17 f18 = f5 a0 a1) ∧
+        (∀a0 a1 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3
+             f15 v4 f16 f17 f18.
+           prog_CASE (LoadByte a0 a1) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10
+             f11 v1 v2 f12 f13 f14 v3 f15 v4 f16 f17 f18 = f6 a0 a1) ∧
+        (∀a0 a1 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3
+             f15 v4 f16 f17 f18.
+           prog_CASE (Store32 a0 a1) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11
+             v1 v2 f12 f13 f14 v3 f15 v4 f16 f17 f18 = f7 a0 a1) ∧
+        (∀a0 a1 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3
+             f15 v4 f16 f17 f18.
+           prog_CASE (StoreByte a0 a1) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10
+             f11 v1 v2 f12 f13 f14 v3 f15 v4 f16 f17 f18 = f8 a0 a1) ∧
+        (∀a0 a1 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3
+             f15 v4 f16 f17 f18.
+           prog_CASE (Seq a0 a1) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1
+             v2 f12 f13 f14 v3 f15 v4 f16 f17 f18 = f9 a0 a1) ∧
+        (∀a0 a1 a2 a3 a4 a5 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2
+             f12 f13 f14 v3 f15 v4 f16 f17 f18.
+           prog_CASE (If a0 a1 a2 a3 a4 a5) v f f1 f2 f3 f4 f5 f6 f7 f8 f9
+             f10 f11 v1 v2 f12 f13 f14 v3 f15 v4 f16 f17 f18 =
+           f10 a0 a1 a2 a3 a4 a5) ∧
+        (∀a0 a1 a2 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14
+             v3 f15 v4 f16 f17 f18.
+           prog_CASE (Loop a0 a1 a2) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11
+             v1 v2 f12 f13 f14 v3 f15 v4 f16 f17 f18 = f11 a0 a1 a2) ∧
+        (∀v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3 f15
+             v4 f16 f17 f18.
+           prog_CASE Break v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12
+             f13 f14 v3 f15 v4 f16 f17 f18 = v1) ∧
+        (∀v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3 f15
+             v4 f16 f17 f18.
+           prog_CASE Continue v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2
+             f12 f13 f14 v3 f15 v4 f16 f17 f18 = v2) ∧
+        (∀a v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3 f15
+             v4 f16 f17 f18.
+           prog_CASE (Raise a) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2
+             f12 f13 f14 v3 f15 v4 f16 f17 f18 = f12 a) ∧
+        (∀a v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3 f15
+             v4 f16 f17 f18.
+           prog_CASE (Return a) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1
+             v2 f12 f13 f14 v3 f15 v4 f16 f17 f18 = f13 a) ∧
+        (∀a0 a1 a2 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14
+             v3 f15 v4 f16 f17 f18.
+           prog_CASE (ShMem a0 a1 a2) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10
+             f11 v1 v2 f12 f13 f14 v3 f15 v4 f16 f17 f18 = f14 a0 a1 a2) ∧
+        (∀v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3 f15
+             v4 f16 f17 f18.
+           prog_CASE Tick v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12
+             f13 f14 v3 f15 v4 f16 f17 f18 = v3) ∧
+        (∀a v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3 f15
+             v4 f16 f17 f18.
+           prog_CASE (Mark a) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2
+             f12 f13 f14 v3 f15 v4 f16 f17 f18 = f15 a) ∧
+        (∀v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3 f15
+             v4 f16 f17 f18.
+           prog_CASE Fail v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12
+             f13 f14 v3 f15 v4 f16 f17 f18 = v4) ∧
+        (∀a0 a1 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3
+             f15 v4 f16 f17 f18.
+           prog_CASE (LocValue a0 a1) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10
+             f11 v1 v2 f12 f13 f14 v3 f15 v4 f16 f17 f18 = f16 a0 a1) ∧
+        (∀a0 a1 a2 a3 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13
+             f14 v3 f15 v4 f16 f17 f18.
+           prog_CASE (Call a0 a1 a2 a3) v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10
+             f11 v1 v2 f12 f13 f14 v3 f15 v4 f16 f17 f18 = f17 a0 a1 a2 a3) ∧
+        ∀a0 a1 a2 a3 a4 a5 v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12
+            f13 f14 v3 f15 v4 f16 f17 f18.
+          prog_CASE (FFI a0 a1 a2 a3 a4 a5) v f f1 f2 f3 f4 f5 f6 f7 f8 f9
+            f10 f11 v1 v2 f12 f13 f14 v3 f15 v4 f16 f17 f18 =
+          f18 a0 a1 a2 a3 a4 a5
+   
+   [prog_size_def]  Definition
+      
+      ⊢ (∀f. prog_size f Skip = 0) ∧
+        (∀f a0 a1. prog_size f (Assign a0 a1) = 1 + (a0 + exp_size f a1)) ∧
+        (∀f a0 a1 a2.
+           prog_size f (Primitive a0 a1 a2) =
+           1 +
+           (list_size (λx. x) a0 + (primop_size a1 + list_size (λx. x) a2))) ∧
+        (∀f a. prog_size f (Arith a) = 1 + loop_arith_size a) ∧
+        (∀f a0 a1. prog_size f (Store a0 a1) = 1 + (exp_size f a0 + a1)) ∧
+        (∀f a0 a1.
+           prog_size f (SetGlobal a0 a1) = 1 + (w2n a0 + exp_size f a1)) ∧
+        (∀f a0 a1. prog_size f (Load32 a0 a1) = 1 + (a0 + a1)) ∧
+        (∀f a0 a1. prog_size f (LoadByte a0 a1) = 1 + (a0 + a1)) ∧
+        (∀f a0 a1. prog_size f (Store32 a0 a1) = 1 + (a0 + a1)) ∧
+        (∀f a0 a1. prog_size f (StoreByte a0 a1) = 1 + (a0 + a1)) ∧
+        (∀f a0 a1.
+           prog_size f (Seq a0 a1) = 1 + (prog_size f a0 + prog_size f a1)) ∧
+        (∀f a0 a1 a2 a3 a4 a5.
+           prog_size f (If a0 a1 a2 a3 a4 a5) =
+           1 +
+           (cmp_size a0 +
+            (a1 +
+             (reg_imm_size f a2 +
+              (prog_size f a3 + (prog_size f a4 + spt_size one_size a5)))))) ∧
+        (∀f a0 a1 a2.
+           prog_size f (Loop a0 a1 a2) =
+           1 +
+           (spt_size one_size a0 + (prog_size f a1 + spt_size one_size a2))) ∧
+        (∀f. prog_size f Break = 0) ∧ (∀f. prog_size f Continue = 0) ∧
+        (∀f a. prog_size f (Raise a) = 1 + a) ∧
+        (∀f a. prog_size f (Return a) = 1 + list_size (λx. x) a) ∧
+        (∀f a0 a1 a2.
+           prog_size f (ShMem a0 a1 a2) =
+           1 + (memop_size a0 + (a1 + exp_size f a2))) ∧
+        (∀f. prog_size f Tick = 0) ∧
+        (∀f a. prog_size f (Mark a) = 1 + prog_size f a) ∧
+        (∀f. prog_size f Fail = 0) ∧
+        (∀f a0 a1. prog_size f (LocValue a0 a1) = 1 + (a0 + a1)) ∧
+        (∀f a0 a1 a2 a3.
+           prog_size f (Call a0 a1 a2 a3) =
+           1 +
+           (option_size (pair_size (list_size (λx. x)) (spt_size one_size))
+              a0 +
+            (option_size (λx. x) a1 +
+             (list_size (λx. x) a2 + prog1_size f a3)))) ∧
+        (∀f a0 a1 a2 a3 a4 a5.
+           prog_size f (FFI a0 a1 a2 a3 a4 a5) =
+           1 +
+           (mlstring_size a0 +
+            (a1 + (a2 + (a3 + (a4 + spt_size one_size a5)))))) ∧
+        (∀f. prog1_size f NONE = 0) ∧
+        (∀f a. prog1_size f (SOME a) = 1 + prog2_size f a) ∧
+        (∀f a0 a1. prog2_size f (a0,a1) = 1 + (a0 + prog3_size f a1)) ∧
+        (∀f a0 a1.
+           prog3_size f (a0,a1) = 1 + (prog_size f a0 + prog4_size f a1)) ∧
+        ∀f a0 a1.
+          prog4_size f (a0,a1) =
+          1 + (prog_size f a0 + spt_size one_size a1)
+   
+   [MEM_IMP_exp_size]  Theorem
+      
+      ⊢ ∀xs a. MEM a xs ⇒ exp_size l a < exp1_size l xs
+   
+   [acc_vars_def]  Theorem
+      
+      ⊢ (∀p2 p1 l. acc_vars (Seq p1 p2) l = acc_vars p1 (acc_vars p2 l)) ∧
+        (∀l. acc_vars Break l = l) ∧ (∀l. acc_vars Continue l = l) ∧
+        (∀l2 l1 l body. acc_vars (Loop l1 body l2) l = acc_vars body l) ∧
+        (∀x3 x2 x1 p2 p1 l1 l.
+           acc_vars (If x1 x2 x3 p1 p2 l1) l = acc_vars p1 (acc_vars p2 l)) ∧
+        (∀l arith.
+           acc_vars (Arith arith) l =
+           case arith of
+             LLongMul v1 v2 v3 v4 => insert v1 () (insert v2 () l)
+           | LLongDiv v1' v2' v3' v4' v5 => insert v1' () (insert v2' () l)
+           | LDiv v1'' v2'' v3'' => insert v1'' () l) ∧
+        (∀p1 l. acc_vars (Mark p1) l = acc_vars p1 l) ∧
+        (∀l. acc_vars Tick l = l) ∧ (∀l. acc_vars Skip l = l) ∧
+        (∀l. acc_vars Fail l = l) ∧ (∀v l. acc_vars (Raise v) l = l) ∧
+        (∀v l. acc_vars (Return v) l = l) ∧
+        (∀ret l handler dest args.
+           acc_vars (Call ret dest args handler) l =
+           case ret of
+             NONE => l
+           | SOME (vs,live) =>
+             (let
+                l' = list_insert vs l
+              in
+                case handler of
+                  NONE => l'
+                | SOME (n,p1,p2,l1) =>
+                  acc_vars p1 (acc_vars p2 (insert n () l')))) ∧
+        (∀n m l. acc_vars (LocValue n m) l = insert n () l) ∧
+        (∀n l exp. acc_vars (Assign n exp) l = insert n () l) ∧
+        (∀rhss pop lhss l.
+           acc_vars (Primitive lhss pop rhss) l = list_insert lhss l) ∧
+        (∀op n l exp. acc_vars (ShMem op n exp) l = insert n () l) ∧
+        (∀n l exp. acc_vars (Store exp n) l = l) ∧
+        (∀w l exp. acc_vars (SetGlobal w exp) l = l) ∧
+        (∀n m l. acc_vars (Load32 n m) l = insert m () l) ∧
+        (∀n m l. acc_vars (LoadByte n m) l = insert m () l) ∧
+        (∀n m l. acc_vars (Store32 n m) l = l) ∧
+        (∀n m l. acc_vars (StoreByte n m) l = l) ∧
+        ∀name n4 n3 n2 n1 live l.
+          acc_vars (FFI name n1 n2 n3 n4 live) l = l
+   
+   [acc_vars_ind]  Theorem
+      
+      ⊢ ∀P. (∀p1 p2 l. P p1 (acc_vars p2 l) ∧ P p2 l ⇒ P (Seq p1 p2) l) ∧
+            (∀l. P Break l) ∧ (∀l. P Continue l) ∧
+            (∀l1 body l2 l. P body l ⇒ P (Loop l1 body l2) l) ∧
+            (∀x1 x2 x3 p1 p2 l1 l.
+               P p1 (acc_vars p2 l) ∧ P p2 l ⇒ P (If x1 x2 x3 p1 p2 l1) l) ∧
+            (∀arith l. P (Arith arith) l) ∧
+            (∀p1 l. P p1 l ⇒ P (Mark p1) l) ∧ (∀l. P Tick l) ∧
+            (∀l. P Skip l) ∧ (∀l. P Fail l) ∧ (∀v l. P (Raise v) l) ∧
+            (∀v l. P (Return v) l) ∧
+            (∀ret dest args handler l.
+               (∀v1 vs live l' v n v2 p1 v4 p2 l1.
+                  ret = SOME v1 ∧ v1 = (vs,live) ∧ l' = list_insert vs l ∧
+                  handler = SOME v ∧ v = (n,v2) ∧ v2 = (p1,v4) ∧
+                  v4 = (p2,l1) ⇒
+                  P p2 (insert n () l')) ∧
+               (∀v1 vs live l' v n v2 p1 v4 p2 l1.
+                  ret = SOME v1 ∧ v1 = (vs,live) ∧ l' = list_insert vs l ∧
+                  handler = SOME v ∧ v = (n,v2) ∧ v2 = (p1,v4) ∧
+                  v4 = (p2,l1) ⇒
+                  P p1 (acc_vars p2 (insert n () l'))) ⇒
+               P (Call ret dest args handler) l) ∧
+            (∀n m l. P (LocValue n m) l) ∧ (∀n exp l. P (Assign n exp) l) ∧
+            (∀lhss pop rhss l. P (Primitive lhss pop rhss) l) ∧
+            (∀op n exp l. P (ShMem op n exp) l) ∧
+            (∀exp n l. P (Store exp n) l) ∧
+            (∀w exp l. P (SetGlobal w exp) l) ∧
+            (∀n m l. P (Load32 n m) l) ∧ (∀n m l. P (LoadByte n m) l) ∧
+            (∀n m l. P (Store32 n m) l) ∧ (∀n m l. P (StoreByte n m) l) ∧
+            (∀name n1 n2 n3 n4 live l. P (FFI name n1 n2 n3 n4 live) l) ⇒
+            ∀v v1. P v v1
+   
+   [assigned_vars_def]  Theorem
+      
+      ⊢ assigned_vars Skip = [] ∧
+        (∀n e. assigned_vars (Assign n e) = [n]) ∧
+        (∀rhss pop lhss. assigned_vars (Primitive lhss pop rhss) = lhss) ∧
+        (∀arith.
+           assigned_vars (Arith arith) =
+           case arith of
+             LLongMul v1 v2 v3 v4 => [v1; v2]
+           | LLongDiv v1' v2' v3' v4' v5 => [v1'; v2']
+           | LDiv v1'' v2'' v3'' => [v1'']) ∧
+        (∀n m. assigned_vars (Load32 n m) = [m]) ∧
+        (∀n m. assigned_vars (LoadByte n m) = [m]) ∧
+        (∀q p. assigned_vars (Seq p q) = assigned_vars p ++ assigned_vars q) ∧
+        (∀r q p ns n cmp.
+           assigned_vars (If cmp n r p q ns) =
+           assigned_vars p ++ assigned_vars q) ∧
+        (∀n m. assigned_vars (LocValue n m) = [n]) ∧
+        (∀op n e. assigned_vars (ShMem op n e) = [n]) ∧
+        (∀p. assigned_vars (Mark p) = assigned_vars p) ∧
+        (∀v6 v0 p. assigned_vars (Loop v0 p v6) = assigned_vars p) ∧
+        (∀v9 v8 v7. assigned_vars (Call NONE v7 v8 v9) = []) ∧
+        (∀v12 v11 v10 ns.
+           assigned_vars (Call (SOME (ns,v10)) v11 v12 NONE) = ns) ∧
+        (∀v16 v15 v14 v13 q p ns m.
+           assigned_vars (Call (SOME (ns,v13)) v14 v15 (SOME (m,p,q,v16))) =
+           ns ++ m::assigned_vars p ++ assigned_vars q) ∧
+        (∀v24 v23. assigned_vars (Store v23 v24) = []) ∧
+        (∀v26 v25. assigned_vars (SetGlobal v25 v26) = []) ∧
+        (∀v32 v31. assigned_vars (Store32 v31 v32) = []) ∧
+        (∀v34 v33. assigned_vars (StoreByte v33 v34) = []) ∧
+        assigned_vars Break = [] ∧ assigned_vars Continue = [] ∧
+        (∀v46. assigned_vars (Raise v46) = []) ∧
+        (∀v47. assigned_vars (Return v47) = []) ∧ assigned_vars Tick = [] ∧
+        assigned_vars Fail = [] ∧
+        ∀v63 v62 v61 v60 v59 v58.
+          assigned_vars (FFI v58 v59 v60 v61 v62 v63) = []
+   
+   [assigned_vars_ind]  Theorem
+      
+      ⊢ ∀P. P Skip ∧ (∀n e. P (Assign n e)) ∧
+            (∀lhss pop rhss. P (Primitive lhss pop rhss)) ∧
+            (∀arith. P (Arith arith)) ∧ (∀n m. P (Load32 n m)) ∧
+            (∀n m. P (LoadByte n m)) ∧ (∀p q. P p ∧ P q ⇒ P (Seq p q)) ∧
+            (∀cmp n r p q ns. P p ∧ P q ⇒ P (If cmp n r p q ns)) ∧
+            (∀n m. P (LocValue n m)) ∧ (∀op n e. P (ShMem op n e)) ∧
+            (∀p. P p ⇒ P (Mark p)) ∧ (∀v0 p v6. P p ⇒ P (Loop v0 p v6)) ∧
+            (∀v7 v8 v9. P (Call NONE v7 v8 v9)) ∧
+            (∀ns v10 v11 v12. P (Call (SOME (ns,v10)) v11 v12 NONE)) ∧
+            (∀ns v13 v14 v15 m p q v16.
+               P p ∧ P q ⇒
+               P (Call (SOME (ns,v13)) v14 v15 (SOME (m,p,q,v16)))) ∧
+            (∀v23 v24. P (Store v23 v24)) ∧
+            (∀v25 v26. P (SetGlobal v25 v26)) ∧
+            (∀v31 v32. P (Store32 v31 v32)) ∧
+            (∀v33 v34. P (StoreByte v33 v34)) ∧ P Break ∧ P Continue ∧
+            (∀v46. P (Raise v46)) ∧ (∀v47. P (Return v47)) ∧ P Tick ∧
+            P Fail ∧
+            (∀v58 v59 v60 v61 v62 v63. P (FFI v58 v59 v60 v61 v62 v63)) ⇒
+            ∀v. P v
+   
+   [datatype_exp]  Theorem
+      
+      ⊢ DATATYPE (exp Const Var Lookup Load Op Shift BaseAddr TopAddr)
+   
+   [datatype_loop_arith]  Theorem
+      
+      ⊢ DATATYPE (loop_arith LLongMul LLongDiv LDiv)
+   
+   [datatype_prog]  Theorem
+      
+      ⊢ DATATYPE
+          (prog Skip Assign Primitive Arith Store SetGlobal Load32 LoadByte
+             Store32 StoreByte Seq If Loop Break Continue Raise Return
+             ShMem Tick Mark Fail LocValue Call FFI)
+   
+   [exp_11]  Theorem
+      
+      ⊢ (∀a a'. Const a = Const a' ⇔ a = a') ∧
+        (∀a a'. Var a = Var a' ⇔ a = a') ∧
+        (∀a a'. Lookup a = Lookup a' ⇔ a = a') ∧
+        (∀a a'. Load a = Load a' ⇔ a = a') ∧
+        (∀a0 a1 a0' a1'. Op a0 a1 = Op a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        ∀a0 a1 a2 a0' a1' a2'.
+          Shift a0 a1 a2 = Shift a0' a1' a2' ⇔
+          a0 = a0' ∧ a1 = a1' ∧ a2 = a2'
+   
+   [exp_Axiom]  Theorem
+      
+      ⊢ ∀f0 f1 f2 f3 f4 f5 f6 f7 f8 f9. ∃fn0 fn1.
+          (∀a. fn0 (Const a) = f0 a) ∧ (∀a. fn0 (Var a) = f1 a) ∧
+          (∀a. fn0 (Lookup a) = f2 a) ∧ (∀a. fn0 (Load a) = f3 a (fn0 a)) ∧
+          (∀a0 a1. fn0 (Op a0 a1) = f4 a0 a1 (fn1 a1)) ∧
+          (∀a0 a1 a2. fn0 (Shift a0 a1 a2) = f5 a0 a2 a1 (fn0 a1)) ∧
+          fn0 BaseAddr = f6 ∧ fn0 TopAddr = f7 ∧ fn1 [] = f8 ∧
+          ∀a0 a1. fn1 (a0::a1) = f9 a0 a1 (fn0 a0) (fn1 a1)
+   
+   [exp_case_cong]  Theorem
+      
+      ⊢ ∀M M' f f1 f2 f3 f4 f5 v v1.
+          M = M' ∧ (∀a. M' = Const a ⇒ f a = f' a) ∧
+          (∀a. M' = Var a ⇒ f1 a = f1' a) ∧
+          (∀a. M' = Lookup a ⇒ f2 a = f2' a) ∧
+          (∀a. M' = Load a ⇒ f3 a = f3' a) ∧
+          (∀a0 a1. M' = Op a0 a1 ⇒ f4 a0 a1 = f4' a0 a1) ∧
+          (∀a0 a1 a2. M' = Shift a0 a1 a2 ⇒ f5 a0 a1 a2 = f5' a0 a1 a2) ∧
+          (M' = BaseAddr ⇒ v = v') ∧ (M' = TopAddr ⇒ v1 = v1') ⇒
+          exp_CASE M f f1 f2 f3 f4 f5 v v1 =
+          exp_CASE M' f' f1' f2' f3' f4' f5' v' v1'
+   
+   [exp_case_eq]  Theorem
+      
+      ⊢ exp_CASE x f f1 f2 f3 f4 f5 v v1 = v' ⇔
+        (∃c. x = Const c ∧ f c = v') ∨ (∃n. x = Var n ∧ f1 n = v') ∨
+        (∃c. x = Lookup c ∧ f2 c = v') ∨ (∃e. x = Load e ∧ f3 e = v') ∨
+        (∃b l. x = Op b l ∧ f4 b l = v') ∨
+        (∃s e n. x = Shift s e n ∧ f5 s e n = v') ∨ x = BaseAddr ∧ v = v' ∨
+        x = TopAddr ∧ v1 = v'
+   
+   [exp_distinct]  Theorem
+      
+      ⊢ (∀a' a. Const a ≠ Var a') ∧ (∀a' a. Const a ≠ Lookup a') ∧
+        (∀a' a. Const a ≠ Load a') ∧ (∀a1 a0 a. Const a ≠ Op a0 a1) ∧
+        (∀a2 a1 a0 a. Const a ≠ Shift a0 a1 a2) ∧
+        (∀a. Const a ≠ BaseAddr) ∧ (∀a. Const a ≠ TopAddr) ∧
+        (∀a' a. Var a ≠ Lookup a') ∧ (∀a' a. Var a ≠ Load a') ∧
+        (∀a1 a0 a. Var a ≠ Op a0 a1) ∧
+        (∀a2 a1 a0 a. Var a ≠ Shift a0 a1 a2) ∧ (∀a. Var a ≠ BaseAddr) ∧
+        (∀a. Var a ≠ TopAddr) ∧ (∀a' a. Lookup a ≠ Load a') ∧
+        (∀a1 a0 a. Lookup a ≠ Op a0 a1) ∧
+        (∀a2 a1 a0 a. Lookup a ≠ Shift a0 a1 a2) ∧
+        (∀a. Lookup a ≠ BaseAddr) ∧ (∀a. Lookup a ≠ TopAddr) ∧
+        (∀a1 a0 a. Load a ≠ Op a0 a1) ∧
+        (∀a2 a1 a0 a. Load a ≠ Shift a0 a1 a2) ∧ (∀a. Load a ≠ BaseAddr) ∧
+        (∀a. Load a ≠ TopAddr) ∧
+        (∀a2 a1' a1 a0' a0. Op a0 a1 ≠ Shift a0' a1' a2) ∧
+        (∀a1 a0. Op a0 a1 ≠ BaseAddr) ∧ (∀a1 a0. Op a0 a1 ≠ TopAddr) ∧
+        (∀a2 a1 a0. Shift a0 a1 a2 ≠ BaseAddr) ∧
+        (∀a2 a1 a0. Shift a0 a1 a2 ≠ TopAddr) ∧ BaseAddr ≠ TopAddr
+   
+   [exp_induction]  Theorem
+      
+      ⊢ ∀P0 P1.
+          (∀c. P0 (Const c)) ∧ (∀n. P0 (Var n)) ∧ (∀c. P0 (Lookup c)) ∧
+          (∀e. P0 e ⇒ P0 (Load e)) ∧ (∀l. P1 l ⇒ ∀b. P0 (Op b l)) ∧
+          (∀e. P0 e ⇒ ∀n s. P0 (Shift s e n)) ∧ P0 BaseAddr ∧ P0 TopAddr ∧
+          P1 [] ∧ (∀e l. P0 e ∧ P1 l ⇒ P1 (e::l)) ⇒
+          (∀e. P0 e) ∧ ∀l. P1 l
+   
+   [exp_nchotomy]  Theorem
+      
+      ⊢ ∀ee.
+          (∃c. ee = Const c) ∨ (∃n. ee = Var n) ∨ (∃c. ee = Lookup c) ∨
+          (∃e. ee = Load e) ∨ (∃b l. ee = Op b l) ∨
+          (∃s e n. ee = Shift s e n) ∨ ee = BaseAddr ∨ ee = TopAddr
+   
+   [locals_touched_def]  Theorem
+      
+      ⊢ (∀w. locals_touched (Const w) = []) ∧
+        (∀v. locals_touched (Var v) = [v]) ∧
+        (∀name. locals_touched (Lookup name) = []) ∧
+        (∀addr. locals_touched (Load addr) = locals_touched addr) ∧
+        (∀wexps op.
+           locals_touched (Op op wexps) =
+           FLAT (MAP (λa. locals_touched a) wexps)) ∧
+        (∀wexp sh n. locals_touched (Shift sh wexp n) = locals_touched wexp) ∧
+        locals_touched BaseAddr = [] ∧ locals_touched TopAddr = []
+   
+   [locals_touched_ind]  Theorem
+      
+      ⊢ ∀P. (∀w. P (Const w)) ∧ (∀v. P (Var v)) ∧
+            (∀name. P (Lookup name)) ∧ (∀addr. P addr ⇒ P (Load addr)) ∧
+            (∀op wexps. (∀a. MEM a wexps ⇒ P a) ⇒ P (Op op wexps)) ∧
+            (∀sh wexp n. P wexp ⇒ P (Shift sh wexp n)) ∧ P BaseAddr ∧
+            P TopAddr ⇒
+            ∀v. P v
+   
+   [loop_arith_11]  Theorem
+      
+      ⊢ (∀a0 a1 a2 a3 a0' a1' a2' a3'.
+           LLongMul a0 a1 a2 a3 = LLongMul a0' a1' a2' a3' ⇔
+           a0 = a0' ∧ a1 = a1' ∧ a2 = a2' ∧ a3 = a3') ∧
+        (∀a0 a1 a2 a3 a4 a0' a1' a2' a3' a4'.
+           LLongDiv a0 a1 a2 a3 a4 = LLongDiv a0' a1' a2' a3' a4' ⇔
+           a0 = a0' ∧ a1 = a1' ∧ a2 = a2' ∧ a3 = a3' ∧ a4 = a4') ∧
+        ∀a0 a1 a2 a0' a1' a2'.
+          LDiv a0 a1 a2 = LDiv a0' a1' a2' ⇔ a0 = a0' ∧ a1 = a1' ∧ a2 = a2'
+   
+   [loop_arith_Axiom]  Theorem
+      
+      ⊢ ∀f0 f1 f2. ∃fn.
+          (∀a0 a1 a2 a3. fn (LLongMul a0 a1 a2 a3) = f0 a0 a1 a2 a3) ∧
+          (∀a0 a1 a2 a3 a4.
+             fn (LLongDiv a0 a1 a2 a3 a4) = f1 a0 a1 a2 a3 a4) ∧
+          ∀a0 a1 a2. fn (LDiv a0 a1 a2) = f2 a0 a1 a2
+   
+   [loop_arith_case_cong]  Theorem
+      
+      ⊢ ∀M M' f f1 f2.
+          M = M' ∧
+          (∀a0 a1 a2 a3.
+             M' = LLongMul a0 a1 a2 a3 ⇒ f a0 a1 a2 a3 = f' a0 a1 a2 a3) ∧
+          (∀a0 a1 a2 a3 a4.
+             M' = LLongDiv a0 a1 a2 a3 a4 ⇒
+             f1 a0 a1 a2 a3 a4 = f1' a0 a1 a2 a3 a4) ∧
+          (∀a0 a1 a2. M' = LDiv a0 a1 a2 ⇒ f2 a0 a1 a2 = f2' a0 a1 a2) ⇒
+          loop_arith_CASE M f f1 f2 = loop_arith_CASE M' f' f1' f2'
+   
+   [loop_arith_case_eq]  Theorem
+      
+      ⊢ loop_arith_CASE x f f1 f2 = v ⇔
+        (∃n n0 n1 n2. x = LLongMul n n0 n1 n2 ∧ f n n0 n1 n2 = v) ∨
+        (∃n n0 n1 n2 n3. x = LLongDiv n n0 n1 n2 n3 ∧ f1 n n0 n1 n2 n3 = v) ∨
+        ∃n n0 n1. x = LDiv n n0 n1 ∧ f2 n n0 n1 = v
+   
+   [loop_arith_distinct]  Theorem
+      
+      ⊢ (∀a4 a3' a3 a2' a2 a1' a1 a0' a0.
+           LLongMul a0 a1 a2 a3 ≠ LLongDiv a0' a1' a2' a3' a4) ∧
+        (∀a3 a2' a2 a1' a1 a0' a0. LLongMul a0 a1 a2 a3 ≠ LDiv a0' a1' a2') ∧
+        ∀a4 a3 a2' a2 a1' a1 a0' a0.
+          LLongDiv a0 a1 a2 a3 a4 ≠ LDiv a0' a1' a2'
+   
+   [loop_arith_induction]  Theorem
+      
+      ⊢ ∀P. (∀n n0 n1 n2. P (LLongMul n n0 n1 n2)) ∧
+            (∀n n0 n1 n2 n3. P (LLongDiv n n0 n1 n2 n3)) ∧
+            (∀n n0 n1. P (LDiv n n0 n1)) ⇒
+            ∀l. P l
+   
+   [loop_arith_nchotomy]  Theorem
+      
+      ⊢ ∀ll.
+          (∃n n0 n1 n2. ll = LLongMul n n0 n1 n2) ∨
+          (∃n n0 n1 n2 n3. ll = LLongDiv n n0 n1 n2 n3) ∨
+          ∃n n0 n1. ll = LDiv n n0 n1
+   
+   [prog_11]  Theorem
+      
+      ⊢ (∀a0 a1 a0' a1'.
+           Assign a0 a1 = Assign a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a2 a0' a1' a2'.
+           Primitive a0 a1 a2 = Primitive a0' a1' a2' ⇔
+           a0 = a0' ∧ a1 = a1' ∧ a2 = a2') ∧
+        (∀a a'. Arith a = Arith a' ⇔ a = a') ∧
+        (∀a0 a1 a0' a1'. Store a0 a1 = Store a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a0' a1'.
+           SetGlobal a0 a1 = SetGlobal a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a0' a1'.
+           Load32 a0 a1 = Load32 a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a0' a1'.
+           LoadByte a0 a1 = LoadByte a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a0' a1'.
+           Store32 a0 a1 = Store32 a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a0' a1'.
+           StoreByte a0 a1 = StoreByte a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a0' a1'. Seq a0 a1 = Seq a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a2 a3 a4 a5 a0' a1' a2' a3' a4' a5'.
+           If a0 a1 a2 a3 a4 a5 = If a0' a1' a2' a3' a4' a5' ⇔
+           a0 = a0' ∧ a1 = a1' ∧ a2 = a2' ∧ a3 = a3' ∧ a4 = a4' ∧ a5 = a5') ∧
+        (∀a0 a1 a2 a0' a1' a2'.
+           Loop a0 a1 a2 = Loop a0' a1' a2' ⇔
+           a0 = a0' ∧ a1 = a1' ∧ a2 = a2') ∧
+        (∀a a'. Raise a = Raise a' ⇔ a = a') ∧
+        (∀a a'. Return a = Return a' ⇔ a = a') ∧
+        (∀a0 a1 a2 a0' a1' a2'.
+           ShMem a0 a1 a2 = ShMem a0' a1' a2' ⇔
+           a0 = a0' ∧ a1 = a1' ∧ a2 = a2') ∧
+        (∀a a'. Mark a = Mark a' ⇔ a = a') ∧
+        (∀a0 a1 a0' a1'.
+           LocValue a0 a1 = LocValue a0' a1' ⇔ a0 = a0' ∧ a1 = a1') ∧
+        (∀a0 a1 a2 a3 a0' a1' a2' a3'.
+           Call a0 a1 a2 a3 = Call a0' a1' a2' a3' ⇔
+           a0 = a0' ∧ a1 = a1' ∧ a2 = a2' ∧ a3 = a3') ∧
+        ∀a0 a1 a2 a3 a4 a5 a0' a1' a2' a3' a4' a5'.
+          FFI a0 a1 a2 a3 a4 a5 = FFI a0' a1' a2' a3' a4' a5' ⇔
+          a0 = a0' ∧ a1 = a1' ∧ a2 = a2' ∧ a3 = a3' ∧ a4 = a4' ∧ a5 = a5'
+   
+   [prog_Axiom]  Theorem
+      
+      ⊢ ∀f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18
+            f19 f20 f21 f22 f23 f24 f25 f26 f27 f28. ∃fn0 fn1 fn2 fn3 fn4.
+          fn0 Skip = f0 ∧ (∀a0 a1. fn0 (Assign a0 a1) = f1 a0 a1) ∧
+          (∀a0 a1 a2. fn0 (Primitive a0 a1 a2) = f2 a0 a1 a2) ∧
+          (∀a. fn0 (Arith a) = f3 a) ∧
+          (∀a0 a1. fn0 (Store a0 a1) = f4 a0 a1) ∧
+          (∀a0 a1. fn0 (SetGlobal a0 a1) = f5 a0 a1) ∧
+          (∀a0 a1. fn0 (Load32 a0 a1) = f6 a0 a1) ∧
+          (∀a0 a1. fn0 (LoadByte a0 a1) = f7 a0 a1) ∧
+          (∀a0 a1. fn0 (Store32 a0 a1) = f8 a0 a1) ∧
+          (∀a0 a1. fn0 (StoreByte a0 a1) = f9 a0 a1) ∧
+          (∀a0 a1. fn0 (Seq a0 a1) = f10 a0 a1 (fn0 a0) (fn0 a1)) ∧
+          (∀a0 a1 a2 a3 a4 a5.
+             fn0 (If a0 a1 a2 a3 a4 a5) =
+             f11 a0 a1 a2 a5 a3 a4 (fn0 a3) (fn0 a4)) ∧
+          (∀a0 a1 a2. fn0 (Loop a0 a1 a2) = f12 a0 a2 a1 (fn0 a1)) ∧
+          fn0 Break = f13 ∧ fn0 Continue = f14 ∧
+          (∀a. fn0 (Raise a) = f15 a) ∧ (∀a. fn0 (Return a) = f16 a) ∧
+          (∀a0 a1 a2. fn0 (ShMem a0 a1 a2) = f17 a0 a1 a2) ∧
+          fn0 Tick = f18 ∧ (∀a. fn0 (Mark a) = f19 a (fn0 a)) ∧
+          fn0 Fail = f20 ∧ (∀a0 a1. fn0 (LocValue a0 a1) = f21 a0 a1) ∧
+          (∀a0 a1 a2 a3. fn0 (Call a0 a1 a2 a3) = f22 a0 a1 a2 a3 (fn1 a3)) ∧
+          (∀a0 a1 a2 a3 a4 a5.
+             fn0 (FFI a0 a1 a2 a3 a4 a5) = f23 a0 a1 a2 a3 a4 a5) ∧
+          fn1 NONE = f24 ∧ (∀a. fn1 (SOME a) = f25 a (fn2 a)) ∧
+          (∀a0 a1. fn2 (a0,a1) = f26 a0 a1 (fn3 a1)) ∧
+          (∀a0 a1. fn3 (a0,a1) = f27 a0 a1 (fn0 a0) (fn4 a1)) ∧
+          ∀a0 a1. fn4 (a0,a1) = f28 a1 a0 (fn0 a0)
+   
+   [prog_case_cong]  Theorem
+      
+      ⊢ ∀M M' v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13 f14 v3
+            f15 v4 f16 f17 f18.
+          M = M' ∧ (M' = Skip ⇒ v = v') ∧
+          (∀a0 a1. M' = Assign a0 a1 ⇒ f a0 a1 = f' a0 a1) ∧
+          (∀a0 a1 a2. M' = Primitive a0 a1 a2 ⇒ f1 a0 a1 a2 = f1' a0 a1 a2) ∧
+          (∀a. M' = Arith a ⇒ f2 a = f2' a) ∧
+          (∀a0 a1. M' = Store a0 a1 ⇒ f3 a0 a1 = f3' a0 a1) ∧
+          (∀a0 a1. M' = SetGlobal a0 a1 ⇒ f4 a0 a1 = f4' a0 a1) ∧
+          (∀a0 a1. M' = Load32 a0 a1 ⇒ f5 a0 a1 = f5' a0 a1) ∧
+          (∀a0 a1. M' = LoadByte a0 a1 ⇒ f6 a0 a1 = f6' a0 a1) ∧
+          (∀a0 a1. M' = Store32 a0 a1 ⇒ f7 a0 a1 = f7' a0 a1) ∧
+          (∀a0 a1. M' = StoreByte a0 a1 ⇒ f8 a0 a1 = f8' a0 a1) ∧
+          (∀a0 a1. M' = Seq a0 a1 ⇒ f9 a0 a1 = f9' a0 a1) ∧
+          (∀a0 a1 a2 a3 a4 a5.
+             M' = If a0 a1 a2 a3 a4 a5 ⇒
+             f10 a0 a1 a2 a3 a4 a5 = f10' a0 a1 a2 a3 a4 a5) ∧
+          (∀a0 a1 a2. M' = Loop a0 a1 a2 ⇒ f11 a0 a1 a2 = f11' a0 a1 a2) ∧
+          (M' = Break ⇒ v1 = v1') ∧ (M' = Continue ⇒ v2 = v2') ∧
+          (∀a. M' = Raise a ⇒ f12 a = f12' a) ∧
+          (∀a. M' = Return a ⇒ f13 a = f13' a) ∧
+          (∀a0 a1 a2. M' = ShMem a0 a1 a2 ⇒ f14 a0 a1 a2 = f14' a0 a1 a2) ∧
+          (M' = Tick ⇒ v3 = v3') ∧ (∀a. M' = Mark a ⇒ f15 a = f15' a) ∧
+          (M' = Fail ⇒ v4 = v4') ∧
+          (∀a0 a1. M' = LocValue a0 a1 ⇒ f16 a0 a1 = f16' a0 a1) ∧
+          (∀a0 a1 a2 a3.
+             M' = Call a0 a1 a2 a3 ⇒ f17 a0 a1 a2 a3 = f17' a0 a1 a2 a3) ∧
+          (∀a0 a1 a2 a3 a4 a5.
+             M' = FFI a0 a1 a2 a3 a4 a5 ⇒
+             f18 a0 a1 a2 a3 a4 a5 = f18' a0 a1 a2 a3 a4 a5) ⇒
+          prog_CASE M v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13
+            f14 v3 f15 v4 f16 f17 f18 =
+          prog_CASE M' v' f' f1' f2' f3' f4' f5' f6' f7' f8' f9' f10' f11'
+            v1' v2' f12' f13' f14' v3' f15' v4' f16' f17' f18'
+   
+   [prog_case_eq]  Theorem
+      
+      ⊢ prog_CASE x v f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 v1 v2 f12 f13
+          f14 v3 f15 v4 f16 f17 f18 = v' ⇔
+        x = Skip ∧ v = v' ∨ (∃n e. x = Assign n e ∧ f n e = v') ∨
+        (∃l p l0. x = Primitive l p l0 ∧ f1 l p l0 = v') ∨
+        (∃l. x = Arith l ∧ f2 l = v') ∨
+        (∃e n. x = Store e n ∧ f3 e n = v') ∨
+        (∃c e. x = SetGlobal c e ∧ f4 c e = v') ∨
+        (∃n n0. x = Load32 n n0 ∧ f5 n n0 = v') ∨
+        (∃n n0. x = LoadByte n n0 ∧ f6 n n0 = v') ∨
+        (∃n n0. x = Store32 n n0 ∧ f7 n n0 = v') ∨
+        (∃n n0. x = StoreByte n n0 ∧ f8 n n0 = v') ∨
+        (∃p p0. x = Seq p p0 ∧ f9 p p0 = v') ∨
+        (∃c n r p p0 s. x = If c n r p p0 s ∧ f10 c n r p p0 s = v') ∨
+        (∃s0 p s. x = Loop s0 p s ∧ f11 s0 p s = v') ∨
+        x = Break ∧ v1 = v' ∨ x = Continue ∧ v2 = v' ∨
+        (∃n. x = Raise n ∧ f12 n = v') ∨ (∃l. x = Return l ∧ f13 l = v') ∨
+        (∃m n e. x = ShMem m n e ∧ f14 m n e = v') ∨ x = Tick ∧ v3 = v' ∨
+        (∃p. x = Mark p ∧ f15 p = v') ∨ x = Fail ∧ v4 = v' ∨
+        (∃n n0. x = LocValue n n0 ∧ f16 n n0 = v') ∨
+        (∃o1 o0 l o'. x = Call o1 o0 l o' ∧ f17 o1 o0 l o' = v') ∨
+        ∃m n n0 n1 n2 s. x = FFI m n n0 n1 n2 s ∧ f18 m n n0 n1 n2 s = v'
+   
+   [prog_distinct]  Theorem
+      
+      ⊢ (∀a1 a0. Skip ≠ Assign a0 a1) ∧
+        (∀a2 a1 a0. Skip ≠ Primitive a0 a1 a2) ∧ (∀a. Skip ≠ Arith a) ∧
+        (∀a1 a0. Skip ≠ Store a0 a1) ∧ (∀a1 a0. Skip ≠ SetGlobal a0 a1) ∧
+        (∀a1 a0. Skip ≠ Load32 a0 a1) ∧ (∀a1 a0. Skip ≠ LoadByte a0 a1) ∧
+        (∀a1 a0. Skip ≠ Store32 a0 a1) ∧ (∀a1 a0. Skip ≠ StoreByte a0 a1) ∧
+        (∀a1 a0. Skip ≠ Seq a0 a1) ∧
+        (∀a5 a4 a3 a2 a1 a0. Skip ≠ If a0 a1 a2 a3 a4 a5) ∧
+        (∀a2 a1 a0. Skip ≠ Loop a0 a1 a2) ∧ Skip ≠ Break ∧
+        Skip ≠ Continue ∧ (∀a. Skip ≠ Raise a) ∧ (∀a. Skip ≠ Return a) ∧
+        (∀a2 a1 a0. Skip ≠ ShMem a0 a1 a2) ∧ Skip ≠ Tick ∧
+        (∀a. Skip ≠ Mark a) ∧ Skip ≠ Fail ∧
+        (∀a1 a0. Skip ≠ LocValue a0 a1) ∧
+        (∀a3 a2 a1 a0. Skip ≠ Call a0 a1 a2 a3) ∧
+        (∀a5 a4 a3 a2 a1 a0. Skip ≠ FFI a0 a1 a2 a3 a4 a5) ∧
+        (∀a2 a1' a1 a0' a0. Assign a0 a1 ≠ Primitive a0' a1' a2) ∧
+        (∀a1 a0 a. Assign a0 a1 ≠ Arith a) ∧
+        (∀a1' a1 a0' a0. Assign a0 a1 ≠ Store a0' a1') ∧
+        (∀a1' a1 a0' a0. Assign a0 a1 ≠ SetGlobal a0' a1') ∧
+        (∀a1' a1 a0' a0. Assign a0 a1 ≠ Load32 a0' a1') ∧
+        (∀a1' a1 a0' a0. Assign a0 a1 ≠ LoadByte a0' a1') ∧
+        (∀a1' a1 a0' a0. Assign a0 a1 ≠ Store32 a0' a1') ∧
+        (∀a1' a1 a0' a0. Assign a0 a1 ≠ StoreByte a0' a1') ∧
+        (∀a1' a1 a0' a0. Assign a0 a1 ≠ Seq a0' a1') ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0. Assign a0 a1 ≠ If a0' a1' a2 a3 a4 a5) ∧
+        (∀a2 a1' a1 a0' a0. Assign a0 a1 ≠ Loop a0' a1' a2) ∧
+        (∀a1 a0. Assign a0 a1 ≠ Break) ∧
+        (∀a1 a0. Assign a0 a1 ≠ Continue) ∧
+        (∀a1 a0 a. Assign a0 a1 ≠ Raise a) ∧
+        (∀a1 a0 a. Assign a0 a1 ≠ Return a) ∧
+        (∀a2 a1' a1 a0' a0. Assign a0 a1 ≠ ShMem a0' a1' a2) ∧
+        (∀a1 a0. Assign a0 a1 ≠ Tick) ∧ (∀a1 a0 a. Assign a0 a1 ≠ Mark a) ∧
+        (∀a1 a0. Assign a0 a1 ≠ Fail) ∧
+        (∀a1' a1 a0' a0. Assign a0 a1 ≠ LocValue a0' a1') ∧
+        (∀a3 a2 a1' a1 a0' a0. Assign a0 a1 ≠ Call a0' a1' a2 a3) ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0. Assign a0 a1 ≠ FFI a0' a1' a2 a3 a4 a5) ∧
+        (∀a2 a1 a0 a. Primitive a0 a1 a2 ≠ Arith a) ∧
+        (∀a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ Store a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ SetGlobal a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ Load32 a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ LoadByte a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ Store32 a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ StoreByte a0' a1') ∧
+        (∀a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ Seq a0' a1') ∧
+        (∀a5 a4 a3 a2' a2 a1' a1 a0' a0.
+           Primitive a0 a1 a2 ≠ If a0' a1' a2' a3 a4 a5) ∧
+        (∀a2' a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ Loop a0' a1' a2') ∧
+        (∀a2 a1 a0. Primitive a0 a1 a2 ≠ Break) ∧
+        (∀a2 a1 a0. Primitive a0 a1 a2 ≠ Continue) ∧
+        (∀a2 a1 a0 a. Primitive a0 a1 a2 ≠ Raise a) ∧
+        (∀a2 a1 a0 a. Primitive a0 a1 a2 ≠ Return a) ∧
+        (∀a2' a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ ShMem a0' a1' a2') ∧
+        (∀a2 a1 a0. Primitive a0 a1 a2 ≠ Tick) ∧
+        (∀a2 a1 a0 a. Primitive a0 a1 a2 ≠ Mark a) ∧
+        (∀a2 a1 a0. Primitive a0 a1 a2 ≠ Fail) ∧
+        (∀a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ LocValue a0' a1') ∧
+        (∀a3 a2' a2 a1' a1 a0' a0. Primitive a0 a1 a2 ≠ Call a0' a1' a2' a3) ∧
+        (∀a5 a4 a3 a2' a2 a1' a1 a0' a0.
+           Primitive a0 a1 a2 ≠ FFI a0' a1' a2' a3 a4 a5) ∧
+        (∀a1 a0 a. Arith a ≠ Store a0 a1) ∧
+        (∀a1 a0 a. Arith a ≠ SetGlobal a0 a1) ∧
+        (∀a1 a0 a. Arith a ≠ Load32 a0 a1) ∧
+        (∀a1 a0 a. Arith a ≠ LoadByte a0 a1) ∧
+        (∀a1 a0 a. Arith a ≠ Store32 a0 a1) ∧
+        (∀a1 a0 a. Arith a ≠ StoreByte a0 a1) ∧
+        (∀a1 a0 a. Arith a ≠ Seq a0 a1) ∧
+        (∀a5 a4 a3 a2 a1 a0 a. Arith a ≠ If a0 a1 a2 a3 a4 a5) ∧
+        (∀a2 a1 a0 a. Arith a ≠ Loop a0 a1 a2) ∧ (∀a. Arith a ≠ Break) ∧
+        (∀a. Arith a ≠ Continue) ∧ (∀a' a. Arith a ≠ Raise a') ∧
+        (∀a' a. Arith a ≠ Return a') ∧
+        (∀a2 a1 a0 a. Arith a ≠ ShMem a0 a1 a2) ∧ (∀a. Arith a ≠ Tick) ∧
+        (∀a' a. Arith a ≠ Mark a') ∧ (∀a. Arith a ≠ Fail) ∧
+        (∀a1 a0 a. Arith a ≠ LocValue a0 a1) ∧
+        (∀a3 a2 a1 a0 a. Arith a ≠ Call a0 a1 a2 a3) ∧
+        (∀a5 a4 a3 a2 a1 a0 a. Arith a ≠ FFI a0 a1 a2 a3 a4 a5) ∧
+        (∀a1' a1 a0' a0. Store a0 a1 ≠ SetGlobal a0' a1') ∧
+        (∀a1' a1 a0' a0. Store a0 a1 ≠ Load32 a0' a1') ∧
+        (∀a1' a1 a0' a0. Store a0 a1 ≠ LoadByte a0' a1') ∧
+        (∀a1' a1 a0' a0. Store a0 a1 ≠ Store32 a0' a1') ∧
+        (∀a1' a1 a0' a0. Store a0 a1 ≠ StoreByte a0' a1') ∧
+        (∀a1' a1 a0' a0. Store a0 a1 ≠ Seq a0' a1') ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0. Store a0 a1 ≠ If a0' a1' a2 a3 a4 a5) ∧
+        (∀a2 a1' a1 a0' a0. Store a0 a1 ≠ Loop a0' a1' a2) ∧
+        (∀a1 a0. Store a0 a1 ≠ Break) ∧ (∀a1 a0. Store a0 a1 ≠ Continue) ∧
+        (∀a1 a0 a. Store a0 a1 ≠ Raise a) ∧
+        (∀a1 a0 a. Store a0 a1 ≠ Return a) ∧
+        (∀a2 a1' a1 a0' a0. Store a0 a1 ≠ ShMem a0' a1' a2) ∧
+        (∀a1 a0. Store a0 a1 ≠ Tick) ∧ (∀a1 a0 a. Store a0 a1 ≠ Mark a) ∧
+        (∀a1 a0. Store a0 a1 ≠ Fail) ∧
+        (∀a1' a1 a0' a0. Store a0 a1 ≠ LocValue a0' a1') ∧
+        (∀a3 a2 a1' a1 a0' a0. Store a0 a1 ≠ Call a0' a1' a2 a3) ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0. Store a0 a1 ≠ FFI a0' a1' a2 a3 a4 a5) ∧
+        (∀a1' a1 a0' a0. SetGlobal a0 a1 ≠ Load32 a0' a1') ∧
+        (∀a1' a1 a0' a0. SetGlobal a0 a1 ≠ LoadByte a0' a1') ∧
+        (∀a1' a1 a0' a0. SetGlobal a0 a1 ≠ Store32 a0' a1') ∧
+        (∀a1' a1 a0' a0. SetGlobal a0 a1 ≠ StoreByte a0' a1') ∧
+        (∀a1' a1 a0' a0. SetGlobal a0 a1 ≠ Seq a0' a1') ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0.
+           SetGlobal a0 a1 ≠ If a0' a1' a2 a3 a4 a5) ∧
+        (∀a2 a1' a1 a0' a0. SetGlobal a0 a1 ≠ Loop a0' a1' a2) ∧
+        (∀a1 a0. SetGlobal a0 a1 ≠ Break) ∧
+        (∀a1 a0. SetGlobal a0 a1 ≠ Continue) ∧
+        (∀a1 a0 a. SetGlobal a0 a1 ≠ Raise a) ∧
+        (∀a1 a0 a. SetGlobal a0 a1 ≠ Return a) ∧
+        (∀a2 a1' a1 a0' a0. SetGlobal a0 a1 ≠ ShMem a0' a1' a2) ∧
+        (∀a1 a0. SetGlobal a0 a1 ≠ Tick) ∧
+        (∀a1 a0 a. SetGlobal a0 a1 ≠ Mark a) ∧
+        (∀a1 a0. SetGlobal a0 a1 ≠ Fail) ∧
+        (∀a1' a1 a0' a0. SetGlobal a0 a1 ≠ LocValue a0' a1') ∧
+        (∀a3 a2 a1' a1 a0' a0. SetGlobal a0 a1 ≠ Call a0' a1' a2 a3) ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0.
+           SetGlobal a0 a1 ≠ FFI a0' a1' a2 a3 a4 a5) ∧
+        (∀a1' a1 a0' a0. Load32 a0 a1 ≠ LoadByte a0' a1') ∧
+        (∀a1' a1 a0' a0. Load32 a0 a1 ≠ Store32 a0' a1') ∧
+        (∀a1' a1 a0' a0. Load32 a0 a1 ≠ StoreByte a0' a1') ∧
+        (∀a1' a1 a0' a0. Load32 a0 a1 ≠ Seq a0' a1') ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0. Load32 a0 a1 ≠ If a0' a1' a2 a3 a4 a5) ∧
+        (∀a2 a1' a1 a0' a0. Load32 a0 a1 ≠ Loop a0' a1' a2) ∧
+        (∀a1 a0. Load32 a0 a1 ≠ Break) ∧
+        (∀a1 a0. Load32 a0 a1 ≠ Continue) ∧
+        (∀a1 a0 a. Load32 a0 a1 ≠ Raise a) ∧
+        (∀a1 a0 a. Load32 a0 a1 ≠ Return a) ∧
+        (∀a2 a1' a1 a0' a0. Load32 a0 a1 ≠ ShMem a0' a1' a2) ∧
+        (∀a1 a0. Load32 a0 a1 ≠ Tick) ∧ (∀a1 a0 a. Load32 a0 a1 ≠ Mark a) ∧
+        (∀a1 a0. Load32 a0 a1 ≠ Fail) ∧
+        (∀a1' a1 a0' a0. Load32 a0 a1 ≠ LocValue a0' a1') ∧
+        (∀a3 a2 a1' a1 a0' a0. Load32 a0 a1 ≠ Call a0' a1' a2 a3) ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0. Load32 a0 a1 ≠ FFI a0' a1' a2 a3 a4 a5) ∧
+        (∀a1' a1 a0' a0. LoadByte a0 a1 ≠ Store32 a0' a1') ∧
+        (∀a1' a1 a0' a0. LoadByte a0 a1 ≠ StoreByte a0' a1') ∧
+        (∀a1' a1 a0' a0. LoadByte a0 a1 ≠ Seq a0' a1') ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0.
+           LoadByte a0 a1 ≠ If a0' a1' a2 a3 a4 a5) ∧
+        (∀a2 a1' a1 a0' a0. LoadByte a0 a1 ≠ Loop a0' a1' a2) ∧
+        (∀a1 a0. LoadByte a0 a1 ≠ Break) ∧
+        (∀a1 a0. LoadByte a0 a1 ≠ Continue) ∧
+        (∀a1 a0 a. LoadByte a0 a1 ≠ Raise a) ∧
+        (∀a1 a0 a. LoadByte a0 a1 ≠ Return a) ∧
+        (∀a2 a1' a1 a0' a0. LoadByte a0 a1 ≠ ShMem a0' a1' a2) ∧
+        (∀a1 a0. LoadByte a0 a1 ≠ Tick) ∧
+        (∀a1 a0 a. LoadByte a0 a1 ≠ Mark a) ∧
+        (∀a1 a0. LoadByte a0 a1 ≠ Fail) ∧
+        (∀a1' a1 a0' a0. LoadByte a0 a1 ≠ LocValue a0' a1') ∧
+        (∀a3 a2 a1' a1 a0' a0. LoadByte a0 a1 ≠ Call a0' a1' a2 a3) ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0.
+           LoadByte a0 a1 ≠ FFI a0' a1' a2 a3 a4 a5) ∧
+        (∀a1' a1 a0' a0. Store32 a0 a1 ≠ StoreByte a0' a1') ∧
+        (∀a1' a1 a0' a0. Store32 a0 a1 ≠ Seq a0' a1') ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0. Store32 a0 a1 ≠ If a0' a1' a2 a3 a4 a5) ∧
+        (∀a2 a1' a1 a0' a0. Store32 a0 a1 ≠ Loop a0' a1' a2) ∧
+        (∀a1 a0. Store32 a0 a1 ≠ Break) ∧
+        (∀a1 a0. Store32 a0 a1 ≠ Continue) ∧
+        (∀a1 a0 a. Store32 a0 a1 ≠ Raise a) ∧
+        (∀a1 a0 a. Store32 a0 a1 ≠ Return a) ∧
+        (∀a2 a1' a1 a0' a0. Store32 a0 a1 ≠ ShMem a0' a1' a2) ∧
+        (∀a1 a0. Store32 a0 a1 ≠ Tick) ∧
+        (∀a1 a0 a. Store32 a0 a1 ≠ Mark a) ∧
+        (∀a1 a0. Store32 a0 a1 ≠ Fail) ∧
+        (∀a1' a1 a0' a0. Store32 a0 a1 ≠ LocValue a0' a1') ∧
+        (∀a3 a2 a1' a1 a0' a0. Store32 a0 a1 ≠ Call a0' a1' a2 a3) ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0.
+           Store32 a0 a1 ≠ FFI a0' a1' a2 a3 a4 a5) ∧
+        (∀a1' a1 a0' a0. StoreByte a0 a1 ≠ Seq a0' a1') ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0.
+           StoreByte a0 a1 ≠ If a0' a1' a2 a3 a4 a5) ∧
+        (∀a2 a1' a1 a0' a0. StoreByte a0 a1 ≠ Loop a0' a1' a2) ∧
+        (∀a1 a0. StoreByte a0 a1 ≠ Break) ∧
+        (∀a1 a0. StoreByte a0 a1 ≠ Continue) ∧
+        (∀a1 a0 a. StoreByte a0 a1 ≠ Raise a) ∧
+        (∀a1 a0 a. StoreByte a0 a1 ≠ Return a) ∧
+        (∀a2 a1' a1 a0' a0. StoreByte a0 a1 ≠ ShMem a0' a1' a2) ∧
+        (∀a1 a0. StoreByte a0 a1 ≠ Tick) ∧
+        (∀a1 a0 a. StoreByte a0 a1 ≠ Mark a) ∧
+        (∀a1 a0. StoreByte a0 a1 ≠ Fail) ∧
+        (∀a1' a1 a0' a0. StoreByte a0 a1 ≠ LocValue a0' a1') ∧
+        (∀a3 a2 a1' a1 a0' a0. StoreByte a0 a1 ≠ Call a0' a1' a2 a3) ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0.
+           StoreByte a0 a1 ≠ FFI a0' a1' a2 a3 a4 a5) ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0. Seq a0 a1 ≠ If a0' a1' a2 a3 a4 a5) ∧
+        (∀a2 a1' a1 a0' a0. Seq a0 a1 ≠ Loop a0' a1' a2) ∧
+        (∀a1 a0. Seq a0 a1 ≠ Break) ∧ (∀a1 a0. Seq a0 a1 ≠ Continue) ∧
+        (∀a1 a0 a. Seq a0 a1 ≠ Raise a) ∧
+        (∀a1 a0 a. Seq a0 a1 ≠ Return a) ∧
+        (∀a2 a1' a1 a0' a0. Seq a0 a1 ≠ ShMem a0' a1' a2) ∧
+        (∀a1 a0. Seq a0 a1 ≠ Tick) ∧ (∀a1 a0 a. Seq a0 a1 ≠ Mark a) ∧
+        (∀a1 a0. Seq a0 a1 ≠ Fail) ∧
+        (∀a1' a1 a0' a0. Seq a0 a1 ≠ LocValue a0' a1') ∧
+        (∀a3 a2 a1' a1 a0' a0. Seq a0 a1 ≠ Call a0' a1' a2 a3) ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0. Seq a0 a1 ≠ FFI a0' a1' a2 a3 a4 a5) ∧
+        (∀a5 a4 a3 a2' a2 a1' a1 a0' a0.
+           If a0 a1 a2 a3 a4 a5 ≠ Loop a0' a1' a2') ∧
+        (∀a5 a4 a3 a2 a1 a0. If a0 a1 a2 a3 a4 a5 ≠ Break) ∧
+        (∀a5 a4 a3 a2 a1 a0. If a0 a1 a2 a3 a4 a5 ≠ Continue) ∧
+        (∀a5 a4 a3 a2 a1 a0 a. If a0 a1 a2 a3 a4 a5 ≠ Raise a) ∧
+        (∀a5 a4 a3 a2 a1 a0 a. If a0 a1 a2 a3 a4 a5 ≠ Return a) ∧
+        (∀a5 a4 a3 a2' a2 a1' a1 a0' a0.
+           If a0 a1 a2 a3 a4 a5 ≠ ShMem a0' a1' a2') ∧
+        (∀a5 a4 a3 a2 a1 a0. If a0 a1 a2 a3 a4 a5 ≠ Tick) ∧
+        (∀a5 a4 a3 a2 a1 a0 a. If a0 a1 a2 a3 a4 a5 ≠ Mark a) ∧
+        (∀a5 a4 a3 a2 a1 a0. If a0 a1 a2 a3 a4 a5 ≠ Fail) ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0.
+           If a0 a1 a2 a3 a4 a5 ≠ LocValue a0' a1') ∧
+        (∀a5 a4 a3' a3 a2' a2 a1' a1 a0' a0.
+           If a0 a1 a2 a3 a4 a5 ≠ Call a0' a1' a2' a3') ∧
+        (∀a5' a5 a4' a4 a3' a3 a2' a2 a1' a1 a0' a0.
+           If a0 a1 a2 a3 a4 a5 ≠ FFI a0' a1' a2' a3' a4' a5') ∧
+        (∀a2 a1 a0. Loop a0 a1 a2 ≠ Break) ∧
+        (∀a2 a1 a0. Loop a0 a1 a2 ≠ Continue) ∧
+        (∀a2 a1 a0 a. Loop a0 a1 a2 ≠ Raise a) ∧
+        (∀a2 a1 a0 a. Loop a0 a1 a2 ≠ Return a) ∧
+        (∀a2' a2 a1' a1 a0' a0. Loop a0 a1 a2 ≠ ShMem a0' a1' a2') ∧
+        (∀a2 a1 a0. Loop a0 a1 a2 ≠ Tick) ∧
+        (∀a2 a1 a0 a. Loop a0 a1 a2 ≠ Mark a) ∧
+        (∀a2 a1 a0. Loop a0 a1 a2 ≠ Fail) ∧
+        (∀a2 a1' a1 a0' a0. Loop a0 a1 a2 ≠ LocValue a0' a1') ∧
+        (∀a3 a2' a2 a1' a1 a0' a0. Loop a0 a1 a2 ≠ Call a0' a1' a2' a3) ∧
+        (∀a5 a4 a3 a2' a2 a1' a1 a0' a0.
+           Loop a0 a1 a2 ≠ FFI a0' a1' a2' a3 a4 a5) ∧ Break ≠ Continue ∧
+        (∀a. Break ≠ Raise a) ∧ (∀a. Break ≠ Return a) ∧
+        (∀a2 a1 a0. Break ≠ ShMem a0 a1 a2) ∧ Break ≠ Tick ∧
+        (∀a. Break ≠ Mark a) ∧ Break ≠ Fail ∧
+        (∀a1 a0. Break ≠ LocValue a0 a1) ∧
+        (∀a3 a2 a1 a0. Break ≠ Call a0 a1 a2 a3) ∧
+        (∀a5 a4 a3 a2 a1 a0. Break ≠ FFI a0 a1 a2 a3 a4 a5) ∧
+        (∀a. Continue ≠ Raise a) ∧ (∀a. Continue ≠ Return a) ∧
+        (∀a2 a1 a0. Continue ≠ ShMem a0 a1 a2) ∧ Continue ≠ Tick ∧
+        (∀a. Continue ≠ Mark a) ∧ Continue ≠ Fail ∧
+        (∀a1 a0. Continue ≠ LocValue a0 a1) ∧
+        (∀a3 a2 a1 a0. Continue ≠ Call a0 a1 a2 a3) ∧
+        (∀a5 a4 a3 a2 a1 a0. Continue ≠ FFI a0 a1 a2 a3 a4 a5) ∧
+        (∀a' a. Raise a ≠ Return a') ∧
+        (∀a2 a1 a0 a. Raise a ≠ ShMem a0 a1 a2) ∧ (∀a. Raise a ≠ Tick) ∧
+        (∀a' a. Raise a ≠ Mark a') ∧ (∀a. Raise a ≠ Fail) ∧
+        (∀a1 a0 a. Raise a ≠ LocValue a0 a1) ∧
+        (∀a3 a2 a1 a0 a. Raise a ≠ Call a0 a1 a2 a3) ∧
+        (∀a5 a4 a3 a2 a1 a0 a. Raise a ≠ FFI a0 a1 a2 a3 a4 a5) ∧
+        (∀a2 a1 a0 a. Return a ≠ ShMem a0 a1 a2) ∧ (∀a. Return a ≠ Tick) ∧
+        (∀a' a. Return a ≠ Mark a') ∧ (∀a. Return a ≠ Fail) ∧
+        (∀a1 a0 a. Return a ≠ LocValue a0 a1) ∧
+        (∀a3 a2 a1 a0 a. Return a ≠ Call a0 a1 a2 a3) ∧
+        (∀a5 a4 a3 a2 a1 a0 a. Return a ≠ FFI a0 a1 a2 a3 a4 a5) ∧
+        (∀a2 a1 a0. ShMem a0 a1 a2 ≠ Tick) ∧
+        (∀a2 a1 a0 a. ShMem a0 a1 a2 ≠ Mark a) ∧
+        (∀a2 a1 a0. ShMem a0 a1 a2 ≠ Fail) ∧
+        (∀a2 a1' a1 a0' a0. ShMem a0 a1 a2 ≠ LocValue a0' a1') ∧
+        (∀a3 a2' a2 a1' a1 a0' a0. ShMem a0 a1 a2 ≠ Call a0' a1' a2' a3) ∧
+        (∀a5 a4 a3 a2' a2 a1' a1 a0' a0.
+           ShMem a0 a1 a2 ≠ FFI a0' a1' a2' a3 a4 a5) ∧
+        (∀a. Tick ≠ Mark a) ∧ Tick ≠ Fail ∧
+        (∀a1 a0. Tick ≠ LocValue a0 a1) ∧
+        (∀a3 a2 a1 a0. Tick ≠ Call a0 a1 a2 a3) ∧
+        (∀a5 a4 a3 a2 a1 a0. Tick ≠ FFI a0 a1 a2 a3 a4 a5) ∧
+        (∀a. Mark a ≠ Fail) ∧ (∀a1 a0 a. Mark a ≠ LocValue a0 a1) ∧
+        (∀a3 a2 a1 a0 a. Mark a ≠ Call a0 a1 a2 a3) ∧
+        (∀a5 a4 a3 a2 a1 a0 a. Mark a ≠ FFI a0 a1 a2 a3 a4 a5) ∧
+        (∀a1 a0. Fail ≠ LocValue a0 a1) ∧
+        (∀a3 a2 a1 a0. Fail ≠ Call a0 a1 a2 a3) ∧
+        (∀a5 a4 a3 a2 a1 a0. Fail ≠ FFI a0 a1 a2 a3 a4 a5) ∧
+        (∀a3 a2 a1' a1 a0' a0. LocValue a0 a1 ≠ Call a0' a1' a2 a3) ∧
+        (∀a5 a4 a3 a2 a1' a1 a0' a0.
+           LocValue a0 a1 ≠ FFI a0' a1' a2 a3 a4 a5) ∧
+        ∀a5 a4 a3' a3 a2' a2 a1' a1 a0' a0.
+          Call a0 a1 a2 a3 ≠ FFI a0' a1' a2' a3' a4 a5
+   
+   [prog_induction]  Theorem
+      
+      ⊢ ∀P0 P1 P2 P3 P4.
+          P0 Skip ∧ (∀n e. P0 (Assign n e)) ∧
+          (∀l p l0. P0 (Primitive l p l0)) ∧ (∀l. P0 (Arith l)) ∧
+          (∀e n. P0 (Store e n)) ∧ (∀c e. P0 (SetGlobal c e)) ∧
+          (∀n n0. P0 (Load32 n n0)) ∧ (∀n n0. P0 (LoadByte n n0)) ∧
+          (∀n n0. P0 (Store32 n n0)) ∧ (∀n n0. P0 (StoreByte n n0)) ∧
+          (∀p p0. P0 p ∧ P0 p0 ⇒ P0 (Seq p p0)) ∧
+          (∀p p0. P0 p ∧ P0 p0 ⇒ ∀s r n c. P0 (If c n r p p0 s)) ∧
+          (∀p. P0 p ⇒ ∀s s0. P0 (Loop s0 p s)) ∧ P0 Break ∧ P0 Continue ∧
+          (∀n. P0 (Raise n)) ∧ (∀l. P0 (Return l)) ∧
+          (∀m n e. P0 (ShMem m n e)) ∧ P0 Tick ∧ (∀p. P0 p ⇒ P0 (Mark p)) ∧
+          P0 Fail ∧ (∀n n0. P0 (LocValue n n0)) ∧
+          (∀ $o. P1 $o ⇒ ∀l o0 o1. P0 (Call o1 o0 l $o)) ∧
+          (∀m n n0 n1 n2 s. P0 (FFI m n n0 n1 n2 s)) ∧ P1 NONE ∧
+          (∀p. P2 p ⇒ P1 (SOME p)) ∧ (∀p. P3 p ⇒ ∀n. P2 (n,p)) ∧
+          (∀p p0. P0 p ∧ P4 p0 ⇒ P3 (p,p0)) ∧ (∀p. P0 p ⇒ ∀s. P4 (p,s)) ⇒
+          (∀p. P0 p) ∧ (∀ $o. P1 $o) ∧ (∀p. P2 p) ∧ (∀p. P3 p) ∧ ∀p. P4 p
+   
+   [prog_nchotomy]  Theorem
+      
+      ⊢ ∀pp.
+          pp = Skip ∨ (∃n e. pp = Assign n e) ∨
+          (∃l p l0. pp = Primitive l p l0) ∨ (∃l. pp = Arith l) ∨
+          (∃e n. pp = Store e n) ∨ (∃c e. pp = SetGlobal c e) ∨
+          (∃n n0. pp = Load32 n n0) ∨ (∃n n0. pp = LoadByte n n0) ∨
+          (∃n n0. pp = Store32 n n0) ∨ (∃n n0. pp = StoreByte n n0) ∨
+          (∃p p0. pp = Seq p p0) ∨ (∃c n r p p0 s. pp = If c n r p p0 s) ∨
+          (∃s0 p s. pp = Loop s0 p s) ∨ pp = Break ∨ pp = Continue ∨
+          (∃n. pp = Raise n) ∨ (∃l. pp = Return l) ∨
+          (∃m n e. pp = ShMem m n e) ∨ pp = Tick ∨ (∃p. pp = Mark p) ∨
+          pp = Fail ∨ (∃n n0. pp = LocValue n n0) ∨
+          (∃o1 o0 l $o. pp = Call o1 o0 l $o) ∨
+          ∃m n n0 n1 n2 s. pp = FFI m n n0 n1 n2 s
+   
+   

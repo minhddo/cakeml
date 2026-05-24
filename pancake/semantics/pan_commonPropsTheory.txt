@@ -1,0 +1,307 @@
+[pan_common] Parent theory of "pan_commonProps"
+   
+   [ctxt_max_def]  Definition
+      
+      ⊢ ∀n fm.
+          ctxt_max n fm ⇔
+          0 ≤ n ∧
+          ∀v a xs. FLOOKUP fm v = SOME (a,xs) ⇒ ∀x. MEM x xs ⇒ x ≤ n
+   
+   [no_overlap_def]  Definition
+      
+      ⊢ ∀fm.
+          no_overlap fm ⇔
+          (∀x a xs. FLOOKUP fm x = SOME (a,xs) ⇒ ALL_DISTINCT xs) ∧
+          ∀x y a b xs ys.
+            FLOOKUP fm x = SOME (a,xs) ∧ FLOOKUP fm y = SOME (b,ys) ∧
+            ¬DISJOINT (set xs) (set ys) ⇒
+            x = y
+   
+   [MAX_LIST_add_not_mem]  Theorem
+      
+      ⊢ ∀xs. ¬MEM (MAX_LIST xs + 1) xs
+   
+   [MAX_LIST_i_genlist]  Theorem
+      
+      ⊢ ∀n. MAX_LIST (GENLIST I n) = n − 1
+   
+   [all_distinct_drop]  Theorem
+      
+      ⊢ ∀ns n. ALL_DISTINCT ns ∧ n ≤ LENGTH ns ⇒ ALL_DISTINCT (DROP n ns)
+   
+   [all_distinct_el_fst_same_eq]  Theorem
+      
+      ⊢ ∀xs n n' x y y'.
+          ALL_DISTINCT (MAP FST xs) ∧ n < LENGTH xs ∧ n' < LENGTH xs ∧
+          xs❲n❳ = (x,y) ∧ xs❲n'❳ = (x,y') ⇒
+          n = n'
+   
+   [all_distinct_flookup_all_distinct]  Theorem
+      
+      ⊢ no_overlap fm ∧ FLOOKUP fm x = SOME (y,zs) ⇒ ALL_DISTINCT zs
+   
+   [all_distinct_take]  Theorem
+      
+      ⊢ ∀ns n. ALL_DISTINCT ns ∧ n ≤ LENGTH ns ⇒ ALL_DISTINCT (TAKE n ns)
+   
+   [all_distinct_take_frop_disjoint]  Theorem
+      
+      ⊢ ∀ns n.
+          ALL_DISTINCT ns ∧ n ≤ LENGTH ns ⇒
+          DISJOINT (set (TAKE n ns)) (set (DROP n ns))
+   
+   [disjoint_drop_take_sum]  Theorem
+      
+      ⊢ ∀n m p ns.
+          ALL_DISTINCT ns ⇒
+          DISJOINT (set (TAKE p (DROP (n + m) ns))) (set (TAKE n ns))
+   
+   [disjoint_not_mem_el]  Theorem
+      
+      ⊢ ∀xs ys n.
+          DISJOINT (set xs) (set ys) ∧ n < LENGTH xs ⇒ ¬MEM xs❲n❳ ys
+   
+   [disjoint_take_drop_sum]  Theorem
+      
+      ⊢ ∀n m p ns.
+          ALL_DISTINCT ns ⇒
+          DISJOINT (set (TAKE n ns)) (set (TAKE p (DROP (n + m) ns)))
+   
+   [distinct_lists_append]  Theorem
+      
+      ⊢ ALL_DISTINCT (xs ++ ys) ⇒ distinct_lists xs ys
+   
+   [distinct_lists_append_intro]  Theorem
+      
+      ⊢ distinct_lists xs ys ∧ distinct_lists xs zs ⇒
+        distinct_lists xs (ys ++ zs)
+   
+   [distinct_lists_commutes]  Theorem
+      
+      ⊢ distinct_lists xs ys ⇔ distinct_lists ys xs
+   
+   [distinct_lists_cons]  Theorem
+      
+      ⊢ distinct_lists (ns ++ xs) (ys ++ zs) ⇒ distinct_lists xs zs
+   
+   [distinct_lists_simp_cons]  Theorem
+      
+      ⊢ distinct_lists xs (y::ys) ⇒ distinct_lists xs ys
+   
+   [domsub_commutes_fupdate]  Theorem
+      
+      ⊢ ∀xs ys fm x.
+          ¬MEM x xs ∧ LENGTH xs = LENGTH ys ⇒
+          (fm |++ ZIP (xs,ys)) \\ x = fm \\ x |++ ZIP (xs,ys)
+   
+   [el_pair_map_fst_el]  Theorem
+      
+      ⊢ ∀xs n x y z. n < LENGTH xs ∧ xs❲n❳ = (x,y,z) ⇒ x = (MAP FST xs)❲n❳
+   
+   [el_reduc_tl]  Theorem
+      
+      ⊢ ∀l n. 0 < n ∧ n < LENGTH l ⇒ l❲n❳ = (TL l)❲n − 1❳
+   
+   [flookup_fupdate_zip_not_mem]  Theorem
+      
+      ⊢ ∀xs ys f n.
+          LENGTH xs = LENGTH ys ∧ ¬MEM n xs ⇒
+          FLOOKUP (f |++ ZIP (xs,ys)) n = FLOOKUP f n
+   
+   [fm_empty_zip_alist]  Theorem
+      
+      ⊢ ∀xs ys.
+          LENGTH xs = LENGTH ys ∧ ALL_DISTINCT xs ⇒
+          FEMPTY |++ ZIP (xs,ys) = alist_to_fmap (ZIP (xs,ys))
+   
+   [fm_empty_zip_flookup]  Theorem
+      
+      ⊢ ∀xs ys x y.
+          LENGTH xs = LENGTH ys ∧ ALL_DISTINCT xs ∧
+          FLOOKUP (FEMPTY |++ ZIP (xs,ys)) x = SOME y ⇒
+          ∃n. n < LENGTH xs ∧ (ZIP (xs,ys))❲n❳ = (x,y)
+   
+   [fm_empty_zip_flookup_el]  Theorem
+      
+      ⊢ ∀xs ys zs n x.
+          ALL_DISTINCT xs ∧ LENGTH xs = LENGTH ys ∧ LENGTH ys = LENGTH zs ∧
+          n < LENGTH xs ∧ xs❲n❳ = x ⇒
+          FLOOKUP (FEMPTY |++ ZIP (xs,ZIP (ys,zs))) x = SOME (ys❲n❳,zs❲n❳)
+   
+   [fm_multi_update]  Theorem
+      
+      ⊢ ∀xs ys a b c d fm.
+          ¬MEM a xs ∧ ¬MEM c xs ∧ a ≠ c ∧ LENGTH xs = LENGTH ys ⇒
+          fm |++ ((a,b)::(c,d)::ZIP (xs,ys)) |++ ((a,b)::ZIP (xs,ys)) =
+          fm |++ ((a,b)::(c,d)::ZIP (xs,ys))
+   
+   [fm_update_diff_vars]  Theorem
+      
+      ⊢ a ≠ b ⇒ fm⟨b ↦ b''; a ↦ a'; b ↦ b'; a ↦ a'⟩ = fm⟨b ↦ b''; a ↦ a'⟩
+   
+   [fm_zip_append_take_drop]  Theorem
+      
+      ⊢ ∀xs ys zs f.
+          ALL_DISTINCT xs ∧ LENGTH xs = LENGTH (ys ++ zs) ⇒
+          f |++ ZIP (xs,ys ++ zs) =
+          f |++ ZIP (TAKE (LENGTH ys) xs,ys) |++
+          ZIP (DROP (LENGTH ys) xs,zs)
+   
+   [fmap_to_alist_eq_fm]  Theorem
+      
+      ⊢ ∀fm. FEMPTY |++ MAP (λ(x,y). (x,y)) (fmap_to_alist fm) = fm
+   
+   [fupdate_flookup_zip_elim]  Theorem
+      
+      ⊢ ∀xs ys zs as x.
+          FLOOKUP (FEMPTY |++ ZIP (xs,ys)) x = NONE ∧
+          LENGTH zs = LENGTH as ∧ LENGTH xs = LENGTH ys ∧ ALL_DISTINCT xs ⇒
+          FLOOKUP (FEMPTY |++ ZIP (xs,ys) |++ ZIP (zs,as)) x =
+          FLOOKUP (FEMPTY |++ ZIP (zs,as)) x
+   
+   [genlist_distinct_max]  Theorem
+      
+      ⊢ ∀n ys m.
+          (∀y. MEM y ys ⇒ y ≤ m) ⇒
+          distinct_lists (GENLIST (λx. SUC x + m) n) ys
+   
+   [genlist_distinct_max']  Theorem
+      
+      ⊢ ∀n ys m p.
+          (∀y. MEM y ys ⇒ y ≤ m) ⇒
+          distinct_lists (GENLIST (λx. SUC x + (m + p)) n) ys
+   
+   [lookup_some_el]  Theorem
+      
+      ⊢ ∀xs n x.
+          lookup n (fromAList xs) = SOME x ⇒
+          ∃m. m < LENGTH xs ∧ xs❲m❳ = (n,x)
+   
+   [map_append_eq_drop]  Theorem
+      
+      ⊢ ∀xs ys zs f. MAP f xs = ys ++ zs ⇒ MAP f (DROP (LENGTH ys) xs) = zs
+   
+   [map_flookup_fupdate_zip_not_mem]  Theorem
+      
+      ⊢ ∀xs ys f n.
+          distinct_lists xs ys ∧ LENGTH xs = LENGTH zs ⇒
+          MAP (FLOOKUP (f |++ ZIP (xs,zs))) ys = MAP (FLOOKUP f) ys
+   
+   [map_some_the_map]  Theorem
+      
+      ⊢ ∀xs ys f. MAP f xs = MAP SOME ys ⇒ MAP (λn. THE (f n)) xs = ys
+   
+   [map_the_some_cancel]  Theorem
+      
+      ⊢ ∀xs. MAP (THE ∘ SOME) xs = xs
+   
+   [max_foldr_lt]  Theorem
+      
+      ⊢ ∀xs x n m. MEM x xs ∧ n ≤ x ∧ 0 < m ⇒ x < FOLDR MAX n xs + m
+   
+   [max_set_MAX_LIST]  Theorem
+      
+      ⊢ ∀xs. MAX_SET (set xs) = MAX_LIST xs
+   
+   [max_set_count_length]  Theorem
+      
+      ⊢ ∀n. MAX_SET (count n) = n − 1
+   
+   [no_overlap_flookup_distinct]  Theorem
+      
+      ⊢ no_overlap fm ∧ x ≠ y ∧ FLOOKUP fm x = SOME (a,xs) ∧
+        FLOOKUP fm y = SOME (b,ys) ⇒
+        distinct_lists xs ys
+   
+   [not_mem_fst_zip_flookup_empty]  Theorem
+      
+      ⊢ ∀xs ys x.
+          ¬MEM x xs ∧ ALL_DISTINCT xs ∧ LENGTH xs = LENGTH ys ⇒
+          FLOOKUP (FEMPTY |++ ZIP (xs,ys)) x = NONE
+   
+   [opt_mmap_disj_zip_flookup]  Theorem
+      
+      ⊢ ∀xs f ys zs.
+          distinct_lists xs ys ∧ LENGTH xs = LENGTH zs ⇒
+          OPT_MMAP (FLOOKUP (f |++ ZIP (xs,zs))) ys =
+          OPT_MMAP (FLOOKUP f) ys
+   
+   [opt_mmap_el]  Theorem
+      
+      ⊢ ∀l f x n. OPT_MMAP f l = SOME x ∧ n < LENGTH l ⇒ f l❲n❳ = SOME x❲n❳
+   
+   [opt_mmap_eq_some]  Theorem
+      
+      ⊢ ∀xs f ys. OPT_MMAP f xs = SOME ys ⇔ MAP f xs = MAP SOME ys
+   
+   [opt_mmap_flookup_update]  Theorem
+      
+      ⊢ OPT_MMAP (FLOOKUP fm) xs = SOME ys ∧ ¬MEM x xs ⇒
+        OPT_MMAP (FLOOKUP fm⟨x ↦ y⟩) xs = SOME ys
+   
+   [opt_mmap_length_eq]  Theorem
+      
+      ⊢ ∀l f n. OPT_MMAP f l = SOME n ⇒ LENGTH l = LENGTH n
+   
+   [opt_mmap_mem_defined]  Theorem
+      
+      ⊢ ∀l f m e n.
+          OPT_MMAP f l = SOME m ∧ MEM e l ∧ f e = SOME n ⇒ MEM n m
+   
+   [opt_mmap_mem_func]  Theorem
+      
+      ⊢ ∀l f n g. OPT_MMAP f l = SOME n ∧ MEM g l ⇒ ∃m. f g = SOME m
+   
+   [opt_mmap_opt_map]  Theorem
+      
+      ⊢ ∀l f n g.
+          OPT_MMAP f l = SOME n ⇒
+          OPT_MMAP (λa. OPTION_MAP g (f a)) l = SOME (MAP g n)
+   
+   [opt_mmap_some_eq_zip_flookup]  Theorem
+      
+      ⊢ ∀xs f ys.
+          ALL_DISTINCT xs ∧ LENGTH xs = LENGTH ys ⇒
+          OPT_MMAP (FLOOKUP (f |++ ZIP (xs,ys))) xs = SOME ys
+   
+   [set_eq_membership]  Theorem
+      
+      ⊢ a = b ∧ x ∈ a ⇒ x ∈ b
+   
+   [subspt_insert]  Theorem
+      
+      ⊢ ∀p n. subspt p (insert n () p)
+   
+   [subspt_right_insert_subspt]  Theorem
+      
+      ⊢ ∀p q n. subspt p q ⇒ subspt p (insert n () q)
+   
+   [subspt_same_insert_cancel]  Theorem
+      
+      ⊢ ∀p q n m.
+          subspt p q ⇒
+          subspt (insert n () (insert m () (insert n () p)))
+            (insert m () (insert n () q))
+   
+   [subspt_same_insert_subspt]  Theorem
+      
+      ⊢ ∀p q n. subspt p q ⇒ subspt (insert n () p) (insert n () q)
+   
+   [update_eq_zip_flookup]  Theorem
+      
+      ⊢ ∀xs f ys n.
+          ALL_DISTINCT xs ∧ LENGTH xs = LENGTH ys ∧ n < LENGTH xs ⇒
+          FLOOKUP (f |++ ZIP (xs,ys)) xs❲n❳ = SOME ys❲n❳
+   
+   [update_eq_zip_map_flookup]  Theorem
+      
+      ⊢ ∀xs f n m.
+          n < LENGTH xs ⇒
+          FLOOKUP (f |++ ZIP (xs,MAP (λx. m) xs)) xs❲n❳ = SOME m
+   
+   [zero_not_mem_genlist_offset]  Theorem
+      
+      ⊢ ∀t. LENGTH t ≤ 31 ⇒
+            ¬MEM 0w (MAP n2w (GENLIST (λi. i + 1) (LENGTH t)))
+   
+   

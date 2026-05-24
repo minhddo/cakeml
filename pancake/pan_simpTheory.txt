@@ -1,0 +1,409 @@
+[panLang] Parent theory of "pan_simp"
+   
+   [SmartSeq_def]  Definition
+      
+      ⊢ ∀p q. SmartSeq p q = if p = Skip then q else Seq p q
+   
+   [compile_def]  Definition
+      
+      ⊢ ∀p. compile p = (let p = seq_assoc Skip p in ret_to_tail p)
+   
+   [compile_prog_def]  Definition
+      
+      ⊢ ∀prog.
+          compile_prog prog =
+          MAP
+            (λdecl.
+                 case decl of
+                   Function fi =>
+                     Function (fi with body := compile fi.body)
+                 | Decl v7 v8 v9 => decl
+                 | Name v10 v11 => decl) prog
+   
+   [ret_to_tail_def_primitive]  Definition
+      
+      ⊢ ret_to_tail =
+        WFREC
+          (@R. WF R ∧ (∀e s v q. R q (Dec v s e q)) ∧
+               (∀p q. R q (Seq p q)) ∧ (∀q p. R p (Seq p q)) ∧
+               (∀p e q. R q (If e p q)) ∧ (∀q e p. R p (If e p q)) ∧
+               (∀e p. R p (While e p)) ∧
+               (∀args name rv exp v eid v2 ev ep.
+                  exp = SOME v ∧ v = (eid,v2) ∧ v2 = (ev,ep) ⇒
+                  R ep (Call (SOME (rv,exp)) name args)) ∧
+               ∀es e s v q. R q (DecCall v s e es q))
+          (λret_to_tail a.
+               case a of
+                 Skip => I Skip
+               | Dec v s e q => I (Dec v s e (ret_to_tail q))
+               | Assign v54 v55 v56 => I (Assign v54 v55 v56)
+               | Primitive v57 v58 v59 => I (Primitive v57 v58 v59)
+               | Store v60 v61 => I (Store v60 v61)
+               | Store32 v62 v63 => I (Store32 v62 v63)
+               | StoreByte v64 v65 => I (StoreByte v64 v65)
+               | Seq p q' =>
+                 I (seq_call_ret (Seq (ret_to_tail p) (ret_to_tail q')))
+               | If e' p' q'' =>
+                 I (If e' (ret_to_tail p') (ret_to_tail q''))
+               | While e'' p'' => I (While e'' (ret_to_tail p''))
+               | Break => I Break
+               | Continue => I Continue
+               | TailCall name args => I (TailCall name args)
+               | Call (SOME (rv,exp)) name args =>
+                 I
+                   (Call
+                      (SOME
+                         (rv,
+                          case exp of
+                            NONE => NONE
+                          | SOME (eid,ev,ep) =>
+                            SOME (eid,ev,ret_to_tail ep))) name args)
+               | DecCall v' s' e'³' es q'³' =>
+                 I (DecCall v' s' e'³' es (ret_to_tail q'³'))
+               | ExtCall v81 v82 v83 v84 v85 =>
+                 I (ExtCall v81 v82 v83 v84 v85)
+               | Raise v86 v87 => I (Raise v86 v87)
+               | Return v88 => I (Return v88)
+               | ShMemLoad v89 v90 v91 v92 => I (ShMemLoad v89 v90 v91 v92)
+               | ShMemStore v93 v94 v95 => I (ShMemStore v93 v94 v95)
+               | Tick => I Tick
+               | Annot v96 v97 => I (Annot v96 v97))
+   
+   [seq_call_ret_def]  Definition
+      
+      ⊢ ∀prog.
+          seq_call_ret prog =
+          case prog of
+            Skip => Skip
+          | Dec v48 v49 v50 v51 => Dec v48 v49 v50 v51
+          | Assign v52 v53 v54 => Assign v52 v53 v54
+          | Primitive v55 v56 v57 => Primitive v55 v56 v57
+          | Store v58 v59 => Store v58 v59
+          | Store32 v60 v61 => Store32 v60 v61
+          | StoreByte v62 v63 => StoreByte v62 v63
+          | Seq v64 Skip => Seq v64 Skip
+          | Seq v64 (Dec v144 v145 v146 v147) =>
+            Seq v64 (Dec v144 v145 v146 v147)
+          | Seq v64 (Assign v148 v149 v150) =>
+            Seq v64 (Assign v148 v149 v150)
+          | Seq v64 (Primitive v151 v152 v153) =>
+            Seq v64 (Primitive v151 v152 v153)
+          | Seq v64 (Store v154 v155) => Seq v64 (Store v154 v155)
+          | Seq v64 (Store32 v156 v157) => Seq v64 (Store32 v156 v157)
+          | Seq v64 (StoreByte v158 v159) => Seq v64 (StoreByte v158 v159)
+          | Seq v64 (Seq v160 v161) => Seq v64 (Seq v160 v161)
+          | Seq v64 (If v162 v163 v164) => Seq v64 (If v162 v163 v164)
+          | Seq v64 (While v165 v166) => Seq v64 (While v165 v166)
+          | Seq v64 Break => Seq v64 Break
+          | Seq v64 Continue => Seq v64 Continue
+          | Seq v64 (Call v167 v168 v169) => Seq v64 (Call v167 v168 v169)
+          | Seq v64 (DecCall v170 v171 v172 v173 v174) =>
+            Seq v64 (DecCall v170 v171 v172 v173 v174)
+          | Seq v64 (ExtCall v175 v176 v177 v178 v179) =>
+            Seq v64 (ExtCall v175 v176 v177 v178 v179)
+          | Seq v64 (Raise v180 v181) => Seq v64 (Raise v180 v181)
+          | Seq Skip (Return v182) => Seq Skip (Return v182)
+          | Seq (Dec v240 v241 v242 v243) (Return v182) =>
+            Seq (Dec v240 v241 v242 v243) (Return v182)
+          | Seq (Assign v244 v245 v246) (Return v182) =>
+            Seq (Assign v244 v245 v246) (Return v182)
+          | Seq (Primitive v247 v248 v249) (Return v182) =>
+            Seq (Primitive v247 v248 v249) (Return v182)
+          | Seq (Store v250 v251) (Return v182) =>
+            Seq (Store v250 v251) (Return v182)
+          | Seq (Store32 v252 v253) (Return v182) =>
+            Seq (Store32 v252 v253) (Return v182)
+          | Seq (StoreByte v254 v255) (Return v182) =>
+            Seq (StoreByte v254 v255) (Return v182)
+          | Seq (Seq v256 v257) (Return v182) =>
+            Seq (Seq v256 v257) (Return v182)
+          | Seq (If v258 v259 v260) (Return v182) =>
+            Seq (If v258 v259 v260) (Return v182)
+          | Seq (While v261 v262) (Return v182) =>
+            Seq (While v261 v262) (Return v182)
+          | Seq Break (Return v182) => Seq Break (Return v182)
+          | Seq Continue (Return v182) => Seq Continue (Return v182)
+          | Seq (Call v263 trgt args) (Return (Const v312)) =>
+            Seq (Call v263 trgt args) (Return (Const v312))
+          | Seq (TailCall trgt args) (Return (Var v313 rv2)) =>
+            Seq (TailCall trgt args) (Return (Var v313 rv2))
+          | Seq (StandAloneCall NONE trgt args) (Return (Var Local rv2)) =>
+            Seq (StandAloneCall NONE trgt args) (Return (Var Local rv2))
+          | Seq (AssignCall (Local,rv1) NONE trgt args)
+            (Return (Var Local rv2)) =>
+            if rv1 = rv2 then TailCall trgt args else prog
+          | Seq (AssignCall (Global,rv1) NONE trgt args)
+            (Return (Var Local rv2)) =>
+            Seq (AssignCall (Global,rv1) NONE trgt args)
+              (Return (Var Local rv2))
+          | Seq (Call (SOME (v340,SOME v343)) trgt args)
+            (Return (Var Local rv2)) =>
+            Seq (Call (SOME (v340,SOME v343)) trgt args)
+              (Return (Var Local rv2))
+          | Seq (Call (SOME v337) trgt args) (Return (Var Global rv2)) =>
+            Seq (Call (SOME v337) trgt args) (Return (Var Global rv2))
+          | Seq (Call v263 trgt args) (Return (RStruct v315)) =>
+            Seq (Call v263 trgt args) (Return (RStruct v315))
+          | Seq (Call v263 trgt args) (Return (RField v316 v317)) =>
+            Seq (Call v263 trgt args) (Return (RField v316 v317))
+          | Seq (Call v263 trgt args) (Return (NStruct v318 v319)) =>
+            Seq (Call v263 trgt args) (Return (NStruct v318 v319))
+          | Seq (Call v263 trgt args) (Return (NField v320 v321)) =>
+            Seq (Call v263 trgt args) (Return (NField v320 v321))
+          | Seq (Call v263 trgt args) (Return (Load v322 v323)) =>
+            Seq (Call v263 trgt args) (Return (Load v322 v323))
+          | Seq (Call v263 trgt args) (Return (Load32 v324)) =>
+            Seq (Call v263 trgt args) (Return (Load32 v324))
+          | Seq (Call v263 trgt args) (Return (LoadByte v325)) =>
+            Seq (Call v263 trgt args) (Return (LoadByte v325))
+          | Seq (Call v263 trgt args) (Return (Op v326 v327)) =>
+            Seq (Call v263 trgt args) (Return (Op v326 v327))
+          | Seq (Call v263 trgt args) (Return (Panop v328 v329)) =>
+            Seq (Call v263 trgt args) (Return (Panop v328 v329))
+          | Seq (Call v263 trgt args) (Return (Cmp v330 v331 v332)) =>
+            Seq (Call v263 trgt args) (Return (Cmp v330 v331 v332))
+          | Seq (Call v263 trgt args) (Return (Shift v333 v334 v335)) =>
+            Seq (Call v263 trgt args) (Return (Shift v333 v334 v335))
+          | Seq (Call v263 trgt args) (Return BaseAddr) =>
+            Seq (Call v263 trgt args) (Return BaseAddr)
+          | Seq (Call v263 trgt args) (Return TopAddr) =>
+            Seq (Call v263 trgt args) (Return TopAddr)
+          | Seq (Call v263 trgt args) (Return BytesInWord) =>
+            Seq (Call v263 trgt args) (Return BytesInWord)
+          | Seq (DecCall v266 v267 v268 v269 v270) (Return v182) =>
+            Seq (DecCall v266 v267 v268 v269 v270) (Return v182)
+          | Seq (ExtCall v271 v272 v273 v274 v275) (Return v182) =>
+            Seq (ExtCall v271 v272 v273 v274 v275) (Return v182)
+          | Seq (Raise v276 v277) (Return v182) =>
+            Seq (Raise v276 v277) (Return v182)
+          | Seq (Return v278) (Return v182) =>
+            Seq (Return v278) (Return v182)
+          | Seq (ShMemLoad v279 v280 v281 v282) (Return v182) =>
+            Seq (ShMemLoad v279 v280 v281 v282) (Return v182)
+          | Seq (ShMemStore v283 v284 v285) (Return v182) =>
+            Seq (ShMemStore v283 v284 v285) (Return v182)
+          | Seq Tick (Return v182) => Seq Tick (Return v182)
+          | Seq (Annot v286 v287) (Return v182) =>
+            Seq (Annot v286 v287) (Return v182)
+          | Seq v64 (ShMemLoad v183 v184 v185 v186) =>
+            Seq v64 (ShMemLoad v183 v184 v185 v186)
+          | Seq v64 (ShMemStore v187 v188 v189) =>
+            Seq v64 (ShMemStore v187 v188 v189)
+          | Seq v64 Tick => Seq v64 Tick
+          | Seq v64 (Annot v190 v191) => Seq v64 (Annot v190 v191)
+          | If v66 v67 v68 => If v66 v67 v68
+          | While v69 v70 => While v69 v70
+          | Break => Break
+          | Continue => Continue
+          | Call v71 v72 v73 => Call v71 v72 v73
+          | DecCall v74 v75 v76 v77 v78 => DecCall v74 v75 v76 v77 v78
+          | ExtCall v79 v80 v81 v82 v83 => ExtCall v79 v80 v81 v82 v83
+          | Raise v84 v85 => Raise v84 v85
+          | Return v86 => Return v86
+          | ShMemLoad v87 v88 v89 v90 => ShMemLoad v87 v88 v89 v90
+          | ShMemStore v91 v92 v93 => ShMemStore v91 v92 v93
+          | Tick => Tick
+          | Annot v94 v95 => Annot v94 v95
+   
+   [compile_prog_pmatch]  Theorem
+      
+      ⊢ compile_prog prog =
+        MAP
+          (λdecl.
+               pmatch decl of
+                 Function fi => Function (fi with body := compile fi.body)
+               | _ => decl) prog
+   
+   [ret_to_tail_def]  Theorem
+      
+      ⊢ ret_to_tail Skip = Skip ∧
+        (∀v s q e. ret_to_tail (Dec v s e q) = Dec v s e (ret_to_tail q)) ∧
+        (∀q p.
+           ret_to_tail (Seq p q) =
+           seq_call_ret (Seq (ret_to_tail p) (ret_to_tail q))) ∧
+        (∀q p e.
+           ret_to_tail (If e p q) = If e (ret_to_tail p) (ret_to_tail q)) ∧
+        (∀p e. ret_to_tail (While e p) = While e (ret_to_tail p)) ∧
+        (∀name args. ret_to_tail (TailCall name args) = TailCall name args) ∧
+        (∀rv name exp args.
+           ret_to_tail (Call (SOME (rv,exp)) name args) =
+           Call
+             (SOME
+                (rv,
+                 case exp of
+                   NONE => NONE
+                 | SOME (eid,ev,ep) => SOME (eid,ev,ret_to_tail ep))) name
+             args) ∧
+        (∀v s q es e.
+           ret_to_tail (DecCall v s e es q) =
+           DecCall v s e es (ret_to_tail q)) ∧
+        (∀v8 v7 v6. ret_to_tail (Assign v6 v7 v8) = Assign v6 v7 v8) ∧
+        (∀v9 v11 v10.
+           ret_to_tail (Primitive v9 v10 v11) = Primitive v9 v10 v11) ∧
+        (∀v13 v12. ret_to_tail (Store v12 v13) = Store v12 v13) ∧
+        (∀v15 v14. ret_to_tail (Store32 v14 v15) = Store32 v14 v15) ∧
+        (∀v17 v16. ret_to_tail (StoreByte v16 v17) = StoreByte v16 v17) ∧
+        ret_to_tail Break = Break ∧ ret_to_tail Continue = Continue ∧
+        (∀v37 v36 v35 v34 v33.
+           ret_to_tail (ExtCall v33 v34 v35 v36 v37) =
+           ExtCall v33 v34 v35 v36 v37) ∧
+        (∀v39 v38. ret_to_tail (Raise v38 v39) = Raise v38 v39) ∧
+        (∀v40. ret_to_tail (Return v40) = Return v40) ∧
+        (∀v44 v43 v42 v41.
+           ret_to_tail (ShMemLoad v41 v42 v43 v44) =
+           ShMemLoad v41 v42 v43 v44) ∧
+        (∀v47 v46 v45.
+           ret_to_tail (ShMemStore v45 v46 v47) = ShMemStore v45 v46 v47) ∧
+        ret_to_tail Tick = Tick ∧
+        ∀v49 v48. ret_to_tail (Annot v48 v49) = Annot v48 v49
+   
+   [ret_to_tail_ind]  Theorem
+      
+      ⊢ ∀P. P Skip ∧ (∀v s e q. P q ⇒ P (Dec v s e q)) ∧
+            (∀p q. P p ∧ P q ⇒ P (Seq p q)) ∧
+            (∀e p q. P p ∧ P q ⇒ P (If e p q)) ∧
+            (∀e p. P p ⇒ P (While e p)) ∧
+            (∀name args. P (TailCall name args)) ∧
+            (∀rv exp name args.
+               (∀v eid v2 ev ep.
+                  exp = SOME v ∧ v = (eid,v2) ∧ v2 = (ev,ep) ⇒ P ep) ⇒
+               P (Call (SOME (rv,exp)) name args)) ∧
+            (∀v s e es q. P q ⇒ P (DecCall v s e es q)) ∧
+            (∀v6 v7 v8. P (Assign v6 v7 v8)) ∧
+            (∀v9 v10 v11. P (Primitive v9 v10 v11)) ∧
+            (∀v12 v13. P (Store v12 v13)) ∧
+            (∀v14 v15. P (Store32 v14 v15)) ∧
+            (∀v16 v17. P (StoreByte v16 v17)) ∧ P Break ∧ P Continue ∧
+            (∀v33 v34 v35 v36 v37. P (ExtCall v33 v34 v35 v36 v37)) ∧
+            (∀v38 v39. P (Raise v38 v39)) ∧ (∀v40. P (Return v40)) ∧
+            (∀v41 v42 v43 v44. P (ShMemLoad v41 v42 v43 v44)) ∧
+            (∀v45 v46 v47. P (ShMemStore v45 v46 v47)) ∧ P Tick ∧
+            (∀v48 v49. P (Annot v48 v49)) ⇒
+            ∀v. P v
+   
+   [ret_to_tail_pmatch]  Theorem
+      
+      ⊢ ∀p. ret_to_tail p =
+            pmatch p of
+              Skip => Skip
+            | Dec v s e q => Dec v s e (ret_to_tail q)
+            | Seq q r => seq_call_ret (Seq (ret_to_tail q) (ret_to_tail r))
+            | If e q r => If e (ret_to_tail q) (ret_to_tail r)
+            | While e q => While e (ret_to_tail q)
+            | Call rtyp name args =>
+                   Call
+                     (case rtyp of
+                        NONE => NONE
+                      | SOME (rv,NONE) => SOME (rv,NONE)
+                      | SOME (rv,SOME (eid,ev,ep)) =>
+                        SOME (rv,SOME (eid,ev,ret_to_tail ep))) name args
+            | DecCall v s e es q => DecCall v s e es (ret_to_tail q)
+            | p => p
+   
+   [seq_assoc_def]  Theorem
+      
+      ⊢ (∀p. seq_assoc p Skip = p) ∧
+        (∀v s q p e.
+           seq_assoc p (Dec v s e q) =
+           SmartSeq p (Dec v s e (seq_assoc Skip q))) ∧
+        (∀r q p. seq_assoc p (Seq q r) = seq_assoc (seq_assoc p q) r) ∧
+        (∀r q p e.
+           seq_assoc p (If e q r) =
+           SmartSeq p (If e (seq_assoc Skip q) (seq_assoc Skip r))) ∧
+        (∀q p e.
+           seq_assoc p (While e q) =
+           SmartSeq p (While e (seq_assoc Skip q))) ∧
+        (∀p name args.
+           seq_assoc p (TailCall name args) =
+           SmartSeq p (TailCall name args)) ∧
+        (∀rv p name exp args.
+           seq_assoc p (Call (SOME (rv,exp)) name args) =
+           SmartSeq p
+             (Call
+                (case exp of
+                   NONE => SOME (rv,NONE)
+                 | SOME (eid,ev,ep) =>
+                   SOME (rv,SOME (eid,ev,seq_assoc Skip ep))) name args)) ∧
+        (∀v s q p es e.
+           seq_assoc p (DecCall v s e es q) =
+           SmartSeq p (DecCall v s e es (seq_assoc Skip q))) ∧
+        (∀v1 v0 p. seq_assoc p (Annot v0 v1) = p) ∧
+        (∀v9 v11 v10 p.
+           seq_assoc p (Assign v9 v10 v11) = SmartSeq p (Assign v9 v10 v11)) ∧
+        (∀v14 v13 v12 p.
+           seq_assoc p (Primitive v12 v13 v14) =
+           SmartSeq p (Primitive v12 v13 v14)) ∧
+        (∀v16 v15 p.
+           seq_assoc p (Store v15 v16) = SmartSeq p (Store v15 v16)) ∧
+        (∀v18 v17 p.
+           seq_assoc p (Store32 v17 v18) = SmartSeq p (Store32 v17 v18)) ∧
+        (∀v20 v19 p.
+           seq_assoc p (StoreByte v19 v20) = SmartSeq p (StoreByte v19 v20)) ∧
+        (∀p. seq_assoc p Break = SmartSeq p Break) ∧
+        (∀p. seq_assoc p Continue = SmartSeq p Continue) ∧
+        (∀v40 v39 v38 v37 v36 p.
+           seq_assoc p (ExtCall v36 v37 v38 v39 v40) =
+           SmartSeq p (ExtCall v36 v37 v38 v39 v40)) ∧
+        (∀v42 v41 p.
+           seq_assoc p (Raise v41 v42) = SmartSeq p (Raise v41 v42)) ∧
+        (∀v43 p. seq_assoc p (Return v43) = SmartSeq p (Return v43)) ∧
+        (∀v47 v46 v45 v44 p.
+           seq_assoc p (ShMemLoad v44 v45 v46 v47) =
+           SmartSeq p (ShMemLoad v44 v45 v46 v47)) ∧
+        (∀v50 v49 v48 p.
+           seq_assoc p (ShMemStore v48 v49 v50) =
+           SmartSeq p (ShMemStore v48 v49 v50)) ∧
+        ∀p. seq_assoc p Tick = SmartSeq p Tick
+   
+   [seq_assoc_ind]  Theorem
+      
+      ⊢ ∀P. (∀p. P p Skip) ∧ (∀p v s e q. P Skip q ⇒ P p (Dec v s e q)) ∧
+            (∀p q r. P p q ∧ P (seq_assoc p q) r ⇒ P p (Seq q r)) ∧
+            (∀p e q r. P Skip q ∧ P Skip r ⇒ P p (If e q r)) ∧
+            (∀p e q. P Skip q ⇒ P p (While e q)) ∧
+            (∀p name args. P p (TailCall name args)) ∧
+            (∀p rv exp name args.
+               (∀v eid v2 ev ep.
+                  exp = SOME v ∧ v = (eid,v2) ∧ v2 = (ev,ep) ⇒ P Skip ep) ⇒
+               P p (Call (SOME (rv,exp)) name args)) ∧
+            (∀p v s e es q. P Skip q ⇒ P p (DecCall v s e es q)) ∧
+            (∀p v0 v1. P p (Annot v0 v1)) ∧
+            (∀p v9 v10 v11. P p (Assign v9 v10 v11)) ∧
+            (∀p v12 v13 v14. P p (Primitive v12 v13 v14)) ∧
+            (∀p v15 v16. P p (Store v15 v16)) ∧
+            (∀p v17 v18. P p (Store32 v17 v18)) ∧
+            (∀p v19 v20. P p (StoreByte v19 v20)) ∧ (∀p. P p Break) ∧
+            (∀p. P p Continue) ∧
+            (∀p v36 v37 v38 v39 v40. P p (ExtCall v36 v37 v38 v39 v40)) ∧
+            (∀p v41 v42. P p (Raise v41 v42)) ∧
+            (∀p v43. P p (Return v43)) ∧
+            (∀p v44 v45 v46 v47. P p (ShMemLoad v44 v45 v46 v47)) ∧
+            (∀p v48 v49 v50. P p (ShMemStore v48 v49 v50)) ∧ (∀p. P p Tick) ⇒
+            ∀v v1. P v v1
+   
+   [seq_assoc_pmatch]  Theorem
+      
+      ⊢ ∀p prog.
+          seq_assoc p prog =
+          pmatch prog of
+            Skip => p
+          | Dec v s e q => SmartSeq p (Dec v s e (seq_assoc Skip q))
+          | Seq q r => seq_assoc (seq_assoc p q) r
+          | If e q r =>
+                 SmartSeq p (If e (seq_assoc Skip q) (seq_assoc Skip r))
+          | While e q => SmartSeq p (While e (seq_assoc Skip q))
+          | Call rtyp name args =>
+                 SmartSeq p
+                   (Call
+                      (case rtyp of
+                         NONE => NONE
+                       | SOME (rv,NONE) => SOME (rv,NONE)
+                       | SOME (rv,SOME (eid,ev,ep)) =>
+                         SOME (rv,SOME (eid,ev,seq_assoc Skip ep))) name
+                      args)
+          | DecCall v s e es q =>
+                 SmartSeq p (DecCall v s e es (seq_assoc Skip q))
+          | Annot _ _ => p
+          | q => SmartSeq p q
+   
+   
