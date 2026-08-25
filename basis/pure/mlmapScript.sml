@@ -79,6 +79,14 @@ Definition diff_def:
       | _    => F) t1)
 End
 
+Definition inter_def:
+  inter (Map cmp t1 : ('a, 'b) map) (Map _ t2 : ('a, 'c) map) =
+    Map cmp (balanced_map$filterWithKey (λk v.
+      case balanced_map$lookup cmp k t2 of
+      | NONE => F
+      | _    => T) t1)
+End
+
 Definition map_def:
   map f (Map cmp t) = Map cmp (balanced_map$map f t)
 End
@@ -567,6 +575,28 @@ Proof
   \\ first_assum (irule_at Any) \\ rw []
 QED
 
+Theorem filterWithKey_thm2:
+  map_ok t ⇒
+    map_ok (filterWithKey f t) ∧
+    to_fmap (filterWithKey f t) =
+    DRESTRICT (to_fmap t)
+          {k | (k,v) | FLOOKUP (to_fmap t) k = SOME v ∧ f k v}
+Proof
+  strip_tac
+  >> imp_res_tac filterWithKey_thm
+  >> fs [FDIFF_def, DRESTRICT_EQ_DRESTRICT, EXTENSION]
+  >> strip_tac
+  >> simp [GSPECIFICATION]
+  >> iff_tac >> rw [FDOM_FLOOKUP]
+  >- (
+    first_x_assum $ qspec_then `(x, v)` $ imp_res_tac o SRULE []
+    >> qexists `(x, v)` >> simp []
+  )
+  >> CCONTR_TAC
+  >> Cases_on `x'` >> Cases_on `x''` >> gvs[]
+QED
+
+
 Theorem lookup_thm:
    map_ok t ==> lookup t k = FLOOKUP (to_fmap t) k
 Proof
@@ -585,22 +615,50 @@ Proof
   \\ fs [FLOOKUP_DEF]
 QED
 
+(*
 Definition fdiff_fdom_def:
   fdiff_fdom f1 f2 = FDIFF f1 (FDOM f2)
 End
+*)
 
 Theorem diff_thm:
   map_ok f1 ∧ map_ok f2 ∧ cmp_of f1 = cmp_of f2 ⇒
     map_ok (diff f1 f2) ∧
     to_fmap (diff f1 f2) =
-    fdiff_fdom (to_fmap f1) (to_fmap f2)
+    FMINUS (to_fmap f1) (to_fmap f2)
 Proof
   Cases_on ‘f1’
   \\ Cases_on ‘f2’
-  \\ fs [fdiff_fdom_def,diff_def]
+  \\ fs [FMINUS_def,diff_def]
   \\ strip_tac
   \\ last_x_assum assume_tac
   \\ drule filterWithKey_thm
+  \\ simp [filterWithKey_def]
+  \\ rw []
+  \\ gvs [cmp_of_def]
+  \\ gvs [TO_FLOOKUP, FLOOKUP_SIMP, FUN_EQ_THM]
+  \\ gen_tac
+  \\ Cases_on ‘FLOOKUP (to_fmap (Map f b)) x’ \\ fs []
+  \\ rpt AP_THM_TAC
+  \\ AP_TERM_TAC
+  \\ imp_res_tac (lookup_thm |> INST_TYPE [beta |-> gamma])
+  \\ gvs [lookup_def]
+  \\ simp [EXTENSION, FORALL_PROD, GSPECIFICATION, EXISTS_PROD]
+  \\ CASE_TAC \\ gvs []
+QED
+
+Theorem inter_thm:
+  map_ok f1 ∧ map_ok f2 ∧ cmp_of f1 = cmp_of f2 ⇒
+    map_ok (inter f1 f2) ∧
+    to_fmap (inter f1 f2) =
+    FINTER (to_fmap f1) (to_fmap f2)
+Proof
+  Cases_on ‘f1’
+  \\ Cases_on ‘f2’
+  \\ fs [FINTER_def,inter_def]
+  \\ strip_tac
+  \\ last_x_assum assume_tac
+  \\ drule filterWithKey_thm2
   \\ simp [filterWithKey_def]
   \\ rw []
   \\ gvs [cmp_of_def]

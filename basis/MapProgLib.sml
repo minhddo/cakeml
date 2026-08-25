@@ -76,15 +76,24 @@ fun add_fmap_for_cmp th = let
   val th2a = INST i1 (INST_TYPE i2 th2)
   val funion_thm = MATCH_MP th1 th2a
   val _ = add_user_proved_v_thm funion_thm
-  (* fdiff_fdom *)
+  (* fminus *)
   val th1 = cj 6 ops_thm
   val th2 = cj 2 mlmap_op_v_thms
   val tm1 = th1 |> concl |> dest_imp |> fst |> rator |> rator
   val tm2 = th2 |> concl |> rator |> rator
   val (i1,i2) = match_term tm2 tm1
   val th2a = INST i1 (INST_TYPE i2 th2)
-  val fdiff_fdom_thm = MATCH_MP th1 th2a
-  val _ = add_user_proved_v_thm fdiff_fdom_thm
+  val fminus_thm = MATCH_MP th1 th2a
+  val _ = add_user_proved_v_thm fminus_thm
+  (* finter *)
+  val th1 = cj 7 ops_thm
+  val th2 = cj 6 mlmap_op_v_thms
+  val tm1 = th1 |> concl |> dest_imp |> fst |> rator |> rator
+  val tm2 = th2 |> concl |> rator |> rator
+  val (i1,i2) = match_term tm2 tm1
+  val th2a = INST i1 (INST_TYPE i2 th2)
+  val finter_thm = MATCH_MP th1 th2a
+  val _ = add_user_proved_v_thm finter_thm
   in () end;
 
 end
